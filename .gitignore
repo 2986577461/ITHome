@@ -1,0 +1,15 @@
+# 忽略 node_modules 文件夹
+node_modules/
+
+# 忽略构建产物文件夹（如 dist 或 build）
+dist/
+build/
+
+.vscode/
+# 忽略日志文件
+*.log
+
+# 忽略环境文件
+.env
+
+public/
