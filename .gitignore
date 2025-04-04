@@ -11,5 +11,3 @@ build/
 
 # 忽略环境文件
 .env
-
-public/
