@@ -1,6 +1,5 @@
-.target/
-.idea/
-.mvn/
-.gitignore
+./idea/
+./mvn/
+/target/
 ITHome.iml
 
