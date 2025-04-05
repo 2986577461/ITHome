@@ -31,6 +31,7 @@ const userStore = user_store();
         >学员管理</router-link
       >
       <router-link to="/harvest" class="nav-item">协会信息</router-link>
+      <router-link to="/ai-dialog" class="nav-item">AI对话</router-link>
       <router-link to="/join-us" class="nav-item">加入我们</router-link>
     </nav>
 

@@ -8,6 +8,10 @@ const router = createRouter({
       redirect: "/home",
     },
     {
+      path: "/ai-dialog",
+      component: () => import("@/views/ai-dialog/ai-dialog.vue"),
+    },
+    {
       path: "/home",
       component: () => import("@/views/home/home.vue"),
     },
