@@ -33,6 +33,8 @@ sa-token:
 server:
   port: 8080
 
+
+#修改为自己的apikey
 deepseek:
   base-url: "https://api.deepseek.com/v1/chat/completions"
-  api-key: "sk-fb71cefef3db4ee18ef8b417b60168c7"
+  api-key: "sk-3b47fc327129460b8c1771428c241911"

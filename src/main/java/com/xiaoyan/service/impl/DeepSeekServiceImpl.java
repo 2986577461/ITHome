@@ -1,5 +1,7 @@
 package com.xiaoyan.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaoyan.service.DeepSeekService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -9,6 +11,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 @Service
 public class DeepSeekServiceImpl implements DeepSeekService {
 
@@ -16,35 +23,45 @@ public class DeepSeekServiceImpl implements DeepSeekService {
     private String DEEPSEEK_API_URL;
 
     @Value("${deepseek.api-key}")
-    private  String API_KEY; // 替换为你的 API Key
+    private String API_KEY;
+
+    // 使用Jackson ObjectMapper处理JSON
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     public String send(String userMessage) {
-        System.out.println(userMessage);
         RestTemplate restTemplate = new RestTemplate();
 
-        // 构造请求头
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Authorization", "Bearer " + API_KEY);
+        // 1. 构造请求体对象
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "deepseek-chat");
 
-        // 构造请求体（类似 OpenAI 格式）
-        String requestBody = """
-            {
-                "model": "deepseek-chat",
-                "messages": [
-                    {"role": "user", "content": "%s"}
-                ]
-            }
-            """.formatted(userMessage);
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of(
+                "role", "user",
+                "content", userMessage
+        ));
+        requestBody.put("messages", messages);
 
-        // 发送 POST 请求
-        HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
-        ResponseEntity<String> response = restTemplate.postForEntity(
-                DEEPSEEK_API_URL,
-                request,
-                String.class
-        );
+        try {
+            // 2. 构造请求头
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Authorization", "Bearer " + API_KEY);
 
-        return response.getBody();
+            // 3. 将请求体转为JSON字符串
+            String requestBodyJson = mapper.writeValueAsString(requestBody);
+
+            // 4. 发送请求
+            HttpEntity<String> request = new HttpEntity<>(requestBodyJson, headers);
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    DEEPSEEK_API_URL,
+                    request,
+                    String.class
+            );
+
+            return response.getBody();
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("JSON处理失败", e);
+        }
     }
 }

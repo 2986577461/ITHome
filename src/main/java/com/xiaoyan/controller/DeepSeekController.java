@@ -16,7 +16,7 @@ public class DeepSeekController {
 
     @PostMapping
     @RequireLogin
-    public String send(String userMessage) {
+    public String send(@RequestBody String userMessage) {
         return deepSeekService.send(userMessage);
     }
 
