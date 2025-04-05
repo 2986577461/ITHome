@@ -32,3 +32,7 @@ sa-token:
 #默认8080端口号
 server:
   port: 8080
+
+deepseek:
+  base-url: "https://api.deepseek.com/v1/chat/completions"
+  api-key: "sk-fb71cefef3db4ee18ef8b417b60168c7"

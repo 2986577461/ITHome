@@ -1,7 +1,5 @@
 /.idea/
-/.mvn/
+.mvn/
 /target/
-ITHome.iml
-
-
+/ITHome.iml
 
