@@ -82,3 +82,8 @@ export const deleteArticle = async (id) => {
 export const logoutAxios = async () => {
   await axiosInstance.patch("users/logout");
 };
+
+export const aiDialog = async (userMessage) => {
+  const response = await axiosInstance.post("aiDialog", userMessage);
+  return response.data;
+};

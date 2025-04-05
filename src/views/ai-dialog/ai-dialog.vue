@@ -86,10 +86,10 @@
 </template>
 
 <script setup>
-import axios from "axios";
 import VueMarkdown from "vue-markdown-render";
 import { ref, onMounted, nextTick } from "vue";
 import Header from "@/components/Header.vue";
+import { aiDialog } from "@/axios/axios";
 
 const userInput = ref("");
 const messages = ref([]);
@@ -170,13 +170,11 @@ const sendMessage = async () => {
     loading.value = true;
     scrollToBottom();
 
-    const response = await axios.post("http://your-api-endpoint/chat", {
-      message: userMessage.content,
-    });
+    const response = await aiDialog(userMessage.content);
 
     messages.value.push({
       role: "assistant",
-      content: response.data.reply,
+      content: response.choices[0].message.content,
       timestamp: new Date(),
     });
   } catch (error) {
@@ -840,7 +838,7 @@ button:not(:disabled):hover .send-wave {
 }
 
 .user :deep(.markdown-content) {
-  color: white;
+  color: rgb(0, 0, 0);
 }
 
 .user :deep(.markdown-content code) {
