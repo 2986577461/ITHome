@@ -32,7 +32,7 @@ const updateImageUrls = async () => {
   // 等待所有图片的URL加载完成
   const promises = news.map(async (item) => {
     const imgData = await getImgForAxios(item.id);
-
+    console.log(imgData);
     // 将二进制数据转换为 Blob 对象
     const blob = new Blob([imgData], { type: "image/jpeg" }); // 假设是 JPEG 图片
     // 创建一个 URL 以便在 img 标签中使用
@@ -171,7 +171,7 @@ onMounted(async () => {
             {{ item.head }}
           </div>
           <div class="content">
-            {{ item.content }}
+            {{ item.releaseDate }} - {{ item.studentName + "上传" }}
           </div>
         </div>
       </div>

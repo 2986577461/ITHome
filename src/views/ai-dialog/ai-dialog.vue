@@ -171,10 +171,10 @@ const sendMessage = async () => {
     scrollToBottom();
 
     const response = await aiDialog(userMessage.content);
-
+    console.log("API Response:", response);
     messages.value.push({
       role: "assistant",
-      content: response.choices[0].message.content,
+      content: response,
       timestamp: new Date(),
     });
   } catch (error) {

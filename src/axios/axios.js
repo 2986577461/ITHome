@@ -2,21 +2,16 @@ import axiosInstance from "./axiosInit";
 
 export const login = async (loginMessage) => {
   const resp = await axiosInstance.post("users/login", loginMessage);
-  return resp.data;
+  return resp;
 };
 
-export const autoLogin = async () => {
-  const resp = await axiosInstance.post("users/autoLogin");
-  return resp.data;
-};
-
-export const selectByID = async (id) => {
-  const resp = await axiosInstance.post("users/" + id);
-  return resp.data;
+export const getCurrentUser = async () => {
+  const resp = await axiosInstance.get("users");
+  return resp;
 };
 
 export const selectAllMenber = async () => {
-  const resp = await axiosInstance.post("users");
+  const resp = await axiosInstance.get("users/all");
   return resp.data;
 };
 
@@ -26,7 +21,7 @@ export const removeStudents = async (students) => {
   return resp.data;
 };
 export const selectArticleCount = async () => {
-  const resp = await axiosInstance.get("articles/count");
+  const resp = await axiosInstance.get("articles");
   return resp.data;
 };
 
@@ -46,7 +41,7 @@ export const agreeNewcomer = async (id) => {
 };
 
 export const getAllArticle = async () => {
-  const resp = await axiosInstance.get("articles");
+  const resp = await axiosInstance.get("articles/all");
   return resp.data;
 };
 
@@ -67,11 +62,11 @@ export const selectResourceCount = async () => {
 
 export const uploadArticle = async (article) => {
   const resp = await axiosInstance.post("articles", article);
-  return resp.data;
+  return resp;
 };
-export const updateArticle = async (id, article) => {
-  const resp = await axiosInstance.put("articles/" + id, article);
-  return resp.data;
+export const updateArticle = async (article) => {
+  const resp = await axiosInstance.put("articles", article);
+  return resp;
 };
 
 export const deleteArticle = async (id) => {
@@ -79,11 +74,12 @@ export const deleteArticle = async (id) => {
   return resp.data;
 };
 
-export const logoutAxios = async () => {
-  await axiosInstance.patch("users/logout");
-};
-
 export const aiDialog = async (userMessage) => {
   const response = await axiosInstance.post("aiDialog", userMessage);
+  return response.data;
+};
+
+export const getUserList = async () => {
+  const response = await axiosInstance.get("chat");
   return response.data;
 };

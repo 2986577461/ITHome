@@ -41,6 +41,10 @@ const router = createRouter({
       path: "/uploadArticle",
       component: () => import("@/components/uploadArticle.vue"),
     },
+    {
+      path: "/chat",
+      component: () => import("@/views/chat/chat.vue"),
+    },
   ],
 });
 

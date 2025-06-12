@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
 import { user_store } from "./user";
-import { logoutAxios } from "../axios/axios";
 
 export const visible_store = defineStore("change", {
   state: () => ({
@@ -23,7 +22,7 @@ export const visible_store = defineStore("change", {
     async loginOrLogoutButton() {
       const userStore = user_store();
       if (userStore.condition) {
-        await logoutAxios();
+        localStorage.removeItem("token");
         location.reload();
       } else {
         this.onvisible();

@@ -1,8 +1,9 @@
 import axios from "axios";
+import { ElMessage } from "element-plus";
 
 const axiosInstance = axios.create({
   //部署到云服务器需要修改为其公网地址
-  // 例： baseURL: "http://1.14.65.37:8080/",
+  // baseURL: "http://192.168.112.1:8080/",
   baseURL: "http://localhost:8080/",
   // 设置请求超时时间60秒
   timeout: 60000,
@@ -12,6 +13,20 @@ const axiosInstance = axios.create({
   },
   //允许跨域携带cookie
   withCredentials: true,
+});
+// 响应拦截器
+axiosInstance.interceptors.response.use((response) => {
+  const res = response.data;
+  return res;
+});
+
+// 请求拦截器：自动添加Authorization头
+axiosInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token != null) {
+    config.headers.Authorization = token;
+  }
+  return config;
 });
 
 export default axiosInstance;

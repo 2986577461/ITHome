@@ -4,7 +4,7 @@ import { user_store } from "@/store/user.js";
 import { storeToRefs } from "pinia";
 import { ref } from "vue";
 import { ElLoading } from "element-plus";
-import { login, selectByID } from "@/axios/axios.js";
+import { login } from "@/axios/axios.js";
 import { ElMessage } from "element-plus";
 const visibleStore = visible_store();
 const userStore = user_store();
@@ -24,24 +24,26 @@ const handleSubmit = async (e) => {
     loadingInstance.close(); //关闭加载动画
 
     const loginMessage = {
-      id: studentID.value,
-      pswd: password.value,
+      username: studentID.value,
+      password: password.value,
     };
-    if (await login(loginMessage)) {
+    const resp = await login(loginMessage);
+    if (resp.code === 200) {
       ElMessage.success("登陆成功。");
-      const student = await selectByID(studentID.value);
-      //填充学号和姓名并将密码删除
+
+      // 1. 存储Token到本地存储
+      localStorage.setItem("token", resp.data.token);
 
       setTimeout(() => {
         visibleStore.offvisible();
         userStore.loginsuccess(
-          student.studentId,
-          student.name,
-          student.position,
-          student.academy
+          resp.data.studentId,
+          resp.data.name,
+          resp.data.position,
+          resp.data.academy
         );
       }, 600);
-    } else ElMessage.error("学号或密码错误。");
+    }
   }, 700);
 };
 </script>

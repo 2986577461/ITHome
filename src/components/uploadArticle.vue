@@ -81,13 +81,17 @@ import { ElMessage } from "element-plus";
 import { useRouter } from "vue-router";
 import { ElLoading } from "element-plus";
 import { article_store } from "@/store/updateArticle";
+import { user_store } from "@/store/user";
 const articleStore = article_store();
+const userStore = user_store();
 // 编辑器实例，必须用 shallowRef
 const editorRef = shallowRef();
 const router = useRouter();
 
 const article = reactive({
-  id: articleStore.id,
+  id: null,
+  author: userStore.name,
+  authorId: userStore.studentID,
   type: "c",
   head: "",
   content: "",
@@ -102,25 +106,27 @@ const upload = async () => {
     ElMessage.error("内容太多了，少写点吧");
     return;
   }
-
-  if (article.id) {
-    await updateArticle(article.id, article);
+  var resp;
+  if (article.id != null) {
+    console.log("触发");
+    resp = await updateArticle(article);
   } else {
-    await uploadArticle(article);
+    resp = await uploadArticle(article);
   }
-
-  ElMessage.success("文章更新成功!");
-  setTimeout(() => {
-    const load = ElLoading.service({
-      fullscreen: true,
-      text: "Loading",
-      background: "white",
-    });
+  if (resp.code == 200) {
+    ElMessage.success("文章上传成功!");
     setTimeout(() => {
-      router.push("/tech-study");
-      load.close();
+      const load = ElLoading.service({
+        fullscreen: true,
+        text: "Loading",
+        background: "white",
+      });
+      setTimeout(() => {
+        router.push("/tech-study");
+        load.close();
+      }, 700);
     }, 700);
-  }, 700);
+  }
 };
 
 // 配置工具栏，添加需要的工具按钮
@@ -159,12 +165,13 @@ const handleCreated = (editor) => {
   editorRef.value = editor; // 记录 editor 实例，重要！
 };
 
-onMounted(() => {
-  if (articleStore.id != 0) {
+onMounted(async () => {
+  if (articleStore.id != null) {
     setTimeout(() => {
       article.content = articleStore.content;
       article.type = articleStore.type;
       article.head = articleStore.head;
+      article.id = articleStore.id;
     }, 1);
   }
 });
@@ -188,7 +195,7 @@ onMounted(() => {
   top: 0;
   left: 0;
   right: 0;
-  height: 6px;
+  height: 3px;
   background: linear-gradient(
     90deg,
     #ff6b6b 0%,

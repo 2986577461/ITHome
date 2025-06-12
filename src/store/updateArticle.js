@@ -1,16 +1,15 @@
-import { uploadArticle } from "@/axios/axios";
 import { defineStore } from "pinia";
 
 export const article_store = defineStore("article_store", {
   state: () => ({
-    id: 0,
+    id: null,
     head: "",
     content: "",
     type: "",
   }),
   getters: {
     getText() {
-      return this.id == 0 ? "发布文章" : "保存文章";
+      return this.id == null ? "发布文章" : "保存文章";
     },
   },
   actions: {

@@ -35,15 +35,17 @@ const handleEdit = (item) => {
 };
 
 const issueArticle = () => {
-  articleStore.setArticle(0, "", "", "");
-  router.push("/uploadArticle");
-};
-const showMoreBt = (id) => {
-  return (
-    id == userStore.studentID ||
-    userStore.position == "会长" ||
-    userStore.position == "副会长"
-  );
+  articleStore.setArticle(null, "", "", "");
+
+  const load = ElLoading.service({
+    fullscreen: true,
+    text: "Loading",
+    background: "white",
+  });
+  setTimeout(() => {
+    router.push("/uploadArticle");
+    load.close();
+  }, 400);
 };
 
 const handleDelete = async () => {
@@ -173,7 +175,7 @@ onMounted(async () => {
             <el-dropdown
               trigger="hover"
               style="cursor: pointer"
-              v-show="showMoreBt(item.authorId)"
+              v-show="item.authorId == userStore.studentID"
             >
               <el-icon size="20"><MoreFilled /></el-icon>
               <template #dropdown>
@@ -203,24 +205,12 @@ onMounted(async () => {
             <span class="meta-item">
               <span class="article-type">{{ item.type }}</span>
             </span>
-            <span class="meta-item">{{
-              `作者：${item.authorId}${item.author}`
-            }}</span>
-            <span class="meta-item">
-              于 {{ `${item.releaseDate}--${item.releaseTime}` }} 发布
-            </span>
+            <span class="meta-item">{{ `作者：${item.author}` }}</span>
+            <span class="meta-item"> 于 {{ item.releaseDateTime }} 发布 </span>
           </div>
 
           <!-- 文章内容 -->
           <div class="article-content" v-html="item.content"></div>
-
-          <div class="articleMessage">
-            <span style="text-align: right"
-              >最后修改时间：{{
-                `${item.updateDate}--${item.updateTime}`
-              }}</span
-            >
-          </div>
         </div>
       </div>
     </div>
@@ -540,15 +530,6 @@ onMounted(async () => {
 
 .article-content a:hover {
   text-decoration: underline;
-}
-
-.articleMessage {
-  font-size: 14px;
-  color: #999;
-
-  height: 100px;
-  box-shadow: 0 -2px 2px rgba(221, 220, 220, 0.6);
-  padding: 0 50px;
 }
 
 .content-area {
