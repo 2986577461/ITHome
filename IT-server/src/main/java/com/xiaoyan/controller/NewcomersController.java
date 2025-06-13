@@ -3,6 +3,7 @@ package com.xiaoyan.controller;
 import com.xiaoyan.pojo.Newcomer;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.NewcomersService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import lombok.AllArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -14,6 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("newcomers")
 @AllArgsConstructor
+@Tag(name = "新学员管理")
 public class NewcomersController {
 
     private NewcomersService memberService;

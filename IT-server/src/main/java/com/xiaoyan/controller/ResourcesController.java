@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.ResourcesService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import java.util.List;
 @RestController
 @RequestMapping("resources")
 @AllArgsConstructor
+@Tag(name = "资料管理")
 public class ResourcesController {
 
     private ResourcesService resourcesService;

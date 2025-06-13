@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.2</version>
+        <version>3.2.2</version>
     </parent>
 
     <groupId>com.xiaoyan</groupId>
@@ -42,25 +42,6 @@
                 <version>3.5.7</version>
             </dependency>
 
-            <!-- Druid Starter -->
-            <dependency>
-                <groupId>com.alibaba</groupId>
-                <artifactId>druid-spring-boot-3-starter</artifactId>
-                <version>1.2.23</version>
-            </dependency>
-
-            <!-- Hibernate Validator -->
-            <dependency>
-                <groupId>org.hibernate</groupId>
-                <artifactId>hibernate-validator</artifactId>
-                <version>8.0.1.Final</version>
-            </dependency>
-            <dependency>
-                <groupId>org.hibernate.validator</groupId>
-                <artifactId>hibernate-validator-annotation-processor</artifactId>
-                <version>8.0.1.Final</version>
-            </dependency>
-
             <!-- Spring Boot Starter AOP -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
@@ -73,34 +54,6 @@
                 <groupId>com.mysql</groupId>
                 <artifactId>mysql-connector-j</artifactId>
                 <version>8.2.0</version>
-            </dependency>
-
-            <!-- Fastjson -->
-            <dependency>
-                <groupId>com.alibaba</groupId>
-                <artifactId>fastjson</artifactId>
-                <version>2.0.52</version>
-            </dependency>
-
-
-            <!-- JAXB API -->
-            <dependency>
-                <groupId>javax.xml.bind</groupId>
-                <artifactId>jaxb-api</artifactId>
-                <version>2.3.1</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-json</artifactId>
-                <version>3.4.2</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-configuration-processor</artifactId>
-                <version>3.1.0</version>
-                <optional>true</optional>
             </dependency>
 
             <dependency>
