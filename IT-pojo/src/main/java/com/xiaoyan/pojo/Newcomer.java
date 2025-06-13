@@ -2,8 +2,6 @@ package com.xiaoyan.pojo;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 import java.util.StringJoiner;
@@ -14,26 +12,19 @@ public class Newcomer {
     @TableId
     private Integer id;
 
-    @NotNull
     private String studentId;
 
-    @NotNull
     private String name;
 
-    @Pattern(regexp = "[男女]", message = "性别必须是'男'或'女'")
     private String sex;
 
-    @NotNull
     @TableField("class")
     private String claxx;
 
-    @NotNull
     private String academy;
 
-    @NotNull
     private String introduce;
 
-    @NotNull
     private String major;
 
 

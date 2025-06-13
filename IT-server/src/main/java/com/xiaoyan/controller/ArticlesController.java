@@ -4,6 +4,7 @@ import com.xiaoyan.dto.ArticleDTO;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.ArticlesService;
 import com.xiaoyan.vo.ArticleVO;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("articles")
 @Slf4j
+@Tag(name = "文章管理")
 public class ArticlesController {
 
     @Resource

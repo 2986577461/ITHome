@@ -3,3 +3,5 @@
 **/target/
 /ITHome.iml
 /IT-server/src/main/resources/application-dev.yml
+/docker-compose.yml
+/Dockerfile

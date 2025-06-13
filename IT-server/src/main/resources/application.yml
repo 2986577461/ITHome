@@ -1,32 +1,28 @@
 spring:
+  profiles:
+    active: dev
   servlet:
     multipart:
       max-file-size: 2048MB
       max-request-size: 2048MB
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql:///ITHome
-    username: root
-    password: jycv587.
+    driver-class-name: ${xiaoyan.datasource.driver-class-name}
+    url: jdbc:mysql://${xiaoyan.datasource.host}:${xiaoyan.datasource.port}/${xiaoyan.datasource.database}
+    username: ${xiaoyan.datasource.username}
+    password: ${xiaoyan.datasource.password}
 
 front-location:
-  request-api: http://localhost:3000,http://192.168.112.1,http://localhost
+  request-url: ${xiaoyan.front-location.request-url}
 
 
 resourses-root-directory:
-  path: "/Users/yuchao/Documents/resources"
-  #修改为你本地的路径或服务器的路径
-  #    path: "/home/ubuntu/resources/"
-
-#默认8080端口号
-server:
-  port: 8080
+  path: ${xiaoyan.resourses-root-directory.path}
 
 
 #修改为自己的apikey
 deepseek:
-  base-url: "https://api.deepseek.com/v1/chat/completions"
-  api-key: "sk-3b47fc327129460b8c1771428c241911"
+  base-url: ${xiaoyan.deepseek.base-url}
+  api-key: ${xiaoyan.deepseek.api-key}
 
 xiaoyan:
   jwt:
@@ -38,4 +34,16 @@ xiaoyan:
     token-name: authorization
 
 admit:
-  url: /users/login,/articles/all
+  url: ${xiaoyan.admit.url}
+
+springdoc:
+  api-docs:
+    # API文档接口的路径，默认为 /v3/api-docs
+    path: /v3/api-docs
+  swagger-ui:
+    # Swagger UI 界面的访问路径，默认为 /swagger-ui.html
+    path: /doc.html
+    # 是否在头部显示API文档接口地址的输入框
+    display-request-duration: true
+    # 默认展开深度，-1表示全部折叠，1表示展开所有tag
+    doc-expansion: -1

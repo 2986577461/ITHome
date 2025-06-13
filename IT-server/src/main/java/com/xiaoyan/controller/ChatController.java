@@ -5,6 +5,7 @@ import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.ChatService;
 import com.xiaoyan.vo.StudentDialogVO;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +18,7 @@ import java.util.List;
 @RequestMapping("chat")
 @Slf4j
 @AllArgsConstructor
+@Tag(name = "聊天管理")
 public class ChatController {
 
     private ChatService chatService;

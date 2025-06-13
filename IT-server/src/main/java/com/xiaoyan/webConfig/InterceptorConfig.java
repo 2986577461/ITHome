@@ -1,11 +1,17 @@
 package com.xiaoyan.webConfig;
 
 import com.xiaoyan.Interceptor.JwtTokenInterceptor;
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
@@ -14,7 +20,7 @@ public class InterceptorConfig implements WebMvcConfigurer {
     @Resource
     private JwtTokenInterceptor jwtTokenInterceptor;
 
-    @Value("${front-location.request-api}")
+    @Value("${front-location.request-url}")
     private String[] location;
 
     @Value("${admit.url}")
@@ -35,5 +41,4 @@ public class InterceptorConfig implements WebMvcConfigurer {
                 .allowCredentials(true) // 允许携带 Cookie
                 .maxAge(3600); // 预检请求缓存时间
     }
-
 }

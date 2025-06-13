@@ -11,6 +11,9 @@ import com.xiaoyan.utils.JwtUtil;
 import com.xiaoyan.vo.ITStudentVO;
 
 import com.xiaoyan.vo.StudentGovernVO;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -32,6 +35,7 @@ import java.util.Map;
 // 端口号相同即可
 @Slf4j
 @AllArgsConstructor
+@Tag(name = "用户管理")
 public class UsersController {
 
     private UsersService userService;
@@ -39,6 +43,7 @@ public class UsersController {
     private JwtProperties jwtProperties;
 
     @GetMapping
+    @Operation(summary = "返回所有用户")
     public Result<ITStudentVO> getUser() {
         ITStudentVO user = userService.getUser();
         return Result.success(user);
@@ -51,6 +56,7 @@ public class UsersController {
     }
 
     @PostMapping("login")
+    @Operation(summary = "根据ID查询用户", description = "需传入有效的用户ID")
     public Result<ITStudentVO> login(@RequestBody LoginDTO message) {
 
         log.info("请求登陆：{}", message);
