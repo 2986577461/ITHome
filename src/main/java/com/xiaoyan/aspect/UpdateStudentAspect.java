@@ -1,7 +1,7 @@
 package com.xiaoyan.aspect;
 
 
-import cn.dev33.satoken.stp.StpUtil;
+import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.UpdateStudent;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.UserMapper;
@@ -9,10 +9,9 @@ import jakarta.annotation.Resource;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
-import org.springframework.stereotype.Component;
 
 @Aspect
-@Component
+//@Component
 public class UpdateStudentAspect {
 
     @Resource
@@ -31,7 +30,7 @@ public class UpdateStudentAspect {
             if (userMapper.selectById(student.getStudentId()) != null)
                 throw new ParameterException("学号重复");
             else
-                StpUtil.logout(id);
+                BaseContext.removeCurrentId();
         }
     }
 }

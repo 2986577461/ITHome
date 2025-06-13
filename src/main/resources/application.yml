@@ -3,31 +3,20 @@ spring:
     multipart:
       max-file-size: 2048MB
       max-request-size: 2048MB
-
-
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql:///ITHome
     username: root
     password: jycv587.
 
-
 front-location:
-  request-api: http://localhost:3000
-
+  request-api: http://localhost:3000,http://192.168.112.1,http://localhost
 
 
 resourses-root-directory:
   path: "/Users/yuchao/Documents/resources"
   #修改为你本地的路径或服务器的路径
   #    path: "/home/ubuntu/resources/"
-
-
-sa-token:
-  auto-renew: true
-  timeout: 604800
-  token-style: cookie
-
 
 #默认8080端口号
 server:
@@ -38,3 +27,15 @@ server:
 deepseek:
   base-url: "https://api.deepseek.com/v1/chat/completions"
   api-key: "sk-3b47fc327129460b8c1771428c241911"
+
+xiaoyan:
+  jwt:
+    # 设置jwt签名加密时使用的秘钥
+    secret-key: itcast
+    # 设置jwt过期时间
+    ttl: 7200000000
+    # 设置前端传递过来的令牌名称
+    token-name: authorization
+
+admit:
+  url: /users/login,/articles/all

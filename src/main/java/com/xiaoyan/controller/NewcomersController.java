@@ -1,42 +1,44 @@
 package com.xiaoyan.controller;
 
-import com.xiaoyan.annotation.RequireAdmin;
 import com.xiaoyan.pojo.Newcomer;
+import com.xiaoyan.result.Result;
 import com.xiaoyan.service.NewcomersService;
 import jakarta.annotation.Resource;
+import lombok.AllArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.List;
 
 @RestController
 @RequestMapping("newcomers")
-@CrossOrigin
+@AllArgsConstructor
 public class NewcomersController {
 
-    @Resource
     private NewcomersService memberService;
 
     @DeleteMapping("{id}")
-    @RequireAdmin
-    public boolean refuseNewcomer(@PathVariable int id) {
-        return memberService.refuseNewcomer(id);
+    public Result<String> refuseNewcomer(@PathVariable int id) {
+        memberService.refuseNewcomer(id);
+        return Result.success();
     }
 
     @PutMapping("{id}")
-    @RequireAdmin
-    public boolean agreeNewcomer(@PathVariable int id) {
-        return memberService.agreeNewcomer(id);
+    public Result<String> agreeNewcomer(@PathVariable int id) {
+        memberService.agreeNewcomer(id);
+        return Result.success();
     }
 
     @PostMapping("/applyJoin")
-    boolean applyJoin(@RequestBody @Validated Newcomer newcomer) {
-        return memberService.applyJoin(newcomer);
+    public Result<String> applyJoin(@RequestBody @Validated Newcomer newcomer) {
+        memberService.applyJoin(newcomer);
+        return Result.success();
     }
 
     @PostMapping
-    @RequireAdmin
-    ArrayList<Newcomer> getnewcomers() {
-        return memberService.getAllnewcomer();
+    public Result<List<Newcomer>> getnewcomers() {
+        List<Newcomer> list = memberService.getAllnewcomer();
+        return Result.success(list);
     }
 }

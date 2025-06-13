@@ -8,53 +8,51 @@ import com.xiaoyan.mapper.UserMapper;
 import com.xiaoyan.pojo.ITStudent;
 import com.xiaoyan.pojo.Newcomer;
 import com.xiaoyan.service.NewcomersService;
-import jakarta.annotation.Resource;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.List;
 
 @Service
-public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper,Newcomer>
+@AllArgsConstructor
+public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
         implements NewcomersService {
 
-    @Resource
     private NewcomerMapper newcomerMapper;
 
-    @Resource
     private UserMapper userMapper;
 
     @Override
-    public boolean refuseNewcomer(int id) {
-       return this.removeById(id);
+    public void refuseNewcomer(int id) {
+        this.removeById(id);
     }
 
     @Override
     @Transactional // 开启事务
-    public boolean agreeNewcomer(int id)  {
+    public void agreeNewcomer(int id) {
         Newcomer newcomer = newcomerMapper.selectById(id);
         if (newcomer == null)
             throw new ParameterException("参数异常");
 
-        if(userMapper.selectById(newcomer.getStudentId())!=null)
+        if (userMapper.selectById(newcomer.getStudentId()) != null)
             throw new RuntimeException("学员重复申请！");
 
         newcomerMapper.deleteById(id);
 
-        return userMapper.insert(new ITStudent(newcomer))==1;
+        userMapper.insert(new ITStudent(newcomer));
     }
 
     @Override
-    public boolean applyJoin(Newcomer newcomer) {
-        if(userMapper.selectById(newcomer.getStudentId())==null)
-            return this.save(newcomer);
-       return false;
-
+    public void applyJoin(Newcomer newcomer) {
+        if (userMapper.selectById(newcomer.getStudentId()) == null)
+            this.save(newcomer);
     }
 
     @Override
-    public ArrayList<Newcomer> getAllnewcomer() {
-        return (ArrayList<Newcomer>) newcomerMapper.selectList(null);
+    public List<Newcomer> getAllnewcomer() {
+        return  newcomerMapper.selectList(null);
     }
 
 }

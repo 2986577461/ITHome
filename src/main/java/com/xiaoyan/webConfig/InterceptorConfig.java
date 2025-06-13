@@ -1,6 +1,6 @@
 package com.xiaoyan.webConfig;
 
-import com.xiaoyan.Interceptor.NewcomersInterceptor;
+import com.xiaoyan.Interceptor.JwtTokenInterceptor;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -12,20 +12,26 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class InterceptorConfig implements WebMvcConfigurer {
 
     @Resource
-    NewcomersInterceptor newcomersInterceptor;
+    private JwtTokenInterceptor jwtTokenInterceptor;
 
     @Value("${front-location.request-api}")
-    private String location;
+    private String[] location;
+
+    @Value("${admit.url}")
+    private String[] admitURL;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-       registry.addInterceptor(newcomersInterceptor)
-               .addPathPatterns("/newcomers");
+        registry.addInterceptor(jwtTokenInterceptor)
+                .addPathPatterns("/**")
+                .excludePathPatterns(admitURL);
     }
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**") // 允许所有路径
                 .allowedOrigins(location) // 允许的前端地址
+                .allowedMethods("*")
                 .allowCredentials(true) // 允许携带 Cookie
                 .maxAge(3600); // 预检请求缓存时间
     }

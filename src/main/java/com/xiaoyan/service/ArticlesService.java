@@ -1,23 +1,21 @@
 package com.xiaoyan.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
-import com.xiaoyan.dto.ArticleContent;
-import com.xiaoyan.pojo.Article;
+import com.xiaoyan.dto.ArticleDTO;
+import com.xiaoyan.vo.ArticleVO;
 import org.springframework.stereotype.Service;
-import org.springframework.validation.annotation.Validated;
 
-import java.util.ArrayList;
+import java.util.List;
 
 @Service
-public interface ArticlesService extends IService<Article> {
+public interface ArticlesService {
 
-    int getCount();
+    Integer getCount();
 
-    boolean upload( @Validated Article articleJson);
+    void upload(ArticleDTO articleDTO);
 
-    ArrayList<Article> getAll();
+    List<ArticleVO> getAll();
 
-    void update(int id, @Validated ArticleContent articleContent);
+    void delete(Long id);
 
-    boolean delete(int id);
+    void update(ArticleDTO articleDTO);
 }

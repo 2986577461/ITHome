@@ -1,9 +1,9 @@
 package com.xiaoyan.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.ResourceContent;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ResourcesMapper;
@@ -28,13 +28,13 @@ import java.sql.Date;
 import java.sql.Time;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 
 
 @Service
-public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper,Resources>
+public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources>
         implements ResourcesService {
 
     @Value("${resourses-root-directory.path}")
@@ -86,13 +86,13 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper,Resources>
     }
 
     @Override
-    public int getCount() {
-        return (int) this.count();
+    public Long getCount() {
+        return this.count();
     }
 
     @Override
-    public ArrayList<Resources> getAll() {
-        return (ArrayList<Resources>) resourcesMapper.selectList(null);
+    public List<Resources> getList() {
+        return resourcesMapper.selectList(null);
     }
 
     @Override
@@ -113,13 +113,13 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper,Resources>
     }
 
     @Override
-    public boolean upload(String uploadResourceJson, MultipartFile file, MultipartFile cover) throws JsonProcessingException {
+    public void upload(String uploadResourceJson, MultipartFile file, MultipartFile cover) throws JsonProcessingException {
 
         ObjectMapper objectMapper = new ObjectMapper();
         ResourceContent resourceContent = objectMapper.
                 readValue(uploadResourceJson, ResourceContent.class);
 
-        ITStudent author = userMapper.selectById((String) StpUtil.getLoginId());
+        ITStudent author = userMapper.selectById(BaseContext.getCurrentId());
 
         Resources resources = new Resources();
 
@@ -152,8 +152,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper,Resources>
 // 上传文件
         this.uploadFile(file, cover, ID);
 
-        userMapper.addReourceCountByID((String) StpUtil.getLoginId());
-        return true;
+        userMapper.addReourceCountByID(BaseContext.getCurrentId());
     }
 
     @Override

@@ -3,17 +3,17 @@ package com.xiaoyan.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.xiaoyan.pojo.Newcomer;
 
-import java.util.ArrayList;
+import java.util.List;
 
 public interface NewcomersService extends IService<Newcomer> {
 
-    boolean refuseNewcomer(int id);
+    void refuseNewcomer(int id);
 
-    boolean agreeNewcomer(int id);
+    void agreeNewcomer(int id);
 
-    boolean applyJoin(Newcomer newcomer);
+    void applyJoin(Newcomer newcomer);
 
-    ArrayList<Newcomer> getAllnewcomer();
+    List<Newcomer> getAllnewcomer();
 
 
 }
