@@ -5,3 +5,4 @@
 /IT-server/src/main/resources/application-dev.yml
 /docker-compose.yml
 /Dockerfile
+.DS_Store
