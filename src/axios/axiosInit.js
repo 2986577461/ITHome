@@ -3,8 +3,9 @@ import { ElMessage } from "element-plus";
 
 const axiosInstance = axios.create({
   //部署到云服务器需要修改为其公网地址
-  // baseURL: "http://192.168.112.1:8080/",
-  baseURL: "http://localhost:8080/",
+  baseURL: "http://1.14.44.69:8080/",
+
+  // baseURL: "http://localhost:8080/",
   // 设置请求超时时间60秒
   timeout: 60000,
   headers: {
