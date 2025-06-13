@@ -2,5 +2,6 @@
 .mvn/
 **/target/
 /ITHome.iml
+src/main/resources/application-dev.yml
 
 
