@@ -56,7 +56,6 @@ public class UsersController {
     }
 
     @PostMapping("login")
-    @Operation(summary = "根据ID查询用户", description = "需传入有效的用户ID")
     public Result<ITStudentVO> login(@RequestBody LoginDTO message) {
 
         log.info("请求登陆：{}", message);

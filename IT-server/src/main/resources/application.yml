@@ -1,15 +1,20 @@
 spring:
   profiles:
     active: dev
-  servlet:
     multipart:
       max-file-size: 2048MB
       max-request-size: 2048MB
   datasource:
     driver-class-name: ${xiaoyan.datasource.driver-class-name}
-    url: jdbc:mysql://${xiaoyan.datasource.host}:${xiaoyan.datasource.port}/${xiaoyan.datasource.database}
+    url: jdbc:mysql://${xiaoyan.datasource.host}:${xiaoyan.datasource.port}/${xiaoyan.datasource.database}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&useUnicode=true&connectionCollation=utf8mb4_unicode_ci&zeroDateTimeBehavior=CONVERT_TO_NULL
     username: ${xiaoyan.datasource.username}
     password: ${xiaoyan.datasource.password}
+  data:
+    redis:
+      host: ${xiaoyan.redis.host}
+      port: ${xiaoyan.redis.port}
+      password: ${xiaoyan.redis.password}
+      database: ${xiaoyan.redis.database}
 
 front-location:
   request-url: ${xiaoyan.front-location.request-url}
@@ -47,3 +52,17 @@ springdoc:
     display-request-duration: true
     # 默认展开深度，-1表示全部折叠，1表示展开所有tag
     doc-expansion: -1
+
+server:
+  address: 0.0.0.0
+
+#mybatis-plus:
+#  configuration:
+#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 关键配置
+logging:
+  level:
+    com:
+      xiaoyan:
+        mapper: info
+        service: info
+        controller: info

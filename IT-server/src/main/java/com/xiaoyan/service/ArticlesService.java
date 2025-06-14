@@ -9,7 +9,7 @@ import java.util.List;
 @Service
 public interface ArticlesService {
 
-    Integer getCount();
+    Long getCount();
 
     void upload(ArticleDTO articleDTO);
 

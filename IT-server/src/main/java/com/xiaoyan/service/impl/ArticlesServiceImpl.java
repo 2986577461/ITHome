@@ -1,6 +1,7 @@
 package com.xiaoyan.service.impl;
 
 
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.ArticleDTO;
@@ -20,13 +21,14 @@ import java.util.List;
 
 @Service
 @AllArgsConstructor
-public class ArticlesServiceImpl implements ArticlesService {
+public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
+        implements ArticlesService {
 
     private ArticleMapper articleMapper;
 
     @Override
-    public Integer getCount() {
-        return articleMapper.getCount();
+    public Long getCount() {
+        return articleMapper.selectCount(null);
     }
 
 
@@ -42,12 +44,12 @@ public class ArticlesServiceImpl implements ArticlesService {
 
     @Override
     public List<ArticleVO> getAll() {
-        List<Article> articles = articleMapper.selectAll();
-        List<ArticleVO> articleVOS=new ArrayList<>();
+        List<Article> articles = articleMapper.selectList(null);
+        List<ArticleVO> articleVOS = new ArrayList<>();
 
         for (Article article : articles) {
             ArticleVO vo = new ArticleVO();
-            BeanUtils.copyProperties(article,vo);
+            BeanUtils.copyProperties(article, vo);
             articleVOS.add(vo);
         }
         articleVOS.sort(Comparator.comparing(ArticleVO::getReleaseDateTime));
@@ -69,7 +71,7 @@ public class ArticlesServiceImpl implements ArticlesService {
     @Override
     public void delete(Long id) {
         Article article = articleMapper.selectById(id);
-        if(article.getAuthorId()!=BaseContext.getCurrentId())
+        if (article.getAuthorId() != BaseContext.getCurrentId())
             throw new PositionException(MessageConstant.OLEY_DELETE_YOUR_OWN_ARTICLE);
 
         articleMapper.deleteById(id);

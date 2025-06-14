@@ -6,37 +6,31 @@
 
 <mapper namespace="com.xiaoyan.mapper.ArticleMapper">
 
-    <insert id="insert">
-        INSERT INTO article(type, head, content, author_id,
-                            author, release_date_time, update_date_time)
-            VALUE (#{type}, #{head}, #{content}, #{authorId}, #{author},
-                   #{releaseDateTime}, #{updateDateTime})
-    </insert>
-    <update id="updateById">
-        UPDATE article
-        <set>
-            <if test="author!=null">
-                author=#{author},
-            </if>
-            <if test="authorId!=null">
-                author_id=#{authorId},
-            </if>
-            <if test="type!=null">
-                type=#{type},
-            </if>
-            <if test="head!=null">
-                head=#{head},
-            </if>
-            <if test="content!=null">
-                content=#{content},
-            </if>
-            <if test="releaseDateTime!=null">
-                release_date_time=#{releaseDateTime},
-            </if>
-            <if test="updateDateTime!=null">
-                update_date_time=#{updateDateTime}
-            </if>
-        </set>
-        WHERE id=#{id}
-    </update>
+<!--    <update>-->
+<!--        UPDATE article-->
+<!--        <set>-->
+<!--            <if test="author!=null">-->
+<!--                author=#{author},-->
+<!--            </if>-->
+<!--            <if test="authorId!=null">-->
+<!--                author_id=#{authorId},-->
+<!--            </if>-->
+<!--            <if test="type!=null">-->
+<!--                type=#{type},-->
+<!--            </if>-->
+<!--            <if test="head!=null">-->
+<!--                head=#{head},-->
+<!--            </if>-->
+<!--            <if test="content!=null">-->
+<!--                content=#{content},-->
+<!--            </if>-->
+<!--            <if test="releaseDateTime!=null">-->
+<!--                release_date_time=#{releaseDateTime},-->
+<!--            </if>-->
+<!--            <if test="updateDateTime!=null">-->
+<!--                update_date_time=#{updateDateTime}-->
+<!--            </if>-->
+<!--        </set>-->
+<!--        WHERE id=#{id}-->
+<!--    </update>-->
 </mapper>
