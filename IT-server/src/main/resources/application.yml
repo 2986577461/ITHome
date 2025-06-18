@@ -41,17 +41,6 @@ xiaoyan:
 admit:
   url: ${xiaoyan.admit.url}
 
-springdoc:
-  api-docs:
-    # API文档接口的路径，默认为 /v3/api-docs
-    path: /v3/api-docs
-  swagger-ui:
-    # Swagger UI 界面的访问路径，默认为 /swagger-ui.html
-    path: /doc.html
-    # 是否在头部显示API文档接口地址的输入框
-    display-request-duration: true
-    # 默认展开深度，-1表示全部折叠，1表示展开所有tag
-    doc-expansion: -1
 
 server:
   address: 0.0.0.0

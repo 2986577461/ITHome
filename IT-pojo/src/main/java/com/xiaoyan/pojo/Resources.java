@@ -7,20 +7,18 @@ import lombok.Data;
 
 import java.sql.Time;
 import java.sql.Date;
+import java.time.LocalDateTime;
 
 
 @Data
 public class Resources {
-
-    @TableId
-    private Integer id;
+    private Long id;
     private String head;
     private String introduce;
     private String fileName;
     private String studentName;
-    private String studentId;
-    private Date releaseDate;
-    private Time releaseTime;
+    private Long studentId;
+    private LocalDateTime releaseDateTime;
 
 
     public Resources() {

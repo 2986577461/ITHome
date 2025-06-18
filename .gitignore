@@ -6,3 +6,4 @@
 /docker-compose.yml
 /Dockerfile
 .DS_Store
+/run.sh

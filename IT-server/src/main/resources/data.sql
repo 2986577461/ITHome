@@ -2,7 +2,7 @@
 
 CREATE TABLE it_student
 (
-    student_id     VARCHAR(20) PRIMARY KEY,
+    id     bigint PRIMARY KEY,
     name           VARCHAR(20)      NOT NULL,
     sex            ENUM ('男','女') NOT NULL,
     major          VARCHAR(20)      NOT NULL,
@@ -13,10 +13,10 @@ CREATE TABLE it_student
     resource_count int default 0,
     password       VARCHAR(100)     NOT NULL
 )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-INSERT INTO it_student(student_id, name, sex, major, class, academy, position, article_count, resource_count, password)
+INSERT INTO it_student(id, name, sex, major, class, academy, position, article_count, resource_count, password)
 values ('1', '测试', '1', '软件技术', '232班', '电子与信息', '副会长', 0, 0,
         '$2a$10$8OVqXgG4u2RNTSFD0NB2KOBRn8ZAv3EX4nxFQfmJUcqRLRsAoeVYO');
-INSERT INTO it_student(student_id, name, sex, major, class, academy, position, article_count, resource_count, password)
+INSERT INTO it_student(id, name, sex, major, class, academy, position, article_count, resource_count, password)
 VALUE ('202300573', '超超', '1', '软件技术', '232班', '电子与信息', '会长', 0, 0,
        '$2a$10$8OVqXgG4u2RNTSFD0NB2KOBRn8ZAv3EX4nxFQfmJUcqRLRsAoeVYO');
 
@@ -28,8 +28,7 @@ CREATE TABLE resources
     file_name    varchar(200)  not null,
     student_name varchar(20)   not null,
     student_id   varchar(40)   not null,
-    release_date date          not null,
-    release_time time          not null
+    release_date_time datetime not null
 )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;;
 CREATE TABLE article
 (

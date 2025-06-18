@@ -29,9 +29,7 @@ public class DeepSeekServiceImpl implements DeepSeekService {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     public String send(String userMessage) {
-        System.out.println(userMessage);
         RestTemplate restTemplate = new RestTemplate();
-
         // 1. 构造请求体对象
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", "deepseek-chat");

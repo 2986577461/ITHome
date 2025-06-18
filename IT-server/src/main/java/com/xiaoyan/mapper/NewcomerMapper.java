@@ -3,8 +3,12 @@ package com.xiaoyan.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.xiaoyan.pojo.Newcomer;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Select;
 
 
 @Mapper
 public interface NewcomerMapper extends BaseMapper<Newcomer> {
+
+    @Select("select * from newcomer where student_id=#{studentId};")
+    Newcomer selectByStudentId(Long studentId);
 }

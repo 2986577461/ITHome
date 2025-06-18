@@ -8,9 +8,11 @@ import com.xiaoyan.dto.ResourceContent;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.UserMapper;
-import com.xiaoyan.pojo.ITStudent;
+import com.xiaoyan.pojo.Student;
 import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.service.ResourcesService;
+import com.xiaoyan.vo.ResourcesVO;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -24,10 +26,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.sql.Date;
-import java.sql.Time;
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
@@ -68,7 +68,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public void uploadFile(MultipartFile file, MultipartFile cover, int id) {
+    public void uploadFile(MultipartFile file, MultipartFile cover, Long id) {
 
         File resource = new File(filePath + "/" + id);
         File fileDirectory = new File(resource, "file");
@@ -91,8 +91,15 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public List<Resources> getList() {
-        return resourcesMapper.selectList(null);
+    public List<ResourcesVO> getList() {
+        List<Resources> resources = resourcesMapper.selectList(null);
+        List<ResourcesVO> list = new ArrayList<>();
+        for (Resources resource : resources) {
+            ResourcesVO resourcesVO = new ResourcesVO();
+            BeanUtils.copyProperties(resource, resourcesVO);
+            list.add(resourcesVO);
+        }
+        return list;
     }
 
     @Override
@@ -119,30 +126,24 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         ResourceContent resourceContent = objectMapper.
                 readValue(uploadResourceJson, ResourceContent.class);
 
-        ITStudent author = userMapper.selectById(BaseContext.getCurrentId());
+        Student author = userMapper.selectById(BaseContext.getCurrentId());
 
         Resources resources = new Resources();
 
         resources.insertContent(resourceContent);
 
         resources.setFileName(file.getOriginalFilename());
-        resources.setStudentId(author.getStudentId());
+        resources.setStudentId(author.getId());
         resources.setStudentName(author.getName());
 
-// 使用 LocalDate 和 LocalTime 只设置日期和时间部分
-        LocalDate releaseDate = LocalDate.now(); // 获取当前日期
-        LocalTime releaseTime = LocalTime.now(); // 获取当前时间
+        resources.setReleaseDateTime(LocalDateTime.now());
 
-        // 将 LocalDate 转换为 java.sql.Date
-        resources.setReleaseDate(Date.valueOf(releaseDate));
-        // 将 LocalTime 转换为 java.sql.Time
-        resources.setReleaseTime(Time.valueOf(releaseTime));
 
 // 生成唯一 ID
         Random random = new Random();
-        int ID = random.nextInt(100000);
+        Long ID = (long) random.nextInt(100000);
         while (resourcesMapper.selectById(ID) != null)
-            ID = random.nextInt(100000);
+            ID = (long) random.nextInt(100000);
 
         resources.setId(ID);
 

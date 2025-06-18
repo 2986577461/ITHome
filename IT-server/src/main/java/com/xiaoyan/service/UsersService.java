@@ -1,32 +1,24 @@
 package com.xiaoyan.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.xiaoyan.dto.LoginDTO;
-import com.xiaoyan.dto.UpdateStudent;
-import com.xiaoyan.pojo.ITStudent;
+import com.xiaoyan.dto.StudentDTO;
 
-import com.xiaoyan.vo.ITStudentVO;
-import com.xiaoyan.vo.StudentGovernVO;
-import jakarta.validation.constraints.NotNull;
-import org.springframework.validation.annotation.Validated;
+import com.xiaoyan.vo.StudentVO;
+import jakarta.validation.Valid;
 
-import java.util.ArrayList;
 import java.util.List;
 
 
-public interface UsersService extends IService<ITStudent> {
+public interface UsersService {
 
-    ITStudentVO getUser();
+    StudentVO getUser();
 
-    ITStudentVO login(LoginDTO message);
+    StudentVO login(LoginDTO message);
 
-    void removeStudents(@NotNull ArrayList<String > students);
+    void removeStudents(List<Long> ids);
 
-    List<ITStudent> selectAllMember() ;
+    List<StudentVO> getAll();
 
-    void updateStudent( @NotNull String id,@Validated UpdateStudent student) ;
+    void update(@Valid StudentDTO studentDTO);
 
-    void updatePassword(@NotNull String id,@NotNull String pswd) ;
-
-    List<StudentGovernVO> getAll();
 }

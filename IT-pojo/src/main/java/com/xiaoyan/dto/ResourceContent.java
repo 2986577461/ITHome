@@ -8,17 +8,8 @@ public class ResourceContent {
 
     private String introduce;
 
-    private String studentId;
+    private Long studentId;
 
     private String name;
 
-
-    @Override
-    public String toString() {
-        return "Resource{" +
-                ", head='" + head + '\'' +
-                ", introduce='" + introduce + '\'' +
-                ", studentId='" + studentId + '\'' +
-                '}';
-    }
 }

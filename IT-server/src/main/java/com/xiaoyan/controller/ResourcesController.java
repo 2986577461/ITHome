@@ -5,6 +5,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.ResourcesService;
+import com.xiaoyan.vo.ResourcesVO;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import org.springframework.core.io.Resource;
@@ -24,19 +26,23 @@ public class ResourcesController {
     private ResourcesService resourcesService;
 
     @GetMapping("count")
+    @Operation(summary = "获取资料总数")
     public Result<Long> getCount() {
-        return Result.success(resourcesService.getCount());
+        Long count = resourcesService.getCount();
+        return Result.success(count);
     }
 
     @GetMapping("cover/{id}")
+
     public Result<ResponseEntity<byte[]>> getCover(@PathVariable("id") int id) throws IOException {
         ResponseEntity<byte[]> cover = resourcesService.getCover(id);
         return Result.success(cover);
     }
 
     @GetMapping
-    public Result<List<Resources>> getList() {
-        List<Resources> list = resourcesService.getList();
+    @Operation(summary = "返回所有资料")
+    public Result<List<ResourcesVO>> getList() {
+        List<ResourcesVO> list = resourcesService.getList();
         return Result.success(list);
     }
 
@@ -46,6 +52,7 @@ public class ResourcesController {
     }
 
     @GetMapping("download/{id}")
+    @Operation(summary = "下载资料")
     public Result<ResponseEntity<Resource>> download(@PathVariable int id) {
         return Result.success(resourcesService.download(id));
     }

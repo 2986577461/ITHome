@@ -7,7 +7,8 @@ import lombok.ToString;
 @Data
 @ToString
 public class StudentDialogVO {
-    private String id;
+
+    private Long id;
 
     private String name;
 }

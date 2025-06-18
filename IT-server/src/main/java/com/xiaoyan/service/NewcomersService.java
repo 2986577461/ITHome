@@ -1,19 +1,18 @@
 package com.xiaoyan.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.xiaoyan.pojo.Newcomer;
 
 import java.util.List;
 
-public interface NewcomersService extends IService<Newcomer> {
+public interface NewcomersService {
 
-    void refuseNewcomer(int id);
+    void refuseNewcomer(Long id);
 
-    void agreeNewcomer(int id);
+    void agreeNewcomer(Long id);
 
     void applyJoin(Newcomer newcomer);
 
-    List<Newcomer> getAllnewcomer();
+    List<Newcomer> getAll();
 
 
 }

@@ -1,11 +1,12 @@
 package com.xiaoyan.vo;
 
+
 import lombok.Data;
 
 @Data
-public class StudentGovernVO {
+public class StudentVO {
 
-    private String studentId;
+    private Long id;
 
     private String name;
 
@@ -22,4 +23,6 @@ public class StudentGovernVO {
     private Integer articleCount;
 
     private Integer resourceCount;
+
+    private String  token;
 }
