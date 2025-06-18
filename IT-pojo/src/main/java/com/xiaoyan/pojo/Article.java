@@ -17,7 +17,7 @@ public class Article {
     private String author;
 
     @TableField(updateStrategy = FieldStrategy.NOT_NULL)
-    private String authorId;
+    private Long authorId;
 
     @TableField(updateStrategy = FieldStrategy.NOT_NULL)
     private String type;

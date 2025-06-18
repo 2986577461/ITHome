@@ -1,4 +1,14 @@
 spring:
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: 2986577461@qq.com
+    password: ${xiaoyan.mail.password}
+    properties:
+      mail:
+        smtp:
+          starttls.enable: true
+          auth: true
   profiles:
     active: dev
     multipart:
@@ -19,9 +29,6 @@ spring:
 front-location:
   request-url: ${xiaoyan.front-location.request-url}
 
-
-resourses-root-directory:
-  path: ${xiaoyan.resourses-root-directory.path}
 
 
 #修改为自己的apikey
@@ -45,13 +52,15 @@ admit:
 server:
   address: 0.0.0.0
 
-#mybatis-plus:
-#  configuration:
-#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 关键配置
-logging:
-  level:
-    com:
-      xiaoyan:
-        mapper: info
-        service: info
-        controller: info
+aliyun:
+  oss:
+    endpoint: ${xiaoyan.alioss.endpoint}
+    accessKeyId: ${xiaoyan.alioss.access-key-id}
+    accessKeySecret: ${xiaoyan.alioss.access-key-secret}
+    bucketName: ${xiaoyan.alioss.bucket-name}
+
+#logging:
+#  level:
+#    com.xiaoyan.mapper: DEBUG
+
+

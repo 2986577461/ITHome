@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class UserTask {
 
-    @Scheduled
+//    @Scheduled()
     public void deleteAllUser(){
         log.info("协会换届，触发删除所有学生");
         //todo

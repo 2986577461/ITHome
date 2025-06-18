@@ -34,7 +34,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public StudentVO getUser() {
-        String currentId = BaseContext.getCurrentId();
+        Long currentId = BaseContext.getCurrentId();
         Student student = userMapper.selectById(currentId);
         if (student == null)
             throw new LoginConditionException(MessageConstant.USER_NOT_LOGIN);
@@ -48,7 +48,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public StudentVO login(LoginDTO message) {
-        String id = message.getId();
+       Long id = message.getId();
         String password = message.getPassword();
 
         Student student = userMapper.selectById(id);

@@ -5,10 +5,6 @@
 
 <mapper namespace="com.xiaoyan.mapper.UserMapper">
 
-    <update id="addReourceCountByID">
-        UPDATE it_student
-        SET resource_count=resource_count + 1
-        WHERE it_student.student_id = #{studentId}
-    </update>
+
 
 </mapper>

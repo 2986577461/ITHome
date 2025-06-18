@@ -1,5 +1,6 @@
 package com.xiaoyan.controller;
 
+import com.xiaoyan.dto.NewComerDTO;
 import com.xiaoyan.pojo.Newcomer;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.NewcomersService;
@@ -36,8 +37,8 @@ public class NewcomersController {
 
     @PostMapping("/applyJoin")
     @Operation(summary = "申请加入协会")
-    public Result<String> applyJoin(@RequestBody @Validated Newcomer newcomer) {
-        memberService.applyJoin(newcomer);
+    public Result<String> applyJoin(@RequestBody @Validated NewComerDTO newComerDTO) {
+        memberService.applyJoin(newComerDTO);
         return Result.success();
     }
 

@@ -21,7 +21,7 @@ public class StudentDTO {
 
     private String password;
 
-    private String claxx;
+    private String className;
 
     private String academy;
 

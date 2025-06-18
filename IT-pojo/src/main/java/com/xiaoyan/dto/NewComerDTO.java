@@ -1,12 +1,9 @@
-package com.xiaoyan.pojo;
+package com.xiaoyan.dto;
 
 import lombok.Data;
 
 @Data
-public class Newcomer {
-
-    private Long id;
-
+public class NewComerDTO {
     private Long studentId;
 
     private String name;
