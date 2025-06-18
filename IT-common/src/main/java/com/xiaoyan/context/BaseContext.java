@@ -2,13 +2,13 @@ package com.xiaoyan.context;
 
 public class BaseContext {
 
-    public static ThreadLocal<String > threadLocal = new ThreadLocal<>();
+    public static final ThreadLocal<Long> threadLocal = new ThreadLocal<>();
 
-    public static void setCurrentId(String  id) {
+    public static void setCurrentId(Long id) {
         threadLocal.set(id);
     }
 
-    public static String  getCurrentId() {
+    public static Long getCurrentId() {
         return threadLocal.get();
     }
 

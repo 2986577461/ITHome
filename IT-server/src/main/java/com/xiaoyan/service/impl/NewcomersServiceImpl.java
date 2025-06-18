@@ -3,6 +3,7 @@ package com.xiaoyan.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.constant.PositionConstant;
+import com.xiaoyan.dto.NewComerDTO;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.exception.RepeatRuestException;
 import com.xiaoyan.mapper.NewcomerMapper;
@@ -17,7 +18,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
 import java.util.List;
 
 @Service
@@ -53,7 +53,7 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
         userMapper.insert(Student.builder().
                 id(newcomer.getId()).
                 academy(newcomer.getAcademy()).
-                claxx(newcomer.getMajor()).
+                className(newcomer.getClassName()).
                 major(newcomer.getMajor()).
                 position(PositionConstant.STUDENT).
                 sex(newcomer.getSex()).
@@ -63,10 +63,13 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
     }
 
     @Override
-    public void applyJoin(Newcomer newcomer) {
-        Long studentId = newcomer.getStudentId();
+    public void applyJoin(NewComerDTO newComerDTO) {
+        Long studentId = newComerDTO.getStudentId();
         if (newcomerMapper.selectByStudentId(studentId) != null)
             throw new RepeatRuestException(MessageConstant.REPEATREQUEST);
+
+        Newcomer newcomer = new Newcomer();
+        BeanUtils.copyProperties(newComerDTO, newcomer);
 
         this.save(newcomer);
     }

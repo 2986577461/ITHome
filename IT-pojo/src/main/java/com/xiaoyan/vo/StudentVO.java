@@ -18,7 +18,7 @@ public class StudentVO {
 
     private String sex;
 
-    private String claxx;
+    private String className;
 
     private Integer articleCount;
 

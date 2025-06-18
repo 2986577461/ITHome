@@ -2,9 +2,7 @@ package com.xiaoyan.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaoyan.pojo.Dialog;
-import jakarta.websocket.EncodeException;
 import jakarta.websocket.OnClose;
-import jakarta.websocket.OnError;
 import jakarta.websocket.OnMessage;
 import jakarta.websocket.OnOpen;
 import jakarta.websocket.Session;
@@ -26,7 +24,7 @@ public class WebSocketServer {
     // 存放会话对象
     private static final Map<String, Session> sessionMap = new ConcurrentHashMap<>();
 
-    public static ObjectMapper objectMapper = new ObjectMapper();
+    public static final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * 连接建立成功调用的方法
@@ -40,7 +38,7 @@ public class WebSocketServer {
      * 收到客户端消息后调用的方法
      */
     @OnMessage
-    public void onMessage(String message, @PathParam("sid") String sid) throws IOException, EncodeException {
+    public void onMessage(String message, @PathParam("sid") String sid) throws IOException {
         log.info("用户{}发来信息：{}", sid, message);
         Dialog dialog = objectMapper.readValue(message, Dialog.class);
         sendToOneClient(dialog);

@@ -63,9 +63,8 @@ public class EmailServiceImpl implements EmailService {
         CodeInfo codeInfo = codePool.get(email);
         if (codeInfo == null) return false;
         // 检查未过期且验证码匹配
-        boolean isValid = System.currentTimeMillis() <= codeInfo.getExpireTime()
-                && inputCode.equals(codeInfo.getCode());
 
-        return isValid;
+        return System.currentTimeMillis() <= codeInfo.getExpireTime()
+                && inputCode.equals(codeInfo.getCode());
     }
 }

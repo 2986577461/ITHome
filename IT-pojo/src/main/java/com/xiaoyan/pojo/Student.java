@@ -3,6 +3,7 @@ package com.xiaoyan.pojo;
 
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -14,6 +15,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@TableName(value = "it_student")
 public class Student {
 
     @NotNull
@@ -37,7 +39,7 @@ public class Student {
 
     @NotBlank
     @TableField(updateStrategy = FieldStrategy.NOT_EMPTY)
-    private String claxx;
+    private String className;
 
     @NotBlank
     @TableField(updateStrategy = FieldStrategy.NOT_EMPTY)

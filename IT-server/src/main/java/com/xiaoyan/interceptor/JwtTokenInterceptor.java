@@ -1,4 +1,4 @@
-package com.xiaoyan.Interceptor;
+package com.xiaoyan.interceptor;
 
 
 import com.xiaoyan.context.BaseContext;
@@ -25,7 +25,7 @@ public class JwtTokenInterceptor implements HandlerInterceptor {
     @Autowired
     private JwtProperties jwtProperties;
 
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         //判断当前拦截到的是Controller的方法还是其他资源
         if (!(handler instanceof HandlerMethod)) {
             //当前拦截到的不是动态方法，直接放行
@@ -38,9 +38,9 @@ public class JwtTokenInterceptor implements HandlerInterceptor {
         try {
             log.info("jwt校验:{}", token);
             Claims claims = JwtUtil.parseJWT(jwtProperties.getSecretKey(), token);
-            String user = claims.get(jwtProperties.getTokenName()).toString();
+            String  user =  claims.get(jwtProperties.getTokenName()).toString();
             log.info("当前id：{}", user);
-            BaseContext.setCurrentId(user);
+            BaseContext.setCurrentId(Long.valueOf(user));
             //3、通过，放行
             return true;
         } catch (Exception ex) {

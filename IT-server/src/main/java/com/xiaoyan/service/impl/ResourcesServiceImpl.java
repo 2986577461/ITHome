@@ -3,87 +3,34 @@ package com.xiaoyan.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
-import com.xiaoyan.dto.ResourceContent;
-import com.xiaoyan.exception.ParameterException;
+import com.xiaoyan.dto.ResourceDTO;
+import com.xiaoyan.exception.AccountNotFoundException;
+import com.xiaoyan.exception.PositionException;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.UserMapper;
 import com.xiaoyan.pojo.Student;
 import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.service.ResourcesService;
 import com.xiaoyan.vo.ResourcesVO;
+import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.Random;
 
 
 @Service
+@AllArgsConstructor
 public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources>
         implements ResourcesService {
 
-    @Value("${resourses-root-directory.path}")
-    String filePath;
-
-    @jakarta.annotation.Resource
     private ResourcesMapper resourcesMapper;
 
-    @jakarta.annotation.Resource
     private UserMapper userMapper;
-
-    @Override
-    public ResponseEntity<Resource> download(int id) {
-
-        if (resourcesMapper.selectById(id) == null)
-            throw new ParameterException("参数异常");
-
-        File[] files = new File(filePath + "/" + id + "/file").listFiles();
-
-        if (files == null || files.length == 0)
-            throw new RuntimeException("文件异常");
-
-        FileSystemResource resource = new FileSystemResource(files[0]);
-
-        // 设置响应头，告诉浏览器这是一个文件下载
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION)
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(resource);
-
-    }
-
-    @Override
-    public void uploadFile(MultipartFile file, MultipartFile cover, Long id) {
-
-        File resource = new File(filePath + "/" + id);
-        File fileDirectory = new File(resource, "file");
-        File coverDirectory = new File(resource, "cover");
-
-        try {
-            if (resource.mkdirs() && fileDirectory.mkdirs() && coverDirectory.mkdirs()) {
-
-                file.transferTo(new File(fileDirectory, Objects.requireNonNull(file.getOriginalFilename())));
-                cover.transferTo(new File(coverDirectory, Objects.requireNonNull(cover.getOriginalFilename())));
-            }
-        } catch (IOException | IllegalStateException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     @Override
     public Long getCount() {
@@ -102,62 +49,34 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         return list;
     }
 
-    @Override
-    public ResponseEntity<byte[]> getCover(int id) throws IOException {
-
-        File[] coverDirectory = new File(filePath + "/" + id + "/cover").listFiles();
-
-        if (coverDirectory == null || coverDirectory.length == 0)
-            throw new RuntimeException("文件异常");
-
-        byte[] imageBytes = Files.readAllBytes(coverDirectory[0].toPath());
-
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.IMAGE_PNG);
-
-        return new ResponseEntity<>(imageBytes, headers, HttpStatus.OK);
-    }
 
     @Override
-    public void upload(String uploadResourceJson, MultipartFile file, MultipartFile cover) throws JsonProcessingException {
-
+    public void upload(String resourceJson) {
         ObjectMapper objectMapper = new ObjectMapper();
-        ResourceContent resourceContent = objectMapper.
-                readValue(uploadResourceJson, ResourceContent.class);
 
-        Student author = userMapper.selectById(BaseContext.getCurrentId());
+        ResourceDTO resourceDTO=null;
+        try {
+            resourceDTO = objectMapper.readValue(resourceJson, ResourceDTO.class);
+        }catch ( JsonProcessingException ex){
+            ex.printStackTrace();
+        }
+
+        if (resourceDTO.getStudentId()!=BaseContext.getCurrentId())
+            throw new AccountNotFoundException(MessageConstant.ACCOUNT_NOT_FOUND);
+
+        Student student = userMapper.selectById(resourceDTO.getStudentId());
+
+        if (!resourceDTO.getStudentName().equals(student.getName()))
+            throw new PositionException(MessageConstant.NAME_MISMATCH);
 
         Resources resources = new Resources();
-
-        resources.insertContent(resourceContent);
-
-        resources.setFileName(file.getOriginalFilename());
-        resources.setStudentId(author.getId());
-        resources.setStudentName(author.getName());
-
+        BeanUtils.copyProperties(resourceDTO, resources);
         resources.setReleaseDateTime(LocalDateTime.now());
 
-
-// 生成唯一 ID
-        Random random = new Random();
-        Long ID = (long) random.nextInt(100000);
-        while (resourcesMapper.selectById(ID) != null)
-            ID = (long) random.nextInt(100000);
-
-        resources.setId(ID);
-
-// 插入数据
         resourcesMapper.insert(resources);
-
-// 上传文件
-        this.uploadFile(file, cover, ID);
 
         userMapper.addReourceCountByID(BaseContext.getCurrentId());
     }
 
-    @Override
-    public String getFileName(int id) {
-        return resourcesMapper.selectFileNameById(id);
-    }
+
 }
