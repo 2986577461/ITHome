@@ -1,7 +1,8 @@
 package com.xiaoyan.service;
 
-import com.xiaoyan.dto.NewComerDTO;
 import com.xiaoyan.pojo.Newcomer;
+import com.xiaoyan.vo.NewcomerVO;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -11,9 +12,8 @@ public interface NewcomersService {
 
     void agreeNewcomer(Long id);
 
-    void applyJoin(NewComerDTO newComerDTO);
+    void applyJoin(@Valid Newcomer newComer);
 
-    List<Newcomer> getAll();
-
+    List<NewcomerVO> getAll();
 
 }

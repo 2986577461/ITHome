@@ -2,19 +2,16 @@ package com.xiaoyan.service.impl;
 
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.xiaoyan.constant.MessageConstant;
-import com.xiaoyan.context.BaseContext;
-import com.xiaoyan.dto.ArticleDTO;
-import com.xiaoyan.exception.PositionException;
+import com.xiaoyan.annotation.AutoFillFields;
 import com.xiaoyan.mapper.ArticleMapper;
 import com.xiaoyan.pojo.Article;
 import com.xiaoyan.service.ArticlesService;
 import com.xiaoyan.vo.ArticleVO;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -33,12 +30,8 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
 
     @Override
-    public void upload(ArticleDTO articleDTO) {
-        Article article = new Article();
-        BeanUtils.copyProperties(articleDTO, article);
-        article.setReleaseDateTime(LocalDateTime.now());
-        article.setUpdateDateTime(LocalDateTime.now());
-
+    @AutoFillFields(AutoFillFields.OpType.INSERT)
+    public void upload(@Valid Article article) {
         articleMapper.insert(article);
     }
 
@@ -58,22 +51,13 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     }
 
     @Override
-    public void update(ArticleDTO articleDTO) {
-        if (!BaseContext.getCurrentId().equals(articleDTO.getAuthorId()))
-            throw new PositionException(MessageConstant.OLEY_MODIFY_YOUR_OWN_ARTICLE);
-        Article article = new Article();
-        BeanUtils.copyProperties(articleDTO, article);
-        article.setUpdateDateTime(LocalDateTime.now());
-
+    @AutoFillFields(AutoFillFields.OpType.UPDATE)
+    public void update(@Valid Article article) {
         articleMapper.updateById(article);
     }
 
     @Override
     public void delete(Long id) {
-        Article article = articleMapper.selectById(id);
-        if (article.getAuthorId() != BaseContext.getCurrentId())
-            throw new PositionException(MessageConstant.OLEY_DELETE_YOUR_OWN_ARTICLE);
-
         articleMapper.deleteById(id);
     }
 

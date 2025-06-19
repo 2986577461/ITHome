@@ -13,18 +13,9 @@ public class ArticleDTO {
     @Schema(description = "上传文章不需要id，修改需要")
     private Long id;
 
-    @NotBlank
-    private String author;
-
-    @NotBlank
-    private String authorId;
-
-    @NotBlank
     private String type;
 
-    @NotBlank
     private String head;
 
-    @NotBlank
     private String content;
 }

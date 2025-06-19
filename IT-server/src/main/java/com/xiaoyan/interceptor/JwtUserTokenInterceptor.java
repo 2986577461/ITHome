@@ -1,9 +1,11 @@
 package com.xiaoyan.interceptor;
 
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.utils.JwtUtil;
+import com.xiaoyan.vo.StudentVO;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -14,16 +16,17 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 
-
 /**
  * jwt令牌校验的拦截器
  */
 @Component
 @Slf4j
-public class JwtTokenInterceptor implements HandlerInterceptor {
+public class JwtUserTokenInterceptor implements HandlerInterceptor {
 
     @Autowired
     private JwtProperties jwtProperties;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         //判断当前拦截到的是Controller的方法还是其他资源
@@ -36,12 +39,12 @@ public class JwtTokenInterceptor implements HandlerInterceptor {
         String token = request.getHeader(jwtProperties.getTokenName());
         //2、校验令牌
         try {
-            log.info("jwt校验:{}", token);
             Claims claims = JwtUtil.parseJWT(jwtProperties.getSecretKey(), token);
-            String  user =  claims.get(jwtProperties.getTokenName()).toString();
-            log.info("当前id：{}", user);
-            BaseContext.setCurrentId(Long.valueOf(user));
-            //3、通过，放行
+            Object studentVoAsObject = claims.get(jwtProperties.getTokenName());
+
+            StudentVO studentVO = objectMapper.convertValue(studentVoAsObject, StudentVO.class);
+
+            BaseContext.setCurrentId(studentVO);
             return true;
         } catch (Exception ex) {
             log.info("请求被拒绝");

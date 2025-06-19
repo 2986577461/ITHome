@@ -1,6 +1,7 @@
-package com.xiaoyan.controller;
+package com.xiaoyan.controller.user;
 
 import com.xiaoyan.dto.ArticleDTO;
+import com.xiaoyan.pojo.Article;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.ArticlesService;
 import com.xiaoyan.vo.ArticleVO;
@@ -8,27 +9,20 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RestController
-@RequestMapping("articles")
-@Slf4j
+@RestController("userArticles")
+@RequestMapping("user/articles")
 @Tag(name = "文章管理")
 public class ArticlesController {
 
     @Resource
     private ArticlesService messageService;
-
-    @GetMapping
-    @Operation(summary = "获取文章总数")
-    public Result<Long> getCount() {
-        return Result.success(messageService.getCount());
-    }
 
     @GetMapping("all")
     @Operation(summary = "返回所有文章")
@@ -41,9 +35,10 @@ public class ArticlesController {
     @PostMapping
     @Operation(summary = "上传文章")
     @CacheEvict(cacheNames = "articleList", allEntries = true)
-    public Result<String> upload(@RequestBody @Valid ArticleDTO articleDTO) {
-        log.info("文章上传:{}", articleDTO);
-        messageService.upload(articleDTO);
+    public Result<String> upload(@RequestBody ArticleDTO articleDTO) {
+        Article article = new Article();
+        BeanUtils.copyProperties(articleDTO, article,"id");
+        messageService.upload(article);
         return Result.success();
     }
 
@@ -51,8 +46,10 @@ public class ArticlesController {
     @Operation(summary = "修改文章")
     @CacheEvict(cacheNames = "articleList", allEntries = true)
     public Result<String> update(@RequestBody @Valid ArticleDTO articleDTO) {
-        log.info("文章修改:{}", articleDTO);
-        messageService.update(articleDTO);
+        Article article = new Article();
+        BeanUtils.copyProperties(articleDTO, article);
+
+        messageService.update(article);
         return Result.success();
     }
 

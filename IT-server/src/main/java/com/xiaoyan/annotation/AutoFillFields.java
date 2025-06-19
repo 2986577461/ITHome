@@ -8,5 +8,12 @@ import java.lang.annotation.Target;
 
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface CheckPrimaryKeyRepeat {
+public @interface AutoFillFields {
+    enum OpType {
+        UPDATE,
+        INSERT,
+        DELETE
+    }
+
+    OpType value();
 }

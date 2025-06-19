@@ -1,4 +1,4 @@
-package com.xiaoyan.controller;
+package com.xiaoyan.controller.user;
 
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -12,7 +12,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("ai-dialog")
+@RequestMapping("user/ai-dialog")
 @AllArgsConstructor
 @Tag(name = "DeepSeek管理")
 public class DeepSeekController {

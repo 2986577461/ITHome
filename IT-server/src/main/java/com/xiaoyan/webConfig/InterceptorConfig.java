@@ -1,6 +1,7 @@
 package com.xiaoyan.webConfig;
 
-import com.xiaoyan.interceptor.JwtTokenInterceptor;
+import com.xiaoyan.interceptor.JwtAdminTokenInterceptor;
+import com.xiaoyan.interceptor.JwtUserTokenInterceptor;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -15,12 +16,14 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 
-
 @Configuration
 public class InterceptorConfig implements WebMvcConfigurer {
 
     @Resource
-    private JwtTokenInterceptor jwtTokenInterceptor;
+    private JwtAdminTokenInterceptor jwtAdminTokenInterceptor;
+
+    @Resource
+    private JwtUserTokenInterceptor jwtUserTokenInterceptor;
 
     @Value("${front-location.request-url}")
     private String[] location;
@@ -30,9 +33,12 @@ public class InterceptorConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(jwtTokenInterceptor)
-                .addPathPatterns("/**")
+        registry.addInterceptor(jwtUserTokenInterceptor)
+                .addPathPatterns("/user/**")
                 .excludePathPatterns(admitURL);
+
+        registry.addInterceptor(jwtAdminTokenInterceptor)
+                .addPathPatterns("/admin/**");
     }
 
     @Override
@@ -43,6 +49,7 @@ public class InterceptorConfig implements WebMvcConfigurer {
                 .allowCredentials(true) // 允许携带 Cookie
                 .maxAge(3600); // 预检请求缓存时间
     }
+
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();

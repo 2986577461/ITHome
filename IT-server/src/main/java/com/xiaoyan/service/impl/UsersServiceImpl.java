@@ -4,9 +4,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.LoginDTO;
-import com.xiaoyan.dto.StudentDTO;
+import com.xiaoyan.dto.PasswordDTO;
 import com.xiaoyan.exception.AccountNotFoundException;
-import com.xiaoyan.exception.LoginConditionException;
 import com.xiaoyan.exception.PasswordErrorException;
 import com.xiaoyan.mapper.UserMapper;
 import com.xiaoyan.pojo.Student;
@@ -15,14 +14,17 @@ import com.xiaoyan.service.UsersService;
 import com.xiaoyan.vo.StudentVO;
 import jakarta.annotation.Resource;
 
+import jakarta.validation.Valid;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@Validated
 public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         implements UsersService {
 
@@ -34,21 +36,12 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public StudentVO getUser() {
-        Long currentId = BaseContext.getCurrentId();
-        Student student = userMapper.selectById(currentId);
-        if (student == null)
-            throw new LoginConditionException(MessageConstant.USER_NOT_LOGIN);
-
-        StudentVO studentVO = new StudentVO();
-        BeanUtils.copyProperties(student, studentVO);
-
-        return studentVO;
-
+        return BaseContext.getCurrentStudent();
     }
 
     @Override
     public StudentVO login(LoginDTO message) {
-       Long id = message.getId();
+        Long id = message.getId();
         String password = message.getPassword();
 
         Student student = userMapper.selectById(id);
@@ -61,7 +54,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         StudentVO studentVO = new StudentVO();
         BeanUtils.copyProperties(student, studentVO);
 
-        BaseContext.setCurrentId(id);
+        BaseContext.setCurrentId(studentVO);
 
         return studentVO;
     }
@@ -87,12 +80,14 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
 
     @Override
-    public void update(StudentDTO studentDTO) {
-        Student student = new Student();
-        BeanUtils.copyProperties(studentDTO,student);
+    public void update( Student student) {
         userMapper.updateById(student);
     }
 
-
+    @Override
+    public void updatePassword(PasswordDTO passwordDTO) {
+        Long id = BaseContext.getCurrentId();
+        userMapper.updatePasswordById(id,encoder.encode(passwordDTO.getPassword()));
+    }
 
 }

@@ -1,7 +1,8 @@
 package com.xiaoyan.service;
 
-import com.xiaoyan.dto.ArticleDTO;
+import com.xiaoyan.pojo.Article;
 import com.xiaoyan.vo.ArticleVO;
+import jakarta.validation.Valid;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -11,11 +12,11 @@ public interface ArticlesService {
 
     Long getCount();
 
-    void upload(ArticleDTO articleDTO);
+    void upload(@Valid Article article);
 
     List<ArticleVO> getAll();
 
     void delete(Long id);
 
-    void update(ArticleDTO articleDTO);
+    void update(@Valid Article article);
 }

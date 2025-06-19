@@ -1,41 +1,45 @@
-package com.xiaoyan.controller;
+package com.xiaoyan.controller.user;
 
-import com.xiaoyan.annotation.CheckPrimaryKeyRepeat;
 import com.xiaoyan.dto.LoginDTO;
+import com.xiaoyan.dto.PasswordDTO;
 import com.xiaoyan.dto.StudentDTO;
+import com.xiaoyan.pojo.Student;
 import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.JwtUtil;
 import com.xiaoyan.vo.StudentVO;
-
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.*;
+
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-@RestController
-@RequestMapping("users")
+@RestController("userUser")
+@RequestMapping("user/users")
 @Slf4j
 @AllArgsConstructor
-@Tag(name = "用户管理")
+@Tag(name = "自身信息维护以及登录操作")
 public class UsersController {
 
     private UsersService userService;
 
     private JwtProperties jwtProperties;
 
-    @GetMapping
-    @Operation(summary = "返回当前学生信息")
-    public Result<StudentVO> getUser() {
-        StudentVO user = userService.getUser();
-        return Result.success(user);
+    @PutMapping
+    @Operation(summary = "修改密码")
+    public Result<String> updateStudent(@RequestBody @Valid PasswordDTO passwordDTO) {
+        userService.updatePassword(passwordDTO);
+        return Result.success();
     }
 
     @PostMapping("login")
@@ -47,7 +51,7 @@ public class UsersController {
 
         //登录成功后，生成jwt令牌
         Map<String, Object> claims = new HashMap<>();
-        claims.put(jwtProperties.getTokenName(), studentVO.getId());
+        claims.put(jwtProperties.getTokenName(), studentVO);
         String token = JwtUtil.createJWT(
                 jwtProperties.getSecretKey(),
                 jwtProperties.getTtl(),
@@ -55,27 +59,5 @@ public class UsersController {
         studentVO.setToken(token);
 
         return Result.success(studentVO);
-    }
-
-    @PostMapping
-    @Operation(summary = "返回所有学生信息")
-    public Result<List<StudentVO>> getAll() {
-        List<StudentVO> list = userService.getAll();
-        return Result.success(list);
-    }
-
-    @DeleteMapping
-    @Operation(summary = "删除学生")
-    public Result<String> removeStudents(List<Long> ids) {
-        userService.removeStudents(ids);
-        return Result.success();
-    }
-
-    @PutMapping
-    @CheckPrimaryKeyRepeat
-    @Operation(summary = "修改学生信息包括密码")
-    public Result<String> updateStudent(@RequestBody @Valid StudentDTO student) {
-        userService.update(student);
-        return Result.success();
     }
 }

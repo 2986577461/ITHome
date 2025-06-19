@@ -1,4 +1,4 @@
-package com.xiaoyan.controller;
+package com.xiaoyan.controller.user;
 
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.dto.EmailDTO;
@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@RequestMapping("/email")
+@RequestMapping("user/email")
 @AllArgsConstructor
 @Slf4j
 @Tag(name = "电子邮件/可以绑定账号")

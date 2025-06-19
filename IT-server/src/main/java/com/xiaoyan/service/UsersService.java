@@ -1,8 +1,10 @@
 package com.xiaoyan.service;
 
 import com.xiaoyan.dto.LoginDTO;
+import com.xiaoyan.dto.PasswordDTO;
 import com.xiaoyan.dto.StudentDTO;
 
+import com.xiaoyan.pojo.Student;
 import com.xiaoyan.vo.StudentVO;
 import jakarta.validation.Valid;
 
@@ -19,6 +21,7 @@ public interface UsersService {
 
     List<StudentVO> getAll();
 
-    void update(@Valid StudentDTO studentDTO);
+    void update(@Valid Student student);
 
+    void updatePassword(PasswordDTO passwordDTO);
 }

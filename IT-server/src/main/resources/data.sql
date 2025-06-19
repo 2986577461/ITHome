@@ -8,7 +8,7 @@ CREATE TABLE it_student
     name           VARCHAR(20)      NOT NULL,
     sex            ENUM ('男','女') NOT NULL,
     major          VARCHAR(20)      NOT NULL,
-    class_name          VARCHAR(20)      NOT NULL,
+    class_name     VARCHAR(20)      NOT NULL,
     academy        VARCHAR(20)      NOT NULL,
     position       varchar(20)      NOT NULL,
     article_count  bigint default 0,
@@ -44,7 +44,7 @@ CREATE TABLE article
     author_id         bigint        not null,
     author            varchar(20)   not null,
     release_date_time DATETIME      not null,
-    update_date_time  datetime      not null
+    updated_date_time datetime      not null
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;;
@@ -66,14 +66,15 @@ VALUES (1, 'css', 'test',
 
 CREATE TABLE newcomer
 (
-    id         INT PRIMARY KEY AUTO_INCREMENT,
-    student_id bigint           NOT NULL,
-    name       VARCHAR(20)      NOT NULL,
-    sex        ENUM ('男','女') NOT NULL,
-    major      VARCHAR(20)      NOT NULL,
-    class      VARCHAR(20)      NOT NULL,
-    academy    VARCHAR(20)      NOT NULL,
-    introduce  VARCHAR(2000)    NOT NULL
+    id                    bigint PRIMARY KEY AUTO_INCREMENT,
+    student_id            bigint           NOT NULL,
+    name                  VARCHAR(20)      NOT NULL,
+    sex                   ENUM ('男','女') NOT NULL,
+    major                 VARCHAR(20)      NOT NULL,
+    class_name                 VARCHAR(20)      NOT NULL,
+    academy               VARCHAR(20)      NOT NULL,
+    introduce             VARCHAR(2000)    NOT NULL,
+    application_date_time datetime         not null
 
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4

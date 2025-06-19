@@ -1,9 +1,9 @@
-package com.xiaoyan.controller;
+package com.xiaoyan.controller.admin;
 
-import com.xiaoyan.dto.NewComerDTO;
 import com.xiaoyan.pojo.Newcomer;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.NewcomersService;
+import com.xiaoyan.vo.NewcomerVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotNull;
@@ -13,10 +13,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RestController
-@RequestMapping("newcomers")
+@RestController("adminNewcomers")
+@RequestMapping("admin/newcomers")
 @AllArgsConstructor
 @Tag(name = "新学员管理")
+@Validated
 public class NewcomersController {
 
     private NewcomersService memberService;
@@ -35,17 +36,10 @@ public class NewcomersController {
         return Result.success();
     }
 
-    @PostMapping("/applyJoin")
-    @Operation(summary = "申请加入协会")
-    public Result<String> applyJoin(@RequestBody @Validated NewComerDTO newComerDTO) {
-        memberService.applyJoin(newComerDTO);
-        return Result.success();
-    }
-
     @PostMapping
     @Operation(summary = "获取所有申请")
-    public Result<List<Newcomer>> getnewcomers() {
-        List<Newcomer> list = memberService.getAll();
+    public Result<List<NewcomerVO>> getnewcomers() {
+        List<NewcomerVO> list = memberService.getAll();
         return Result.success(list);
     }
 }

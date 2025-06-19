@@ -7,6 +7,7 @@ import com.xiaoyan.pojo.Student;
 import com.xiaoyan.service.ChatService;
 import com.xiaoyan.vo.StudentDialogVO;
 import lombok.AllArgsConstructor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -20,16 +21,17 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public List<StudentDialogVO> getList() {
-        LambdaQueryWrapper<Student> wrapper = new LambdaQueryWrapper<>();
-        wrapper.ne(Student::getId, BaseContext.getCurrentId());
-        List<Student> list = userMapper.selectList(wrapper);
+        List<Student> students = userMapper.selectList(null);
 
+        for (Student student : students) {
+            if (student.getId().equals(BaseContext.getCurrentId())) ;
+            students.remove(student);
+        }
         List<StudentDialogVO> studentDialogVOList = new ArrayList<>();
 
-        for (Student student1 : list) {
+        for (Student student1 : students) {
             StudentDialogVO studentDialogVO = new StudentDialogVO();
-            studentDialogVO.setId(student1.getId());
-            studentDialogVO.setName(student1.getName());
+            BeanUtils.copyProperties(student1, studentDialogVO);
             studentDialogVOList.add(studentDialogVO);
         }
         return studentDialogVOList;
