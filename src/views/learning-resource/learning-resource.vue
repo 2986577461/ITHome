@@ -81,7 +81,7 @@
 <script lang="ts" setup>
 import uploadVue from "@/components/uploadResources.vue";
 import Header from "@/components/Header.vue";
-import { downloadFile, fetchArticles, getImgForAxios } from "@/axios/file";
+import { downloadFile, fetchResources, getImgForAxios } from "@/axios/file";
 import { reactive, onMounted, ref } from "vue";
 import Foot from "@/components/Foot.vue";
 import { Download } from "@element-plus/icons-vue";
@@ -112,7 +112,7 @@ const loadImageUrls = async () => {
 };
 
 onMounted(async () => {
-  const res = await fetchArticles(); //加载文章文字
+  const res = await fetchResources(); //加载文章文字
   resources.splice(0, 0, ...res); //返回文字
   await loadImageUrls(); //加载图片
 });

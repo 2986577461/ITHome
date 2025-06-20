@@ -12,7 +12,7 @@ const userStore = user_store();
 <template>
   <div id="main">
     <img
-      src="/ITLogo.png"
+      src="https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/ITLogo.png"
       alt="无法加载"
       class="logo"
       @click="router.push('/home')"
@@ -34,6 +34,8 @@ const userStore = user_store();
       <router-link to="/ai-dialog" class="nav-item">AI对话</router-link>
       <router-link to="/chat" class="nav-item">在线聊天室</router-link>
       <router-link to="/join-us" class="nav-item">加入我们</router-link>
+<!--      用完记得删-->
+      <a href="http://47.108.61.239/swagger-ui/index.html" target="_blank"  class="nav-item">接口文档</a>
     </nav>
 
     <div class="user-section">

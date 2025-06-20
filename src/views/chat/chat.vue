@@ -281,7 +281,7 @@ const scrollToBottom = () => {
 // 初始化WebSocket连接
 const initWebSocket = () => {
   // 替换为你的WebSocket服务器地址
-  socket.value = new WebSocket("ws://localhost:8080/ws/" + userStore.studentID);
+  socket.value = new WebSocket("ws://47.108.61.239/ws/" + userStore.studentID);
 
   socket.value.onopen = () => {
     connected.value = true;

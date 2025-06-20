@@ -31,21 +31,15 @@ export const downloadFile = async (id) => {
       });
   }
 };
-export const getImgForAxios = async (id) => {
-  const response = await axiosInstance({
-    url: "resources/cover/" + id,
-    method: "get",
-    responseType: "arraybuffer",
-  });
-  return response.data;
-};
-export const fetchArticles = async () => {
-  const resp = await axiosInstance.get("resources");
+
+export const fetchResources = async () => {
+  const resp = await axiosInstance.get("user/resources");
+  console.log(resp)
   return resp.data;
 };
 
 export const uploadResource = async (formData) => {
-  const resp = await axiosInstance.post("resources", formData, {
+  const resp = await axiosInstance.post("user/resources/upload", formData, {
     headers: {
       "Content-Type": "multipart/form-data", // 确保是 multipart/form-data 格式
     },
@@ -54,6 +48,6 @@ export const uploadResource = async (formData) => {
 };
 
 export const getnewcomers = async () => {
-  const resp = await axiosInstance.post("/newcomers");
+  const resp = await axiosInstance.post("admin/newcomers");
   return resp.data;
 };

@@ -95,7 +95,7 @@ onMounted(async () => {
     return;
   }
   const resp = await selectAllMenber(); // 获取数据
-
+  console.log(resp)
   governStore.member.splice(0, governStore.member.length, ...resp);
 
   resourceCount.value = await selectResourceCount();
@@ -178,11 +178,11 @@ onMounted(async () => {
           <div class="table-cell checkbox-cell">
             <el-checkbox v-model="checked[index]" size="large" />
           </div>
-          <div class="table-cell">{{ student.studentId }}</div>
+          <div class="table-cell">{{ student.id }}</div>
           <div class="table-cell">{{ student.name }}</div>
           <div class="table-cell">{{ student.sex }}</div>
           <div class="table-cell">{{ student.major }}</div>
-          <div class="table-cell">{{ student.claxx }}</div>
+          <div class="table-cell">{{ student.className }}</div>
           <div class="table-cell">{{ student.academy }}</div>
           <div class="table-cell">{{ student.position }}</div>
           <div class="table-cell">{{ student.articleCount }}</div>
