@@ -47,12 +47,12 @@ import Header from "@/components/Header.vue";
 
 // 证书相关数据
 const certificateImages = [
-  "/public/medal1.png",
-  "/public/medal3.png",
-  "/public/medal6.png",
-  "/public/medal7.png",
-  "/public/medal2.png",
-  "/public/medal9.png",
+  "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/medal1.png",
+  "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/medal3.png",
+  "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/medal6.png",
+  "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/medal7.png",
+  "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/medal2.png",
+  "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/medal9.png",
 ];
 
 const certificateTitles = [

@@ -1,22 +1,23 @@
 <script setup>
 import Header from "@/components/Header.vue";
 import Footer from "@/components/Foot.vue";
-import { user_store } from "@/store/user.js";
-import { storeToRefs } from "pinia";
-import { onMounted, reactive, computed } from "vue";
-import { fetchArticles, getImgForAxios } from "@/axios/file.js";
-import { ref } from "vue";
-import { useRouter } from "vue-router";
-import { visible_store } from "@/store/visible.js";
+import {user_store} from "@/store/user.js";
+import {onMounted, reactive, computed} from "vue";
+import {fetchResources} from "@/axios/file.js";
+import {ref} from "vue";
+import {useRouter} from "vue-router";
+import {visible_store} from "@/store/visible.js";
 import ResetPassword from "@/components/resetPassword.vue";
 
 const visibleStore = visible_store();
 const router = useRouter();
 
-const imgArr = ["3.jpg", "2.jpg", "1.jpg", "4.jpg"];
+const imgArr = ["https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/3.jpg",
+  "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/2.jpg",
+  "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/1.jpg",
+  "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/4.jpg"];
 
 const userStore = user_store();
-const { condition } = storeToRefs(userStore);
 
 let imgLink = ref("");
 
@@ -28,19 +29,6 @@ const gotoPage = (page) => {
   router.push(page);
 };
 
-const updateImageUrls = async () => {
-  // 等待所有图片的URL加载完成
-  const promises = news.map(async (item) => {
-    const imgData = await getImgForAxios(item.id);
-    console.log(imgData);
-    // 将二进制数据转换为 Blob 对象
-    const blob = new Blob([imgData], { type: "image/jpeg" }); // 假设是 JPEG 图片
-    // 创建一个 URL 以便在 img 标签中使用
-    item.imgUrl = URL.createObjectURL(blob);
-  });
-  // 使用 Promise.all 等待所有异步操作完成
-  await Promise.all(promises);
-};
 
 let news = reactive([]);
 
@@ -74,14 +62,13 @@ const handlePageChange = (page) => {
   // 可以在这里添加滚动到新闻区域顶部的效果
   const newsBar = document.querySelector(".newsBar");
   if (newsBar) {
-    newsBar.scrollIntoView({ behavior: "smooth" });
+    newsBar.scrollIntoView({behavior: "smooth"});
   }
 };
 
 onMounted(async () => {
-  const res = await fetchArticles(); //加载文章文字
-  news.splice(0, news.length, ...res); //返回文字
-  await updateImageUrls(); //加载图片
+  const res = await fetchResources();
+  news.splice(0, news.length, ...res);
 });
 </script>
 
@@ -93,7 +80,7 @@ onMounted(async () => {
         <el-carousel height="500px" arrow="always" direction="vertical">
           <el-carousel-item v-for="(item, index) in 4" :key="index">
             <a :href="imgLink" target="_blank" @click="intoUrl(index)"
-              ><img :src="getimg(item)" alt="ngm" class="img"
+            ><img :src="getimg(item)" alt="ngm" class="img"
             /></a>
           </el-carousel-item>
         </el-carousel>
@@ -119,16 +106,16 @@ onMounted(async () => {
           </div>
 
           <div
-            @click="visibleStore.resetPasswordVisible = true"
-            class="change-password-btn"
-            v-if="userStore.condition"
+              @click="visibleStore.resetPasswordVisible = true"
+              class="change-password-btn"
+              v-if="userStore.condition"
           >
             修改密码
           </div>
           <div
-            class="logout-btn"
-            @click="visibleStore.loginOrLogoutButton()"
-            :class="{ 'full-width': !userStore.condition }"
+              class="logout-btn"
+              @click="visibleStore.loginOrLogoutButton()"
+              :class="{ 'full-width': !userStore.condition }"
           >
             {{ visibleStore.getText }}
           </div>
@@ -160,13 +147,11 @@ onMounted(async () => {
 
     <div class="newsBar">
       <div
-        class="newsStyle"
-        v-for="item in currentPageNews"
-        :key="item.id"
-        @click="gotoPage('/leraningResource')"
-      >
-        <img :src="item.imgUrl" class="newsImg" alt="无法加载" />
-        <div class="text">
+          class="newsStyle"
+          v-for="item in currentPageNews"
+          :key="item.id"
+          @click="gotoPage('/leraningResource')"
+      ><div class="text">
           <div class="head">
             {{ item.head }}
           </div>
@@ -179,14 +164,14 @@ onMounted(async () => {
     <!-- 分页器容器 -->
     <div class="pagination-container">
       <el-pagination
-        class="pageBar"
-        background
-        size="large"
-        layout="prev, pager, next"
-        :total="news.length"
-        :page-size="pageSize"
-        :current-page="currentPage"
-        @current-change="handlePageChange"
+          class="pageBar"
+          background
+          size="large"
+          layout="prev, pager, next"
+          :total="news.length"
+          :page-size="pageSize"
+          :current-page="currentPage"
+          @current-change="handlePageChange"
       />
     </div>
 
@@ -198,6 +183,7 @@ onMounted(async () => {
 .main {
   background-color: #f2f6fb;
 }
+
 .headBar {
   margin: 0 auto;
   width: 95%;
@@ -289,7 +275,7 @@ onMounted(async () => {
 
 .innerBox {
   cursor: pointer;
-  font-family: "Microsoft JhengHei";
+  font-family: "Microsoft JhengHei",serif;
   padding: 25px;
   background: white;
   border-radius: 8px;
@@ -353,18 +339,12 @@ onMounted(async () => {
   min-height: 700px; /* 固定高度，防止分页切换时页面跳动 */
 }
 
-.newsImg {
-  margin-left: 20px;
-  width: 200px;
-  height: 150px;
-}
-
 .text {
   display: inline-block;
   width: 280px;
   height: 150px;
   vertical-align: top;
-  font-family: "Microsoft JhengHei";
+  font-family: "Microsoft JhengHei",serif;
 }
 
 .newsStyle {
@@ -407,64 +387,7 @@ onMounted(async () => {
 }
 
 /* 自定义分页器样式 */
-:deep(.el-pagination.is-background) .el-pager li {
-  background-color: #f4f4f5;
-  color: #606266;
-  min-width: 45px;
-  height: 45px;
-  line-height: 45px;
-  font-size: 18px;
-  border-radius: 4px;
-  margin: 0 8px;
-  transition: all 0.3s;
-}
 
-:deep(.el-pagination.is-background) .el-pager li:not(.disabled).active {
-  background-color: #409eff;
-  color: #fff;
-  transform: scale(1.1);
-}
-
-:deep(.el-pagination.is-background) .el-pager li:not(.disabled):hover {
-  background-color: #ecf5ff;
-  color: #409eff;
-}
-
-:deep(.el-pagination.is-background) .btn-prev,
-:deep(.el-pagination.is-background) .btn-next {
-  background-color: #f4f4f5;
-  border-radius: 4px;
-  min-width: 45px;
-  height: 45px;
-  line-height: 45px;
-  margin: 0 8px;
-  font-size: 18px;
-}
-
-:deep(.el-pagination.is-background) .btn-prev:hover,
-:deep(.el-pagination.is-background) .btn-next:hover {
-  background-color: #ecf5ff;
-  color: #409eff;
-}
-
-/* 添加更多按钮的样式 */
-:deep(.el-pagination.is-background) .btn-quicknext,
-:deep(.el-pagination.is-background) .btn-quickprev {
-  background-color: #f4f4f5;
-  color: #606266;
-  min-width: 45px;
-  height: 45px;
-  line-height: 45px;
-  margin: 0 8px;
-  font-size: 18px;
-  border-radius: 4px;
-}
-
-:deep(.el-pagination.is-background) .btn-quicknext:hover,
-:deep(.el-pagination.is-background) .btn-quickprev:hover {
-  background-color: #ecf5ff;
-  color: #409eff;
-}
 
 .pagination-container {
   display: flex;

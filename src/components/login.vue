@@ -24,7 +24,7 @@ const handleSubmit = async (e) => {
     loadingInstance.close(); //关闭加载动画
 
     const loginMessage = {
-      username: studentID.value,
+      id: studentID.value,
       password: password.value,
     };
     const resp = await login(loginMessage);

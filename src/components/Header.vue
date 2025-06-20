@@ -12,7 +12,7 @@ const userStore = user_store();
 <template>
   <div id="main">
     <img
-      src="/ITLogo.png"
+      src="https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/ITLogo.png"
       alt="无法加载"
       class="logo"
       @click="router.push('/home')"

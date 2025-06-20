@@ -169,9 +169,7 @@ const sendMessage = async () => {
   try {
     loading.value = true;
     scrollToBottom();
-
     const response = await aiDialog(userMessage.content);
-    console.log("API Response:", response);
     messages.value.push({
       role: "assistant",
       content: response,
