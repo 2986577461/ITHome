@@ -22,12 +22,14 @@ public class ChatServiceImpl implements ChatService {
     @Override
     public List<StudentDialogVO> getList() {
         List<Student> students = userMapper.selectList(null);
-
+        System.out.println(students);
         for (Student student : students) {
             if (student.getId().equals(BaseContext.getCurrentId())) ;
             students.remove(student);
         }
+        System.out.println(students);
         List<StudentDialogVO> studentDialogVOList = new ArrayList<>();
+
 
         for (Student student1 : students) {
             StudentDialogVO studentDialogVO = new StudentDialogVO();

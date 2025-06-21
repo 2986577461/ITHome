@@ -43,14 +43,16 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         return list;
     }
 
-
     @Override
     @AutoFillFields(AutoFillFields.OpType.INSERT)
-    public void upload(@Valid Resources resources) {
+    public void saveResource(@Valid Resources resources) {
         resourcesMapper.insert(resources);
 
         userMapper.addReourceCountByID(BaseContext.getCurrentId());
     }
+
+
+
 
 
 }

@@ -21,6 +21,15 @@ public class Resources implements BaseEntity {
     private String introduce;
 
     @NotBlank
+    private String fileUrl;
+
+    @NotBlank
+    private String fileName;
+
+    @NotBlank
+    private String coverUrl;
+
+    @NotBlank
     private LocalDateTime releaseDateTime;
 
     private Long studentId;
@@ -34,7 +43,7 @@ public class Resources implements BaseEntity {
 
     @Override
     public void setCreatedDateTime(LocalDateTime createdDateTime) {
-            this.releaseDateTime=createdDateTime;
+        this.releaseDateTime = createdDateTime;
     }
 
     @Override

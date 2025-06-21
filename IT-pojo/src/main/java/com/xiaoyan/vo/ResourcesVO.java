@@ -15,7 +15,11 @@ public class ResourcesVO {
 
     private LocalDateTime releaseDateTime;
 
-    private Long studentId;
+    private String fileName;
+
+    private String fileUrl;
+
+    private String coverUrl;
 
     private String studentName;
 }

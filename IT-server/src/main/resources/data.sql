@@ -1,4 +1,3 @@
-# USE YOUR DATABASE;
 drop database ITHome;
 create database ITHome;
 use ITHome;
@@ -24,6 +23,7 @@ INSERT INTO it_student(id, name, sex, major, class_name, academy, position, arti
     VALUE ('202300573', '超超', '1', '软件技术', '232班', '电子与信息', '会长', 0, 0,
            '$2a$10$8OVqXgG4u2RNTSFD0NB2KOBRn8ZAv3EX4nxFQfmJUcqRLRsAoeVYO');
 
+drop table resources;
 CREATE TABLE resources
 (
     id                bigint AUTO_INCREMENT primary key,
@@ -31,6 +31,9 @@ CREATE TABLE resources
     introduce         varchar(4000) NOT NULL,
     student_name      varchar(20)   not null,
     student_id        bigint        not null,
+    file_name         varchar(50)   not null,
+    file_url          varchar(300)  not null,
+    cover_url         varchar(300)  not null,
     release_date_time datetime      not null
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
@@ -71,7 +74,7 @@ CREATE TABLE newcomer
     name                  VARCHAR(20)      NOT NULL,
     sex                   ENUM ('男','女') NOT NULL,
     major                 VARCHAR(20)      NOT NULL,
-    class_name                 VARCHAR(20)      NOT NULL,
+    class_name            VARCHAR(20)      NOT NULL,
     academy               VARCHAR(20)      NOT NULL,
     introduce             VARCHAR(2000)    NOT NULL,
     application_date_time datetime         not null

@@ -1,21 +1,19 @@
 package com.xiaoyan.controller.user;
 
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.dto.ResourceDTO;
 import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.ResourcesService;
 import com.xiaoyan.utils.AliOssUtil;
+import com.xiaoyan.vo.FileVO;
 import com.xiaoyan.vo.ResourcesVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,43 +34,36 @@ public class ResourcesController {
 
     private ResourcesService resourcesService;
 
-    @GetMapping
+    @GetMapping("all")
     @Operation(summary = "返回所有资料")
     public Result<List<ResourcesVO>> getList() {
         List<ResourcesVO> list = resourcesService.getList();
         return Result.success(list);
     }
 
-
     @PostMapping("/upload")
-    @Transactional
-    public Result<String> upload(@RequestPart("file") MultipartFile file,
-                                 @RequestPart("resource") String resourceJson) {
-        log.info("文件上传:{},{}", file, resourceJson);
+    @Operation(summary = "上传资料到远程OSS")
+    public Result<FileVO> upload(MultipartFile file) throws IOException {
+        log.info("文件上传:{}", file);
 
-        ObjectMapper objectMapper = new ObjectMapper();
+        String name = file.getOriginalFilename();
 
-        ResourceDTO resourceDTO = null;
-        try {
-            resourceDTO = objectMapper.readValue(resourceJson, ResourceDTO.class);
-        } catch (JsonProcessingException ex) {
-            throw new RuntimeException(ex.getMessage());
-        }
+        String filePath = aliOssUtil.upload(file.getBytes(),
+                UUID.randomUUID()
+                        + name.substring(name.lastIndexOf(".")));
+
+        return Result.success(FileVO.builder().fileName(name).fileUrl(filePath).build());
+    }
+
+    @PostMapping
+    public Result<String> saveResource(@RequestBody ResourceDTO resourceDTO) {
+        log.info("保存文章：{}", resourceDTO);
         Resources resources = new Resources();
         BeanUtils.copyProperties(resourceDTO, resources);
-        resourcesService.upload(resources);
-        try {
-            String name = file.getOriginalFilename();
 
-            String filePath = aliOssUtil.upload(file.getBytes(),
-                    UUID.randomUUID()
-                            + name.substring(name.lastIndexOf(".")));
+        resourcesService.saveResource(resources);
 
-            return Result.success(filePath);
-        } catch (IOException e) {
-            log.error(e.toString());
-        }
-        return Result.error(MessageConstant.UPLOAD_FAILED);
+        return Result.success();
     }
 
 

@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -40,6 +41,13 @@ public class UsersController {
     public Result<String> updateStudent(@RequestBody @Valid PasswordDTO passwordDTO) {
         userService.updatePassword(passwordDTO);
         return Result.success();
+    }
+
+    @GetMapping
+    @Operation(summary = "返回当前学生信息")
+    public Result<StudentVO> getUser() {
+        StudentVO user = userService.getUser();
+        return Result.success(user);
     }
 
     @PostMapping("login")

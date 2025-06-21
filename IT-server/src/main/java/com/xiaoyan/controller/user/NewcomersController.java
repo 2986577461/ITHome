@@ -19,7 +19,7 @@ public class NewcomersController {
 
     private NewcomersService memberService;
 
-    @PostMapping("/applyJoin")
+    @PostMapping("/apply-join")
     @Operation(summary = "申请加入协会")
     public Result<String> applyJoin(@RequestBody NewComerDTO newComerDTO) {
         Newcomer newcomer = new Newcomer();

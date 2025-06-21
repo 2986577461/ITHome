@@ -28,13 +28,6 @@ public class UsersController {
     private UsersService userService;
 
     @GetMapping
-    @Operation(summary = "返回当前学生信息")
-    public Result<StudentVO> getUser() {
-        StudentVO user = userService.getUser();
-        return Result.success(user);
-    }
-
-    @GetMapping("all")
     @Operation(summary = "返回所有学生信息")
     public Result<List<StudentVO>> getAll() {
         List<StudentVO> list = userService.getAll();
