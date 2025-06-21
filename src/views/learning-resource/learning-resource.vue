@@ -44,7 +44,7 @@
             <div class="resource-body">
               <div class="resource-image">
                 <img
-                  :src="item.imageUrl"
+                  :src="item.coverUrl"
                   :alt="item.head"
                   class="fixed-image"
                 />
@@ -54,12 +54,16 @@
                   <p class="content-text">{{ item.introduce }}</p>
                 </div>
 
-                <button class="download-button" @click="downloadFile(item.id)">
+                <a
+                  class="download-button"
+                  :href="item.fileUrl"
+                  :download="item.fileName"
+                >
                   <el-icon :size="24">
                     <Download />
                   </el-icon>
                   <span>下载资料</span>
-                </button>
+                </a>
               </div>
             </div>
           </div>
@@ -81,7 +85,7 @@
 <script lang="ts" setup>
 import uploadVue from "@/components/uploadResources.vue";
 import Header from "@/components/Header.vue";
-import { downloadFile, fetchResources, getImgForAxios } from "@/axios/file";
+import { fetchResources } from "@/axios/file";
 import { reactive, onMounted, ref } from "vue";
 import Foot from "@/components/Foot.vue";
 import { Download } from "@element-plus/icons-vue";
@@ -100,20 +104,13 @@ const handleClick = (e) => {
   e.preventDefault();
 };
 
-const loadImageUrls = async () => {
-  // 等待所有图片的URL加载完成
-  const promises = resources.map(async (item) => {
-    const imgData = await getImgForAxios(item.id);
-    const blob = new Blob([imgData], { type: "image/png" });
-    item.imageUrl = URL.createObjectURL(blob);
-  });
-  // 使用 Promise.all 等待所有异步操作完成
-  await Promise.all(promises);
-};
+const loadImageUrls = async () => {};
 
 onMounted(async () => {
   const res = await fetchResources(); //加载文章文字
+  console.log(res);
   resources.splice(0, 0, ...res); //返回文字
+  console.log(resources);
   await loadImageUrls(); //加载图片
 });
 </script>
@@ -328,6 +325,7 @@ onMounted(async () => {
   transition: all 0.3s ease;
   font-weight: 500;
   align-self: center; /* 在flex容器中居中 */
+  text-decoration: none;
 }
 
 .download-button:hover {

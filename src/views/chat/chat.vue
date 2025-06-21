@@ -279,41 +279,57 @@ const scrollToBottom = () => {
 };
 
 // 初始化WebSocket连接
-const initWebSocket = () => {
-  // 替换为你的WebSocket服务器地址
-  socket.value = new WebSocket("ws://47.108.61.239/ws/" + userStore.studentID);
+const initWebSocket = async () => {
+  return new Promise((resolve, reject) => {
+    socket.value = new WebSocket(
+      "ws://localhost:8080/ws/" + userStore.studentID
+    );
 
-  socket.value.onopen = () => {
-    connected.value = true;
-  };
+    socket.value.onopen = () => {
+      connected.value = true;
+      console.log("WebSocket连接已建立！"); // 调试信息
+      resolve(); // 连接成功后才resolve Promise
+    };
 
-  socket.value.onmessage = (event) => {
-    try {
-      const message = JSON.parse(event.data);
-      // 如果消息是发给当前用户的
-      if (message.receiver === currentUser.value.id) {
-        const senderId = message.sender;
-        // 添加到消息列表
-        if (!allMessages.value[senderId]) {
-          allMessages.value[senderId] = [];
+    socket.value.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.receiver === currentUser.value.id) {
+          const senderId = message.sender;
+          if (!allMessages.value[senderId]) {
+            allMessages.value[senderId] = [];
+          }
+          allMessages.value[senderId].push(message);
         }
-        allMessages.value[senderId].push(message);
+      } catch (e) {
+        console.error("解析消息错误:", e);
       }
-    } catch (e) {
-      console.error("解析消息错误:", e);
-    }
-  };
+    };
 
-  socket.value.onclose = () => {
-    connected.value = false;
-    setTimeout(initWebSocket, 3000);
-  };
+    socket.value.onclose = () => {
+      connected.value = false;
+      console.log("WebSocket连接已关闭。"); // 调试信息
+      // reject("WebSocket连接已关闭"); // 如果需要，关闭时也reject
+    };
 
-  socket.value.onerror = (error) => {
-    console.error("WebSocket错误:", error);
-  };
+    socket.value.onerror = (error) => {
+      console.error("WebSocket错误:", error);
+      connected.value = false;
+      reject(error); // 连接错误时reject Promise
+    };
+  });
 };
 
+// 生命周期钩子
+onMounted(async () => {
+  try {
+    await initWebSocket(); // 等待 WebSocket 连接真正建立成功
+    users.value = await getUserList(); // 此时再调用
+  } catch (error) {
+    console.error("WebSocket 连接失败，无法获取用户列表:", error);
+    // 处理连接失败的情况，例如显示错误消息给用户
+  }
+});
 // 监听所有消息变化;
 watch(currentChatUser, (newVal) => {
   if (newVal) {
@@ -321,12 +337,6 @@ watch(currentChatUser, (newVal) => {
     currentMessages.value = allMessages.value[newVal.id] || [];
     scrollToBottom();
   }
-});
-
-// 生命周期钩子
-onMounted(async () => {
-  initWebSocket();
-  users.value = await getUserList();
 });
 </script>
 

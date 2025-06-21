@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 export const user_store = defineStore("user", {
   state: () => ({
-    studentID: "",
+    studentID: null,
     name: "",
     condition: false,
     position: "",
@@ -11,7 +11,7 @@ export const user_store = defineStore("user", {
   actions: {
     clear() {
       this.password = "";
-      this.studentID = "";
+      this.studentID = null;
       this.name = "";
       this.condition = false;
       this.academy = "";

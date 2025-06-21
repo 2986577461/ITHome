@@ -8,7 +8,6 @@ import { login } from "@/axios/axios.js";
 import { ElMessage } from "element-plus";
 const visibleStore = visible_store();
 const userStore = user_store();
-const { condition } = storeToRefs(userStore);
 const studentID = ref("");
 const password = ref("");
 
@@ -37,12 +36,14 @@ const handleSubmit = async (e) => {
       setTimeout(() => {
         visibleStore.offvisible();
         userStore.loginsuccess(
-          resp.data.studentId,
+          resp.data.id,
           resp.data.name,
           resp.data.position,
           resp.data.academy
         );
       }, 600);
+    } else {
+      ElMessage.error("账号或密码错误，请重试。");
     }
   }, 700);
 };
