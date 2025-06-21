@@ -8,7 +8,6 @@ import { login } from "@/axios/axios.js";
 import { ElMessage } from "element-plus";
 const visibleStore = visible_store();
 const userStore = user_store();
-const { condition } = storeToRefs(userStore);
 const studentID = ref("");
 const password = ref("");
 

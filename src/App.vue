@@ -5,9 +5,7 @@ import { getCurrentUser } from "@/axios/axios.js";
 const userStore = user_store();
 
 onMounted(async () => {
-  //发送axios请求，登陆成功则返回true
   const student = await getCurrentUser();
-  console.log(student)
   userStore.loginsuccess(
     student.data.id,
     student.data.name,

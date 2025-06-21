@@ -143,7 +143,7 @@ import { ElMessage } from "element-plus";
 import type { UploadProps } from "element-plus";
 import { upload_sotre } from "@/store/upload";
 import { user_store } from "@/store/user";
-import { uploadResource } from "@/axios/file";
+import { uploadFile, uploadResource } from "@/axios/file";
 import { ElUpload, ElButton } from "element-plus";
 const uploadStore = upload_sotre();
 const userStore = user_store();
@@ -152,9 +152,11 @@ const { loadFile_visible } = storeToRefs(uploadStore);
 const coverFileList = ref([]);
 const fileList = ref([]);
 const resource = reactive({
-  //资料简介数据
   head: "",
   introduce: "",
+  fileUrl: "",
+  coverUrl: "",
+  fileName: "",
 });
 
 const submitUpload = async () => {
@@ -169,14 +171,15 @@ const submitUpload = async () => {
 
   const formData = new FormData();
 
-  formData.append("resource", JSON.stringify(resource));
   formData.append("file", fileList.value[0].raw);
-  formData.append("cover", coverFileList.value[0].raw);
-  const condition = await uploadResource(formData); //发送表单格式的axios请求
-  if (condition == false) {
-    ElMessage.error("上传失败");
-    return;
-  }
+  const file = await uploadFile(formData);
+  formData.append("file", coverFileList.value[0].raw);
+  const cover = await uploadFile(formData);
+
+  resource.fileUrl = file.fileUrl;
+  resource.coverUrl = cover.fileUrl;
+  resource.fileName = file.fileName;
+  await uploadResource(resource);
 
   ElMessage.success("上传成功");
 
