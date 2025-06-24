@@ -23,3 +23,10 @@ export const getnewcomers = async () => {
   const resp = await axiosInstance.post("admin/newcomers");
   return resp.data;
 };
+
+export const getUrl = async (object, name) => {
+  const resp = await axiosInstance.get("user/resources/url", {
+    params: { objectName: object, friendlyName: name },
+  });
+  return resp.data;
+};

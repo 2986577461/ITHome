@@ -1,7 +1,6 @@
 <template>
   <Header></Header>
   <div class="chat-app">
-    <!-- 左侧学员列表 -->
     <div class="user-list">
       <div class="search-box">
         <input
@@ -36,7 +35,6 @@
       </div>
     </div>
 
-    <!-- 右侧聊天区域 -->
     <div class="chat-area">
       <div class="chat-header">
         <div v-if="currentChatUser" class="current-chat-info">
@@ -49,12 +47,6 @@
       </div>
 
       <div class="message-container" ref="messageContainer">
-        <!-- 加载更多按钮 -->
-        <div v-if="hasMoreMessages" class="load-more" @click="loadMoreMessages">
-          <button class="load-more-btn">加载更多消息</button>
-        </div>
-
-        <!-- 消息列表 -->
         <div
           v-for="(message, index) in currentMessages"
           :key="message.id || index"
@@ -91,16 +83,25 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
-import Header from "@/components/Header.vue";
-import axios from "axios";
-import { getUserList } from "@/axios/axios";
+import {
+  ref,
+  computed,
+  onMounted,
+  nextTick,
+  watch,
+  onBeforeUnmount,
+} from "vue";
 import { user_store } from "@/store/user";
+import { baseURL } from "@/axios/axiosInit";
+import { ElMessage } from "element-plus";
+import Header from "@/components/Header.vue";
 
 const userStore = user_store();
 // 当前用户信息
-const currentUser = ref({ id: userStore.studentID });
-
+const currentUser = computed(() => ({
+  id: userStore.studentID,
+  name: userStore.name,
+}));
 // 学员列表
 const users = ref([]);
 
@@ -111,22 +112,11 @@ const searchQuery = ref("");
 const currentChatUser = ref(null);
 
 // 所有聊天记录 { userId: [messages] }
+// 消息结构：{ sender: Long, receiver: Long, content: String, timestamp: Long }
 const allMessages = ref({});
 
 // 当前显示的聊天记录
 const currentMessages = ref([]);
-
-// 分页控制
-const pagination = ref({
-  page: 1,
-  pageSize: 20,
-  total: 0,
-});
-
-const hasMoreMessages = computed(() => {
-  if (!currentChatUser.value) return false;
-  return currentMessages.value.length < pagination.value.total;
-});
 
 // 新消息内容
 const newMessage = ref("");
@@ -138,10 +128,18 @@ const connected = ref(false);
 // DOM引用
 const messageContainer = ref(null);
 
-// 过滤后的学员列表
+// WebSocket 重试相关
+const MAX_RETRIES = 10; // 最大重试次数
+const RETRY_INTERVAL_MS = 1000; // 初始重试间隔，毫秒
+let retryCount = 0; // 当前重试次数
+let retryTimeoutId = null; // 用于存储 setTimeout 的 ID
+
+// 过滤后的学员列表 - 确保不显示自己
 const filteredUsers = computed(() => {
-  return users.value.filter((user) =>
-    user.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+  return users.value.filter(
+    (user) =>
+      user.id !== currentUser.value.id && // 核心：过滤掉当前用户
+      user.name.toLowerCase().includes(searchQuery.value.toLowerCase())
   );
 });
 
@@ -168,73 +166,23 @@ const getUnreadCount = (userId) => {
 
 // 格式化消息时间
 const formatMessageTime = (timestamp) => {
+  if (!timestamp) return "";
   const date = new Date(timestamp);
+  // 可以根据需要调整时间格式，例如显示日期和时间
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
 
 // 选择聊天用户
 const selectUser = async (user) => {
   currentChatUser.value = user;
-  // 标记消息为已读
   markMessagesAsRead(user.id);
-  // 加载历史消息
-  // await loadMessages();
-  // 滚动到底部
+  currentMessages.value = allMessages.value[user.id] || [];
   scrollToBottom();
-};
-
-// 加载历史消息
-const loadMessages = async () => {
-  if (!currentChatUser.value) return;
-
-  try {
-    const response = await axios.get("/api/messages", {
-      params: {
-        userId: currentChatUser.value.id,
-        page: pagination.value.page,
-        pageSize: pagination.value.pageSize,
-      },
-    });
-
-    const messages = response.data.messages || [];
-    pagination.value.total = response.data.total || 0;
-
-    // 如果是第一页，直接替换
-    if (pagination.value.page === 1) {
-      currentMessages.value = messages;
-      allMessages.value[currentChatUser.value.id] = messages;
-    } else {
-      // 否则添加到前面
-      currentMessages.value = [...messages, ...currentMessages.value];
-      allMessages.value[currentChatUser.value.id] = [
-        ...messages,
-        ...allMessages.value[currentChatUser.value.id],
-      ];
-    }
-  } catch (error) {
-    console.error("加载消息失败:", error);
-  }
-};
-
-// 加载更多消息
-const loadMoreMessages = async () => {
-  pagination.value.page += 1;
-  await loadMessages();
-
-  // 保持滚动位置
-  nextTick(() => {
-    if (messageContainer.value) {
-      const oldHeight = messageContainer.value.scrollHeight;
-      const scrollPosition = messageContainer.value.scrollHeight - oldHeight;
-      messageContainer.value.scrollTop = scrollPosition;
-    }
-  });
 };
 
 // 标记消息为已读
 const markMessagesAsRead = (userId) => {
   if (!allMessages.value[userId]) return;
-
   allMessages.value[userId] = allMessages.value[userId].map((msg) => {
     if (msg.sender === userId && !msg.read) {
       return { ...msg, read: true };
@@ -246,25 +194,27 @@ const markMessagesAsRead = (userId) => {
 // 发送消息
 const sendMessage = async () => {
   if (!newMessage.value.trim() || !currentChatUser.value) return;
+
   const message = {
-    id: Date.now().toString(),
     sender: currentUser.value.id,
     receiver: currentChatUser.value.id,
     content: newMessage.value,
-    timestamp: Date.now(),
+    timestamp: Date.now(), // 添加时间戳，毫秒
   };
 
-  // 添加到本地消息列表
   if (!allMessages.value[currentChatUser.value.id]) {
     allMessages.value[currentChatUser.value.id] = [];
   }
   allMessages.value[currentChatUser.value.id].push(message);
 
-  // 通过WebSocket发送消息
+  currentMessages.value = allMessages.value[currentChatUser.value.id];
+
   if (socket.value && connected.value) {
     socket.value.send(JSON.stringify(message));
+  } else {
+    ElMessage.error("WebSocket连接未建立，无法发送消息。");
   }
-  currentMessages.value = allMessages.value[message.receiver] || [];
+
   newMessage.value = "";
   scrollToBottom();
 };
@@ -278,129 +228,203 @@ const scrollToBottom = () => {
   });
 };
 
-// 初始化WebSocket连接
+// 初始化WebSocket连接（带重试机制）
 const initWebSocket = async () => {
-  return new Promise((resolve, reject) => {
-    socket.value = new WebSocket(
-      "ws://localhost:8080/ws/" + userStore.studentID
+  // 如果已经连接，则不再尝试
+  if (
+    connected.value &&
+    socket.value &&
+    socket.value.readyState === WebSocket.OPEN
+  ) {
+    console.log("WebSocket已连接，无需重新建立。");
+    return;
+  }
+
+  // 每次尝试连接前，清除之前的重试定时器
+  if (retryTimeoutId) {
+    clearTimeout(retryTimeoutId);
+    retryTimeoutId = null;
+  }
+
+  // 检查用户数据是否已准备好
+  if (!userStore.studentID || !userStore.name) {
+    console.warn(
+      `用户数据未准备好 (ID: ${userStore.studentID}, Name: ${userStore.name})，${RETRY_INTERVAL_MS}ms 后重试...`
     );
+    // 如果用户数据未准备好，立即安排下一次重试，不计入 retryCount
+    retryTimeoutId = setTimeout(initWebSocket, RETRY_INTERVAL_MS);
+    return;
+  }
+
+  // 检查是否达到最大重试次数
+  if (retryCount >= MAX_RETRIES) {
+    console.error("达到最大WebSocket重试次数，连接失败。");
+    ElMessage.error("聊天服务连接失败，请刷新页面或稍后重试。");
+    return;
+  }
+
+  console.log(`尝试建立WebSocket连接 (第 ${retryCount + 1} 次)...`);
+
+  const encodedUserName = encodeURIComponent(userStore.name);
+  const wsUrl = `ws://${baseURL}/ws/${userStore.studentID}/${encodedUserName}`;
+
+  try {
+    socket.value = new WebSocket(wsUrl);
 
     socket.value.onopen = () => {
       connected.value = true;
-      console.log("WebSocket连接已建立！"); // 调试信息
-      resolve(); // 连接成功后才resolve Promise
+      console.log("WebSocket连接已建立！");
+      retryCount = 0; // 重置重试次数
     };
 
     socket.value.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        if (message.receiver === currentUser.value.id) {
+
+        if (message.messageType === "ONLINE_USER_LIST_UPDATE") {
+          console.log("收到在线用户列表更新:", message.onlineUsers);
+          users.value = message.onlineUsers || [];
+        } else if (message.receiver === currentUser.value.id) {
           const senderId = message.sender;
           if (!allMessages.value[senderId]) {
             allMessages.value[senderId] = [];
           }
-          allMessages.value[senderId].push(message);
+          allMessages.value[senderId].push({ ...message, read: false });
+
+          if (currentChatUser.value && currentChatUser.value.id === senderId) {
+            currentMessages.value = allMessages.value[senderId];
+            scrollToBottom();
+            markMessagesAsRead(senderId);
+          }
         }
       } catch (e) {
-        console.error("解析消息错误:", e);
+        console.error("解析WebSocket消息错误:", e);
       }
     };
 
     socket.value.onclose = () => {
       connected.value = false;
-      console.log("WebSocket连接已关闭。"); // 调试信息
-      // reject("WebSocket连接已关闭"); // 如果需要，关闭时也reject
+      console.warn("WebSocket连接已关闭。");
+      // 连接关闭后，如果不是用户主动关闭，尝试重连
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        const delay = RETRY_INTERVAL_MS * Math.pow(2, retryCount - 1); // 指数退避
+        console.log(`WebSocket将在 ${delay}ms 后尝试重连...`);
+        retryTimeoutId = setTimeout(initWebSocket, delay);
+      } else {
+        console.error("WebSocket重连失败，达到最大重试次数。");
+        ElMessage.error("聊天服务连接断开，请刷新页面或稍后重试。");
+      }
     };
 
     socket.value.onerror = (error) => {
       console.error("WebSocket错误:", error);
       connected.value = false;
-      reject(error); // 连接错误时reject Promise
+      // 错误发生时，也会触发 onclose，所以重连逻辑主要放在 onclose 中处理
+      // 这里的 reject 可以在 onMounted 中捕获，用于首次连接失败
     };
-  });
+  } catch (error) {
+    // 这捕获的是 new WebSocket() 自身抛出的同步错误，不常见
+    console.error("创建WebSocket对象失败:", error);
+    if (retryCount < MAX_RETRIES) {
+      retryCount++;
+      const delay = RETRY_INTERVAL_MS * Math.pow(2, retryCount - 1);
+      console.log(`创建WebSocket失败，将在 ${delay}ms 后尝试重试...`);
+      retryTimeoutId = setTimeout(initWebSocket, delay);
+    } else {
+      ElMessage.error("无法建立WebSocket连接，请检查网络或联系管理员。");
+    }
+  }
 };
 
 // 生命周期钩子
-onMounted(async () => {
-  try {
-    await initWebSocket(); // 等待 WebSocket 连接真正建立成功
-    users.value = await getUserList(); // 此时再调用
-  } catch (error) {
-    console.error("WebSocket 连接失败，无法获取用户列表:", error);
-    // 处理连接失败的情况，例如显示错误消息给用户
+onMounted(() => {
+  // 首次尝试连接，会检查用户数据并启动重试机制
+  initWebSocket();
+});
+
+onBeforeUnmount(() => {
+  if (socket.value && socket.value.readyState === WebSocket.OPEN) {
+    socket.value.close();
+  }
+  // 清除任何未执行的重试定时器
+  if (retryTimeoutId) {
+    clearTimeout(retryTimeoutId);
+    retryTimeoutId = null;
   }
 });
-// 监听所有消息变化;
+
+// 监听 currentChatUser 变化，以更新 currentMessages
 watch(currentChatUser, (newVal) => {
   if (newVal) {
-    pagination.value.page = 1;
     currentMessages.value = allMessages.value[newVal.id] || [];
     scrollToBottom();
+  } else {
+    currentMessages.value = [];
   }
 });
 </script>
 
 <style scoped>
+/* 你的 CSS 样式保持不变 */
 .chat-app {
   display: flex;
-  height: 92vh;
-  margin: 0 auto;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  height: calc(100vh - 60px); /* 假设 Header 高度 60px */
+  border: 1px solid #ccc;
   overflow: hidden;
 }
 
-/* 左侧学员列表 */
 .user-list {
-  width: 300px;
-  border-right: 1px solid #eaeaea;
+  width: 280px;
+  border-right: 1px solid #eee;
+  padding: 10px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
 }
 
 .search-box {
-  padding: 15px;
   position: relative;
-  border-bottom: 1px solid #eaeaea;
+  margin-bottom: 15px;
 }
 
 .search-input {
-  width: 80%;
-  padding: 10px 15px 10px 35px;
-  border: 1px solid #eaeaea;
+  width: 100%;
+  padding: 10px 10px 10px 40px; /* 留出左侧空间给图标 */
+  border: 1px solid #ddd;
   border-radius: 20px;
-  outline: none;
-  font-size: 14px;
-  transition: border-color 0.3s;
-}
-
-.search-input:focus {
-  border-color: #1e88e5;
+  font-size: 1em;
+  box-sizing: border-box;
 }
 
 .search-icon {
   position: absolute;
-  left: 25px;
+  left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  width: 18px;
-  height: 18px;
-  fill: #999;
+  width: 20px;
+  height: 20px;
+  fill: #888;
 }
 
 .user-list-content {
-  flex: 1;
+  flex-grow: 1;
   overflow-y: auto;
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.user-list-content::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera*/
 }
 
 .user-item {
   display: flex;
-  padding: 12px 15px;
   align-items: center;
+  padding: 12px 10px;
+  border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
-  transition: background-color 0.2s;
-  position: relative;
+  transition: background-color 0.2s ease;
 }
 
 .user-item:hover {
@@ -408,67 +432,71 @@ watch(currentChatUser, (newVal) => {
 }
 
 .user-item.active {
-  background-color: #e3f2fd;
+  background-color: #e6f7ff; /* 选中状态背景色 */
+  border-left: 3px solid #007bff; /* 选中状态左边框 */
+  padding-left: 7px; /* 调整填充以适应边框 */
 }
 
 .user-avatar {
-  width: 40px;
-  height: 40px;
+  width: 45px;
+  height: 45px;
   border-radius: 50%;
-  background-color: #1e88e5;
+  background-color: #007bff;
   color: white;
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   font-weight: bold;
+  font-size: 1.2em;
   margin-right: 12px;
-  flex-shrink: 0;
+  flex-shrink: 0; /* 防止头像被压缩 */
 }
 
 .user-info {
-  flex: 1;
-  min-width: 0;
+  flex-grow: 1;
+  overflow: hidden; /* 隐藏溢出内容 */
 }
 
 .user-name {
-  font-weight: 500;
-  margin-bottom: 3px;
+  font-weight: bold;
+  font-size: 1.1em;
+  color: #333;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .user-last-msg {
-  font-size: 12px;
-  color: #666;
+  font-size: 0.9em;
+  color: #888;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-top: 2px;
 }
 
 .unread-count {
-  background-color: #ff3b30;
+  background-color: #ff4d4f; /* 红色 */
   color: white;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: bold;
+  border-radius: 12px; /* 更圆 */
+  padding: 4px 8px;
+  font-size: 0.8em;
+  margin-left: 10px;
+  min-width: 24px; /* 最小宽度，保证圆形 */
+  text-align: center;
+  flex-shrink: 0;
 }
 
-/* 右侧聊天区域 */
 .chat-area {
-  flex: 1;
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
 }
 
 .chat-header {
   padding: 15px 20px;
-  border-bottom: 1px solid #eaeaea;
+  border-bottom: 1px solid #eee;
+  background-color: #f7f7f7;
   display: flex;
   align-items: center;
 }
@@ -479,142 +507,141 @@ watch(currentChatUser, (newVal) => {
 }
 
 .chat-user-avatar {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background-color: #1e88e5;
+  background-color: #1890ff;
   color: white;
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   font-weight: bold;
-  margin-right: 12px;
+  margin-right: 10px;
+  font-size: 1.1em;
 }
 
 .chat-user-name {
-  font-weight: 500;
-  font-size: 16px;
+  font-weight: bold;
+  font-size: 1.2em;
+  color: #333;
 }
 
 .select-user-prompt {
-  color: #666;
-  font-style: italic;
+  flex-grow: 1;
+  text-align: center;
+  color: #888;
+  font-size: 1.1em;
 }
 
 .message-container {
-  flex: 1;
-  padding: 20px;
+  flex-grow: 1;
+  padding: 15px 20px;
   overflow-y: auto;
-  background-color: #f9f9f9;
+  background-color: #fdfdfd;
+  display: flex;
+  flex-direction: column; /* 保持消息从上到下排列 */
+  gap: 10px; /* 消息间距 */
 }
 
+/* 加载更多按钮样式移除 */
 .load-more {
   text-align: center;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 
 .load-more-btn {
-  background-color: #e3f2fd;
-  color: #1e88e5;
+  background-color: #e9e9e9;
   border: none;
   padding: 8px 15px;
-  border-radius: 15px;
-  font-size: 13px;
+  border-radius: 5px;
   cursor: pointer;
+  font-size: 0.9em;
+  color: #555;
   transition: background-color 0.2s;
 }
 
 .load-more-btn:hover {
-  background-color: #bbdefb;
+  background-color: #ddd;
 }
 
 .message {
-  margin-bottom: 15px;
   display: flex;
   flex-direction: column;
-  max-width: 70%;
+  max-width: 60%;
+  padding: 10px 15px;
+  border-radius: 15px;
+  word-wrap: break-word;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .message.sent {
-  align-self: flex-end;
-  align-items: flex-end;
+  align-self: flex-end; /* 右对齐 */
+  background-color: #e1ffc7; /* 发送消息的背景色 */
+  color: #333;
+  border-bottom-right-radius: 2px; /* 模拟聊天气泡尖角 */
 }
 
 .message.received {
-  align-self: flex-start;
-  align-items: flex-start;
+  align-self: flex-start; /* 左对齐 */
+  background-color: #ffffff; /* 接收消息的背景色 */
+  color: #333;
+  border-bottom-left-radius: 2px; /* 模拟聊天气泡尖角 */
 }
 
 .message-content {
-  padding: 10px 15px;
-  border-radius: 18px;
-  font-size: 14px;
-  line-height: 1.4;
-  word-break: break-word;
-}
-
-.message.sent .message-content {
-  background-color: #1e88e5;
-  color: white;
-  border-bottom-right-radius: 5px;
-}
-
-.message.received .message-content {
-  background-color: #e3f2fd;
-  color: #333;
-  border-bottom-left-radius: 5px;
+  font-size: 1em;
+  margin-bottom: 5px;
 }
 
 .message-time {
-  font-size: 11px;
+  font-size: 0.75em;
   color: #999;
-  margin-top: 4px;
+  text-align: right; /* 时间右对齐 */
 }
 
 .message-input {
-  padding: 15px;
-  border-top: 1px solid #eaeaea;
   display: flex;
-  align-items: center;
+  padding: 15px 20px;
+  border-top: 1px solid #eee;
+  background-color: #f7f7f7;
 }
 
 .message-input input {
-  flex: 1;
-  padding: 12px 15px;
-  border: 1px solid #eaeaea;
+  flex-grow: 1;
+  padding: 10px 15px;
+  border: 1px solid #ddd;
   border-radius: 20px;
-  outline: none;
-  font-size: 14px;
-  transition: border-color 0.3s;
-}
-
-.message-input input:focus {
-  border-color: #1e88e5;
+  font-size: 1em;
+  margin-right: 10px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .message-input button {
-  margin-left: 10px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: #1e88e5;
+  background-color: #007bff;
   color: white;
   border: none;
+  border-radius: 20px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 1em;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s ease;
+}
+
+.message-input button:hover:not(:disabled) {
+  background-color: #0056b3;
 }
 
 .message-input button:disabled {
-  background-color: #bbdefb;
+  background-color: #cccccc;
   cursor: not-allowed;
 }
 
 .send-icon {
   width: 20px;
   height: 20px;
-  fill: currentColor;
+  fill: white;
 }
 </style>
