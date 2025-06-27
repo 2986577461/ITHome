@@ -199,7 +199,7 @@ const sendMessage = async () => {
     sender: currentUser.value.id,
     receiver: currentChatUser.value.id,
     content: newMessage.value,
-    timestamp: Date.now(), // 添加时间戳，毫秒
+    messageType: "CHAT",
   };
 
   if (!allMessages.value[currentChatUser.value.id]) {
@@ -246,7 +246,6 @@ const initWebSocket = async () => {
     retryTimeoutId = null;
   }
 
-  // 检查用户数据是否已准备好
   if (!userStore.studentID || !userStore.name) {
     console.warn(
       `用户数据未准备好 (ID: ${userStore.studentID}, Name: ${userStore.name})，${RETRY_INTERVAL_MS}ms 后重试...`
@@ -267,6 +266,7 @@ const initWebSocket = async () => {
 
   const encodedUserName = encodeURIComponent(userStore.name);
   const wsUrl = `ws://${baseURL}/ws/${userStore.studentID}/${encodedUserName}`;
+  // const wsUrl = `ws://${baseURL}/ws/${202300573}/${"靳玉超"}`;
 
   try {
     socket.value = new WebSocket(wsUrl);

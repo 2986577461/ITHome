@@ -1,5 +1,6 @@
 import axios from "axios";
-export const baseURL = "localhost:8080";
+// export const baseURL = "localhost:8080";
+export const baseURL = "47.108.61.239";
 const axiosInstance = axios.create({
   //部署到云服务器需要修改为其公网地址
   baseURL: "http://" + baseURL,
