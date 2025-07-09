@@ -1,15 +1,16 @@
 spring:
   profiles:
     active: dev
+  servlet:
     multipart:
-      max-file-size: 2048MB
-      max-request-size: 2048MB
+      max-file-size: 500MB      # 单个文件最大大小
+      max-request-size: 500MB   # 整个请求的最大大小（适用于多文件上传）
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
-
+    type: com.alibaba.druid.pool.DruidDataSource
 
   data:
     redis:
@@ -19,5 +20,21 @@ spring:
       database: ${SPRING_REDIS_DATABASE:0}
       timeout: 5000ms
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus # 暴露这些端点
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+        pushgateway:
+          enabled: true
 
-
+mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-field: deleted # 逻辑删除的数据库字段名，与表中保持一致
+      logic-not-delete-value: 0      # 未删除字段的默认值 (例如：0, false, null)
+      logic-delete-value: 1         # 已删除字段的值 (例如：1, true)

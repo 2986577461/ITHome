@@ -6,5 +6,6 @@
 /docker-compose.yml
 /Dockerfile
 .DS_Store
-/run.sh
+
 /IT-server/src/main/resources/application-prod.yml
+/my.cnf

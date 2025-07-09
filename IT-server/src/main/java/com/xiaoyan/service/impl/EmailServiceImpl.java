@@ -51,7 +51,7 @@ public class EmailServiceImpl implements EmailService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(email);
-        message.setSubject("马家骑服务平台");
+        message.setSubject("IT之家协会");
         message.setText("验证码: " + code + "，5分钟内有效");
         mailSender.send(message);
     }

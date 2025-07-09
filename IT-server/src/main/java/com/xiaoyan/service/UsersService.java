@@ -2,12 +2,12 @@ package com.xiaoyan.service;
 
 import com.xiaoyan.dto.LoginDTO;
 import com.xiaoyan.dto.PasswordDTO;
-import com.xiaoyan.dto.StudentDTO;
 
 import com.xiaoyan.pojo.Student;
 import com.xiaoyan.vo.StudentVO;
-import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 
+import java.io.IOException;
 import java.util.List;
 
 
@@ -17,11 +17,14 @@ public interface UsersService {
 
     StudentVO login(LoginDTO message);
 
-    void removeStudents(List<Long> ids);
+    void removeStudents(List<Integer> ids);
 
     List<StudentVO> getAll();
 
-    void update(@Valid Student student);
+    void update(Student student);
 
     void updatePassword(PasswordDTO passwordDTO);
+
+    ResponseEntity<byte[]> downloadExcel() throws IOException;
+
 }

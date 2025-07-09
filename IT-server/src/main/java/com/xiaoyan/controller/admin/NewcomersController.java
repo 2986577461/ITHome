@@ -1,6 +1,5 @@
 package com.xiaoyan.controller.admin;
 
-import com.xiaoyan.pojo.Newcomer;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.NewcomersService;
 import com.xiaoyan.vo.NewcomerVO;
@@ -22,21 +21,21 @@ public class NewcomersController {
 
     private NewcomersService memberService;
 
-    @DeleteMapping
+    @DeleteMapping("{id}")
     @Operation(summary = "拒绝申请")
-    public Result<String> refuseNewcomer(@NotNull Long id) {
+    public Result<String> refuseNewcomer(@PathVariable @NotNull Integer id) {
         memberService.refuseNewcomer(id);
         return Result.success();
     }
 
-    @PutMapping
+    @PutMapping("{id}")
     @Operation(summary = "同意申请")
-    public Result<String> agreeNewcomer(@NotNull Long id) {
+    public Result<String> agreeNewcomer(@PathVariable @NotNull Integer id) {
         memberService.agreeNewcomer(id);
         return Result.success();
     }
 
-    @PostMapping
+    @GetMapping
     @Operation(summary = "获取所有申请")
     public Result<List<NewcomerVO>> getnewcomers() {
         List<NewcomerVO> list = memberService.getAll();

@@ -1,20 +1,14 @@
 package com.xiaoyan.context;
 
-import com.xiaoyan.vo.StudentVO;
-
 public class BaseContext {
 
-    public static final ThreadLocal<StudentVO> threadLocal = new ThreadLocal<>();
+    public static final ThreadLocal<Integer> threadLocal = new ThreadLocal<>();
 
-    public static void setCurrentId(StudentVO studentVO) {
-        threadLocal.set(studentVO);
+    public static void setCurrentStudentId(Integer id) {
+        threadLocal.set(id);
     }
 
-    public static Long getCurrentId() {
-        StudentVO studentVO = threadLocal.get();
-        return studentVO.getId();
-    }
-    public static StudentVO getCurrentStudent(){
+    public static Integer getCurrentStudentId(){
         return threadLocal.get();
     }
 

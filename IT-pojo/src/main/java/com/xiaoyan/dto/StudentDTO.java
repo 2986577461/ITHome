@@ -1,5 +1,6 @@
 package com.xiaoyan.dto;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.ToString;
 
@@ -8,7 +9,10 @@ import lombok.ToString;
 @ToString
 public class StudentDTO {
 
-    private Long id;
+    @NotNull
+    private Integer id;
+
+    private Integer studentId;
 
     private String name;
 

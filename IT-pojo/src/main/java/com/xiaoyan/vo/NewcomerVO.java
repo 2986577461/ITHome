@@ -7,9 +7,9 @@ import java.time.LocalDateTime;
 @Data
 public class NewcomerVO {
 
-    private Long id;
+    private Integer id;
 
-    private Long studentId;
+    private Integer studentId;
 
     private String name;
 

@@ -35,7 +35,7 @@ public class ArticlesController {
     @PostMapping
     @Operation(summary = "上传文章")
     @CacheEvict(cacheNames = "articleList", allEntries = true)
-    public Result<String> upload(@RequestBody ArticleDTO articleDTO) {
+    public Result<String> upload(@RequestBody @Valid ArticleDTO articleDTO) {
         Article article = new Article();
         BeanUtils.copyProperties(articleDTO, article,"id");
         messageService.upload(article);
@@ -45,7 +45,7 @@ public class ArticlesController {
     @PutMapping
     @Operation(summary = "修改文章")
     @CacheEvict(cacheNames = "articleList", allEntries = true)
-    public Result<String> update(@RequestBody @Valid ArticleDTO articleDTO) {
+    public Result<String> update(@RequestBody ArticleDTO articleDTO) {
         Article article = new Article();
         BeanUtils.copyProperties(articleDTO, article);
 
@@ -53,10 +53,10 @@ public class ArticlesController {
         return Result.success();
     }
 
-    @DeleteMapping
+    @DeleteMapping("{id}")
     @Operation(summary = "删除文章")
     @CacheEvict(cacheNames = "articleList", allEntries = true)
-    public Result<String> delete(Long id) {
+    public Result<String> delete(@PathVariable Integer id) {
         messageService.delete(id);
         return Result.success();
     }

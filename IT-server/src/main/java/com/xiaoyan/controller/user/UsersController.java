@@ -1,9 +1,10 @@
 package com.xiaoyan.controller.user;
 
+import com.xiaoyan.constant.JwtClaimsConstant;
+import com.xiaoyan.constant.PositionConstant;
 import com.xiaoyan.dto.LoginDTO;
 import com.xiaoyan.dto.PasswordDTO;
-import com.xiaoyan.dto.StudentDTO;
-import com.xiaoyan.pojo.Student;
+
 import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.UsersService;
@@ -52,14 +53,20 @@ public class UsersController {
 
     @PostMapping("login")
     @Operation(summary = "账号密码登录")
-    public Result<StudentVO> login(@RequestBody LoginDTO message) {
+    public Result<StudentVO> login(@RequestBody @Valid LoginDTO message) {
 
-        log.info("请求登陆：{}", message);
         StudentVO studentVO = userService.login(message);
+
+        String position = studentVO.getPosition();
+        String tokenName;
+        if(position.equals(PositionConstant.STUDENT))
+            tokenName= JwtClaimsConstant.USER_ID;
+        else
+            tokenName=JwtClaimsConstant.ADMIN_ID;
 
         //登录成功后，生成jwt令牌
         Map<String, Object> claims = new HashMap<>();
-        claims.put(jwtProperties.getTokenName(), studentVO);
+        claims.put(tokenName, studentVO.getStudentId());
         String token = JwtUtil.createJWT(
                 jwtProperties.getSecretKey(),
                 jwtProperties.getTtl(),

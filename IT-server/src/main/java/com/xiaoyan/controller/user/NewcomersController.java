@@ -6,6 +6,7 @@ import com.xiaoyan.result.Result;
 import com.xiaoyan.service.NewcomersService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,7 @@ public class NewcomersController {
 
     @PostMapping("/apply-join")
     @Operation(summary = "申请加入协会")
-    public Result<String> applyJoin(@RequestBody NewComerDTO newComerDTO) {
+    public Result<String> applyJoin(@RequestBody @Valid NewComerDTO newComerDTO) {
         Newcomer newcomer = new Newcomer();
         BeanUtils.copyProperties(newComerDTO, newcomer);
         memberService.applyJoin(newcomer);

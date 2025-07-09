@@ -50,7 +50,7 @@ public class GlobalException {
 
     @ExceptionHandler
     public Result<String> exceptionHandler(RuntimeException ex) {
-        log.error("异常信息：{}", ex.getMessage());
+        ex.printStackTrace();
         return Result.error(ex.getMessage());
     }
 }

@@ -1,17 +1,16 @@
 package com.xiaoyan.interceptor;
 
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.xiaoyan.constant.PositionConstant;
+
+import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.utils.JwtUtil;
-import com.xiaoyan.vo.StudentVO;
 import io.jsonwebtoken.Claims;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -24,10 +23,8 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @Slf4j
 public class JwtAdminTokenInterceptor implements HandlerInterceptor {
 
-    @Autowired
+    @Resource
     private JwtProperties jwtProperties;
-
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         //判断当前拦截到的是Controller的方法还是其他资源
@@ -41,22 +38,10 @@ public class JwtAdminTokenInterceptor implements HandlerInterceptor {
         //2、校验令牌
         try {
             Claims claims = JwtUtil.parseJWT(jwtProperties.getSecretKey(), token);
-            Object studentVoAsObject = claims.get(jwtProperties.getTokenName());
-
-            StudentVO studentVO = objectMapper.convertValue(studentVoAsObject, StudentVO.class);
-            log.info("用户身份:{}", studentVO.getPosition());
-            if (studentVO.getPosition().equals(PositionConstant.STUDENT)) {
-                response.setStatus(401);
-                return false;
-            }
-
-
-            BaseContext.setCurrentId(studentVO);
+            Integer studentId = Integer.valueOf(claims.get(JwtClaimsConstant.ADMIN_ID).toString());
+            BaseContext.setCurrentStudentId(studentId);
             return true;
         } catch (Exception ex) {
-            ex.printStackTrace();
-            log.info("请求被拒绝");
-            //4、不通过，响应401状态码
             response.setStatus(401);
             return false;
         }

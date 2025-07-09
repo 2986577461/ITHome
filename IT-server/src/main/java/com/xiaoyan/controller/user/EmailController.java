@@ -28,8 +28,6 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 public class EmailController {
 
-    private JwtProperties jwtProperties;
-
     private EmailService emailService;
 
     // 发送验证码

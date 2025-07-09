@@ -2,17 +2,16 @@ package com.xiaoyan.service;
 
 import com.xiaoyan.pojo.Newcomer;
 import com.xiaoyan.vo.NewcomerVO;
-import jakarta.validation.Valid;
 
 import java.util.List;
 
 public interface NewcomersService {
 
-    void refuseNewcomer(Long id);
+    void refuseNewcomer(Integer id);
 
-    void agreeNewcomer(Long id);
+    void agreeNewcomer(Integer id);
 
-    void applyJoin(@Valid Newcomer newComer);
+    void applyJoin(Newcomer newComer);
 
     List<NewcomerVO> getAll();
 

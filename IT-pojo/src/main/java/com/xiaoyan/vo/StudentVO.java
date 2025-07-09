@@ -8,7 +8,9 @@ import lombok.ToString;
 @ToString
 public class StudentVO {
 
-    private Long id;
+    private Integer id;
+
+    private Integer studentId;
 
     private String name;
 
@@ -26,5 +28,5 @@ public class StudentVO {
 
     private Integer resourceCount;
 
-    private String  token;
+    private String token;
 }

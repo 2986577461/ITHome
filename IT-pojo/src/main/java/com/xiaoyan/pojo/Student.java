@@ -3,23 +3,27 @@ package com.xiaoyan.pojo;
 
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @TableName(value = "it_student")
-public class Student {
+public class Student implements Serializable {
 
-    @NotNull
-    private Long id;
+    private Integer id;
+
+    @TableField(updateStrategy = FieldStrategy.NOT_EMPTY)
+    private Integer studentId;
 
     @TableField(updateStrategy = FieldStrategy.NOT_EMPTY)
     private String name;
@@ -46,5 +50,6 @@ public class Student {
 
     private Integer resourceCount;
 
-
+    @TableLogic
+    private Boolean deleted;
 }

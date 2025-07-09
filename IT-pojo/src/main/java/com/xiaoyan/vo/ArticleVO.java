@@ -12,17 +12,17 @@ public class ArticleVO implements Serializable {
 
     private static final long serialVersionUID=1L;
 
-    private Long id;
+    private Integer id;
 
-    private String author;
+    private String name;
 
-    private String authorId;
+    private Integer studentId;
 
-    private String type;
+    private Integer type;
 
     private String head;
 
     private String content;
 
-    private LocalDateTime releaseDateTime;
+    private LocalDateTime updatedDateTime;
 }
