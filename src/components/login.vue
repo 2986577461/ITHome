@@ -1,14 +1,15 @@
 <script setup>
-import { visible_store } from "@/store/visible.js";
-import { user_store } from "@/store/user.js";
-import { storeToRefs } from "pinia";
-import { ref } from "vue";
-import { ElLoading } from "element-plus";
-import { login } from "@/axios/axios.js";
-import { ElMessage } from "element-plus";
+import {visible_store} from "@/store/visible.js";
+import {user_store} from "@/store/user.js";
+import {ref} from "vue";
+import {ElLoading} from "element-plus";
+import {ElMessage} from "element-plus";
+import {login} from "@/request/axiosForUser.js";
+import router from "@/router/router.js";
+
 const visibleStore = visible_store();
 const userStore = user_store();
-const studentID = ref("");
+const studentId = ref("");
 const password = ref("");
 
 const handleSubmit = async (e) => {
@@ -23,7 +24,7 @@ const handleSubmit = async (e) => {
     loadingInstance.close(); //关闭加载动画
 
     const loginMessage = {
-      id: studentID.value,
+      studentId: studentId.value,
       password: password.value,
     };
     const resp = await login(loginMessage);
@@ -36,11 +37,12 @@ const handleSubmit = async (e) => {
       setTimeout(() => {
         visibleStore.offvisible();
         userStore.loginsuccess(
-          resp.data.id,
-          resp.data.name,
-          resp.data.position,
-          resp.data.academy
+            resp.data.id,
+            resp.data.name,
+            resp.data.position,
+            resp.data.academy
         );
+        router.push("/")
       }, 600);
     } else {
       ElMessage.error("账号或密码错误，请重试。");
@@ -51,32 +53,32 @@ const handleSubmit = async (e) => {
 
 <template>
   <el-dialog
-    width="550px"
-    :show-close="false"
-    style="
+      width="550px"
+      :show-close="false"
+      style="
       padding: 0;
       background: linear-gradient(135deg, #90caf9 0%, #1976d2 100%);
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
       height: 440px;
       border-radius: 18px;
     "
-    v-model="visibleStore.visible"
+      v-model="visibleStore.visible"
   >
     <form @submit="handleSubmit">
       <div class="headLine">IT之家协会</div>
 
       <div class="input-group">
         <div>请输入账号：</div>
-        <input v-model="studentID" required />
+        <input v-model="studentId" required/>
       </div>
       <div class="input-group">
         <div>请输入密码：</div>
-        <input v-model="password" type="password" required />
+        <input v-model="password" type="password" required/>
       </div>
 
       <div class="submit-div">
         <el-button type="success" native-type="submit" class="glass-btn"
-          >登录
+        >登录
         </el-button>
       </div>
     </form>
@@ -123,6 +125,7 @@ const handleSubmit = async (e) => {
   pointer-events: none;
   transition: all 0.3s ease;
 }
+
 .input-group input {
   width: 95%;
   height: 40px;
@@ -135,6 +138,7 @@ const handleSubmit = async (e) => {
   background-color: rgba(255, 255, 255, 0.3);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.1);
 }
+
 .input-group input:focus {
   border-color: #007bff;
   transform: scale(1.02);

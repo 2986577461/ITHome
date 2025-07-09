@@ -103,22 +103,6 @@ const certificateDescriptions = [
   align-items: center;
 }
 
-.card-content {
-  min-height: 100px;
-}
-
-.info-content {
-  min-height: 200px;
-}
-
-.el-divider {
-  margin: 40px 0;
-}
-
-.el-row {
-  margin-bottom: 20px;
-}
-
 .certificate-card {
   background: #fafafa;
   height: 450px;
@@ -166,46 +150,5 @@ const certificateDescriptions = [
   height: 24vh;
   object-fit: cover;
   border-radius: 4px;
-}
-
-/* 调整布局响应式 */
-@media screen and (max-width: 1200px) {
-  .el-col {
-    width: 50% !important;
-  }
-}
-
-@media screen and (max-width: 768px) {
-  .el-col {
-    width: 100% !important;
-  }
-}
-
-/* 添加以下样式来自定义图片预览 */
-:deep(.el-image-viewer__wrapper) {
-  width: 100vw;
-  height: 100vh;
-}
-
-:deep(.el-image-viewer__img) {
-  max-width: 100vw !important;
-  max-height: 100vh !important;
-  object-fit: contain;
-}
-
-:deep(.el-image-viewer__actions) {
-  opacity: 0.9;
-  padding: 15px;
-}
-
-:deep(.el-image-viewer__close) {
-  top: 20px;
-  right: 20px;
-}
-
-:deep(.el-image-viewer__canvas) {
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 </style>

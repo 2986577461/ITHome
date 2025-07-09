@@ -1,11 +1,11 @@
 <script lang="ts" setup>
 import { onMounted, reactive, ref } from "vue";
 import Header from "@/components/Header.vue";
-import { getAllArticle, deleteArticle } from "@/axios/axios.js";
 import { user_store } from "@/store/user";
 import { useRouter } from "vue-router";
 import { ElLoading, ElMessage, ElDialog } from "element-plus";
 import { article_store } from "@/store/updateArticle";
+import { deleteById,getAll } from "@/request/axiosForArticles";
 const articleStore = article_store();
 const userStore = user_store();
 const router = useRouter();
@@ -19,6 +19,21 @@ const articleToDelete = ref(null);
 const handleClick = (e) => {
   e.preventDefault();
 };
+
+const getType=(type)=>{
+  if(type==1)
+    return "C语言";
+  else if(type==2)
+    return "HTML";
+  else if(type==3)
+    return "CSS"
+  else if(type==4)
+    return "JavaScript"
+  else if(type==5)
+    return "Java"
+  else if(type==6)
+    return "MySQL"
+}
 
 const handleEdit = (item) => {
   articleStore.setArticle(item.id, item.head, item.content, item.type);
@@ -50,7 +65,7 @@ const issueArticle = () => {
 
 const handleDelete = async () => {
   if (!articleToDelete.value) return;
-  const condition = await deleteArticle(articleToDelete.value.id);
+  const condition = await deleteById(articleToDelete.value.id);
   if (!condition) {
     ElMessage.error("删除失败");
   } else {
@@ -67,8 +82,8 @@ const handleDelete = async () => {
 };
 
 onMounted(async () => {
-  const resp = await getAllArticle();
-  Article.splice(0, 0, ...resp);
+  const resp = await getAll();
+  Article.splice(0, 0, ...resp.data);
 });
 </script>
 <template>
@@ -89,7 +104,7 @@ onMounted(async () => {
             <div class="nav-item parent">C语言</div>
             <div class="sub-items">
               <el-anchor-link
-                v-for="item in Article.filter((item) => item.type == 'c')"
+                v-for="item in Article.filter((item) => item.type == 1)"
                 :href="`#part${item.id}`"
                 @click="handleClick"
                 ><div class="nav-sub-item">
@@ -99,10 +114,10 @@ onMounted(async () => {
             </div>
           </div>
           <div class="nav-group">
-            <div class="nav-item parent">HTML5</div>
+            <div class="nav-item parent">HTML</div>
             <div class="sub-items">
               <el-anchor-link
-                v-for="item in Article.filter((item) => item.type == 'html')"
+                v-for="item in Article.filter((item) => item.type == 2)"
                 :href="`#part${item.id}`"
                 @click="handleClick"
                 ><div class="nav-sub-item">
@@ -115,7 +130,7 @@ onMounted(async () => {
             <div class="nav-item parent">CSS</div>
             <div class="sub-items">
               <el-anchor-link
-                v-for="item in Article.filter((item) => item.type == 'css')"
+                v-for="item in Article.filter((item) => item.type == 3)"
                 :href="`#part${item.id}`"
                 @click="handleClick"
                 ><div class="nav-sub-item">
@@ -128,7 +143,7 @@ onMounted(async () => {
             <div class="nav-item parent">JavaScript</div>
             <div class="sub-items">
               <el-anchor-link
-                v-for="item in Article.filter((item) => item.type == 'js')"
+                v-for="item in Article.filter((item) => item.type == 4)"
                 :href="`#part${item.id}`"
                 @click="handleClick"
                 ><div class="nav-sub-item">
@@ -141,7 +156,7 @@ onMounted(async () => {
             <div class="nav-item parent">Java</div>
             <div class="sub-items">
               <el-anchor-link
-                v-for="item in Article.filter((item) => item.type == 'java')"
+                v-for="item in Article.filter((item) => item.type == 5)"
                 :href="`#part${item.id}`"
                 @click="handleClick"
                 ><div class="nav-sub-item">
@@ -154,7 +169,7 @@ onMounted(async () => {
             <div class="nav-item parent">Mysql</div>
             <div class="sub-items">
               <el-anchor-link
-                v-for="item in Article.filter((item) => item.type == 'mysql')"
+                v-for="item in Article.filter((item) => item.type == 6)"
                 :href="`#part${item.id}`"
                 @click="handleClick"
                 ><div class="nav-sub-item">
@@ -175,7 +190,7 @@ onMounted(async () => {
             <el-dropdown
               trigger="hover"
               style="cursor: pointer"
-              v-show="item.authorId == userStore.studentID"
+              v-show="item.studentId == userStore.studentId"
             >
               <el-icon size="20"><MoreFilled /></el-icon>
               <template #dropdown>
@@ -203,10 +218,10 @@ onMounted(async () => {
           <!-- 文章信息栏 -->
           <div class="article-meta">
             <span class="meta-item">
-              <span class="article-type">{{ item.type }}</span>
+              <span class="article-type">{{ getType(item.type) }}</span>
             </span>
-            <span class="meta-item">{{ `作者：${item.author}` }}</span>
-            <span class="meta-item"> 于 {{ item.releaseDateTime }} 发布 </span>
+            <span class="meta-item">{{ `作者：${item.name}` }}</span>
+            <span class="meta-item"> 最后修改时间: {{ item.updatedDateTime }} </span>
           </div>
 
           <!-- 文章内容 -->
@@ -548,7 +563,6 @@ onMounted(async () => {
   font-size: 14px;
   font-weight: 500;
   margin-right: 15px;
-  text-transform: uppercase;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 

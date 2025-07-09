@@ -72,11 +72,11 @@
           />
         </div>
         <div class="form-item">
-          <label for="claxx">班级：</label>
+          <label for="className">班级：</label>
           <input
             type="text"
             id="claxx"
-            v-model="form.claxx"
+            v-model="form.className"
             required
             placeholder="例如：252"
           />
@@ -113,7 +113,7 @@
 
 <script setup>
 import { ElLoading, ElMessage } from "element-plus";
-import { applyJoin } from "@/axios/axios.js";
+import { sendApply } from "@/request/axiosForNewcomers.js";
 import Foot from "@/components/Foot.vue";
 import HeaderVue from "@/components/Header.vue";
 import { ref } from "vue";
@@ -132,11 +132,11 @@ const academys = [
 ];
 
 const form = ref({
-  studentId: "",
+  studentId: null,
   name: "",
   sex: "",
   major: "",
-  claxx: "",
+  className: "",
   academy: "",
   introduce: "",
 });
@@ -151,7 +151,7 @@ const submitForm = async () => {
     return;
   }
 
-  const resp = await applyJoin(form.value);
+  const resp = await sendApply(form.value);
   if (resp) {
     ElMessage.success("申请成功。");
     setTimeout(() => {

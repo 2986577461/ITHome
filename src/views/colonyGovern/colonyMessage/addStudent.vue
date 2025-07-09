@@ -37,7 +37,7 @@
           <div class="info-column">
             <div class="info-row">
               <span class="label">班级：</span>
-              <span>{{ student.major + student.claxx }}</span>
+              <span>{{ student.major + student.className }}</span>
             </div>
             <div class="info-row">
               <span class="label">学院：</span>
@@ -78,7 +78,7 @@ import { ref } from "vue";
 import { ElMessage } from "element-plus";
 import { govern_store } from "@/store/govern.js";
 import { storeToRefs } from "pinia";
-import { agreeNewcomer, refuseNewcomer } from "@/axios/axios.js";
+import { refuse,agree } from "@/request/axiosForNewcomers.js";
 
 const governStore = govern_store();
 let { newcomers } = storeToRefs(governStore);
@@ -86,7 +86,7 @@ let { newcomers } = storeToRefs(governStore);
 const introduceVisible = ref([false]);
 
 const handleApprove = async (id) => {
-  const resp = await agreeNewcomer(id);
+  const resp = await agree(id);
   if (resp) {
     ElMessage.success("已通过申请");
     const student = governStore.newcomers.find((item) => item.id === id);
@@ -107,7 +107,7 @@ const handleRefuse = async (id) => {
   governStore.newcomers = governStore.newcomers.filter(
     (item) => item.id !== id
   );
-  const resp = await refuseNewcomer(id);
+  const resp = await refuse(id);
   if (resp) {
     ElMessage.warning("已拒绝申请");
   } else {

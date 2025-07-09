@@ -1,8 +1,8 @@
 import axios from "axios";
-// export const baseURL = "localhost:8080";
-export const baseURL = "47.108.61.239";
+
+export const baseHost = "localhost:8080";
+export const baseURL = "localhost:8080";
 const axiosInstance = axios.create({
-  //部署到云服务器需要修改为其公网地址
   baseURL: "http://" + baseURL,
   // 设置请求超时时间60秒
   timeout: 60000,
@@ -13,10 +13,9 @@ const axiosInstance = axios.create({
   //允许跨域携带cookie
   withCredentials: true,
 });
-// 响应拦截器
+// // 响应拦截器
 axiosInstance.interceptors.response.use((response) => {
-  const res = response.data;
-  return res;
+  return response.data;
 });
 
 // 请求拦截器：自动添加Authorization头

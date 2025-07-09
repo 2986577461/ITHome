@@ -22,14 +22,17 @@
   height: 110px;
   display: inline-block;
 }
+
 .el_input {
   font-size: 23px;
   height: 40px;
 }
+
 .fileItem {
   /* width: 300px; */
   display: inline-block;
 }
+
 .uploadDiv {
   vertical-align: top;
   /* margin: 0 20px; */
@@ -43,6 +46,7 @@
   width: 300px;
   margin: 30px auto;
 }
+
 .introduce-input {
   border: 1px solid #dcdfe6;
   flex: 1;
@@ -62,10 +66,10 @@
 </style>
 <template>
   <el-dialog
-    v-model="loadFile_visible"
-    :show-close="false"
-    top="8vh"
-    style="border-radius: 20px; width: 800px"
+      v-model="loadFile_visible"
+      :show-close="false"
+      top="8vh"
+      style="border-radius: 20px; width: 800px"
   >
     <div class="main">
       <div class="head">学习资料上传</div>
@@ -73,21 +77,21 @@
         <el-form label-width="auto">
           <div class="headItem">
             <b>标题：</b>
-            <el-input class="el_input" v-model="resource.head" required />
+            <el-input class="el_input" v-model="resource.head" required/>
           </div>
 
           <div class="fileItem">
             <div class="uploadDiv">
               <span>封面</span>
               <el-upload
-                ref="coverUpload"
-                accept=".jpg,.jpeg,.png"
-                v-model:file-list="coverFileList"
-                :on-preview="handlePreview"
-                :on-remove="handleRemove"
-                :on-exceed="handleExceed"
-                :auto-upload="false"
-                :limit="1"
+                  ref="coverUpload"
+                  accept=".jpg,.jpeg,.png"
+                  v-model:file-list="coverFileList"
+                  :on-preview="handlePreview"
+                  :on-remove="handleRemove"
+                  :on-exceed="handleExceed"
+                  :auto-upload="false"
+                  :limit="1"
               >
                 <template #trigger>
                   <el-button type="primary">上传</el-button>
@@ -97,13 +101,13 @@
             <div class="uploadDiv">
               <div>文件</div>
               <el-upload
-                ref="fileupload"
-                v-model:file-list="fileList"
-                :on-preview="handlePreview"
-                :on-remove="handleRemove"
-                :limit="2"
-                :on-exceed="handleExceed"
-                :auto-upload="false"
+                  ref="fileupload"
+                  v-model:file-list="fileList"
+                  :on-preview="handlePreview"
+                  :on-remove="handleRemove"
+                  :limit="2"
+                  :on-exceed="handleExceed"
+                  :auto-upload="false"
               >
                 <template #trigger>
                   <el-button type="primary">上传</el-button>
@@ -115,20 +119,21 @@
           <div>
             <div>简介</div>
             <textarea
-              v-model="resource.introduce"
-              class="introduce-input"
-              style="width: 600px; font-size: 20px; height: 400px"
-              required
+                v-model="resource.introduce"
+                class="introduce-input"
+                style="width: 600px; font-size: 20px; height: 400px"
+                required
             />
           </div>
         </el-form>
       </div>
       <div class="btItem">
         <el-button
-          type="success"
-          @click="submitUpload"
-          style="width: 100px; height: 45px; font-size: 20px"
-          >提交</el-button
+            type="success"
+            @click="submitUpload"
+            style="width: 100px; height: 45px; font-size: 20px"
+        >提交
+        </el-button
         >
       </div>
     </div>
@@ -136,18 +141,17 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref } from "vue";
+import {reactive, ref} from "vue";
+import {save} from "@/request/axiosForResources";
+import {storeToRefs} from "pinia";
+import {ElMessage} from "element-plus";
+import type {UploadProps} from "element-plus";
+import {upload_sotre} from "@/store/upload";
+import {ElUpload, ElButton} from "element-plus";
+import {saveIntroduce} from "@/request/axiosForResources";
 
-import { storeToRefs } from "pinia";
-import { ElMessage } from "element-plus";
-import type { UploadProps } from "element-plus";
-import { upload_sotre } from "@/store/upload";
-import { user_store } from "@/store/user";
-import { uploadFile, uploadResource } from "@/axios/file";
-import { ElUpload, ElButton } from "element-plus";
 const uploadStore = upload_sotre();
-const userStore = user_store();
-const { loadFile_visible } = storeToRefs(uploadStore);
+const {loadFile_visible} = storeToRefs(uploadStore);
 
 const coverFileList = ref([]);
 const fileList = ref([]);
@@ -168,18 +172,18 @@ const submitUpload = async () => {
     ElMessage.error("请填写标题和简介");
     return;
   }
-
-  const formData = new FormData();
-
+  let formData = new FormData();
   formData.append("file", fileList.value[0].raw);
-  const file = await uploadFile(formData);
-  formData.append("file", coverFileList.value[0].raw);
-  const cover = await uploadFile(formData);
+  const file = await save(formData);
 
-  resource.fileUrl = file.fileUrl;
-  resource.coverUrl = cover.fileUrl;
-  resource.fileName = file.fileName;
-  await uploadResource(resource);
+  formData = new FormData();
+  formData.append("file", coverFileList.value[0].raw);
+  const cover = await save(formData);
+
+  resource.fileUrl = file.data.fileUrl;
+  resource.coverUrl = cover.data.fileUrl;
+  resource.fileName = file.data.fileName;
+  await saveIntroduce(resource);
 
   ElMessage.success("上传成功");
 

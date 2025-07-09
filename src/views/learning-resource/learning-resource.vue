@@ -84,14 +84,13 @@
 <script lang="ts" setup>
 import uploadVue from "@/components/uploadResources.vue";
 import Header from "@/components/Header.vue";
-import { fetchResources, getUrl } from "@/axios/file";
 import { reactive, onMounted, ref } from "vue";
 import Foot from "@/components/Foot.vue";
 import { Download } from "@element-plus/icons-vue";
 import { user_store } from "@/store/user";
 import { storeToRefs } from "pinia";
 import { upload_sotre } from "@/store/upload";
-
+import {getDownloadUrl,getAll} from "@/request/axiosForResources"
 const uploadStore = upload_sotre();
 const userStore = user_store();
 let { condition } = storeToRefs(userStore);
@@ -103,16 +102,15 @@ const handleClick = (e) => {
   e.preventDefault();
 };
 
-const loadImageUrls = async () => {};
 
 const download = async (url, name) => {
   const urlObj = new URL(url);
   const pathname = urlObj.pathname; // 获取路径部分：/a5b8f572-f785-408d-915f-e22983c9c80b.jpeg
   const objectName = pathname.substring(pathname.lastIndexOf("/") + 1); // 获取最后一个斜杠后的部分
-  const resp = await getUrl(objectName, name);
+  const resp = await getDownloadUrl(objectName, name);
 
   const link = document.createElement("a");
-  link.href = resp;
+  link.href = resp.data;
   link.download = name; // 设置下载文件名
   document.body.appendChild(link);
   link.click();
@@ -120,9 +118,9 @@ const download = async (url, name) => {
 };
 
 onMounted(async () => {
-  const res = await fetchResources(); //加载文章文字
-  resources.splice(0, 0, ...res); //返回文字
-  await loadImageUrls(); //加载图片
+  const res = await getAll(); //加载文章文字
+  resources.splice(0, 0, ...res.data); //返回文字
+  console.log(res.data)
 });
 </script>
 

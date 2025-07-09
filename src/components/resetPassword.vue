@@ -36,8 +36,8 @@
 import { ref } from "vue";
 import { visible_store } from "@/store/visible";
 import { ElMessage } from "element-plus";
-import { updatePassword } from "@/axios/axios.js";
 import { user_store } from "@/store/user";
+import {updatePassword} from "@/request/axiosForUser.js";
 const visibleStore = visible_store();
 const userStore = user_store();
 const oldPassword = ref("");
@@ -48,8 +48,8 @@ const handleSubmit = async () => {
     return;
   }
 
-  const resp = await updatePassword(userStore.studentID, newPassword.value);
-  if (resp == false) {
+  const resp = await updatePassword(newPassword.value);
+  if (resp === false) {
     ElMessage.error("密码修改失败。");
     return;
   }
@@ -80,7 +80,7 @@ const handleSubmit = async () => {
 }
 
 .input-group div {
-  font-family: "Microsoft JhengHei";
+  font-family: "Microsoft JhengHei",serif;
   color: #e2e2e3;
   font-size: 20px;
   pointer-events: none;

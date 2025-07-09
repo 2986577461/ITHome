@@ -3,11 +3,11 @@ import Header from "@/components/Header.vue";
 import Footer from "@/components/Foot.vue";
 import {user_store} from "@/store/user.js";
 import {onMounted, reactive, computed} from "vue";
-import {fetchResources} from "@/axios/file.js";
 import {ref} from "vue";
 import {useRouter} from "vue-router";
 import {visible_store} from "@/store/visible.js";
 import ResetPassword from "@/components/resetPassword.vue";
+import {getAll} from "@/request/axiosForResources.js";
 
 const visibleStore = visible_store();
 const router = useRouter();
@@ -67,8 +67,9 @@ const handlePageChange = (page) => {
 };
 
 onMounted(async () => {
-  const res = await fetchResources();
-  news.splice(0, news.length, ...res);
+  const res = await getAll();
+  news.splice(0, news.length, ...res.data);
+  console.log(res.data)
 });
 </script>
 
@@ -90,7 +91,7 @@ onMounted(async () => {
           <h2 class="info-title">用户信息 / UserInfo</h2>
           <div class="info-item">
             <span class="label">账 号</span>
-            <span class="value">{{ userStore.studentID }}</span>
+            <span class="value">{{ userStore.studentId }}</span>
           </div>
           <div class="info-item">
             <span class="label">用户名</span>
@@ -151,12 +152,14 @@ onMounted(async () => {
           v-for="item in currentPageNews"
           :key="item.id"
           @click="gotoPage('/leraningResource')"
-      ><div class="text">
+      >
+        <img :src="item.coverUrl" class="news-image">
+        <div class="text">
           <div class="head">
             {{ item.head }}
           </div>
           <div class="content">
-            {{ item.releaseDate }} - {{ item.studentName + "上传" }}
+            {{ item.releaseDateTime + "上传" }}
           </div>
         </div>
       </div>
@@ -275,7 +278,7 @@ onMounted(async () => {
 
 .innerBox {
   cursor: pointer;
-  font-family: "Microsoft JhengHei",serif;
+  font-family: "Microsoft JhengHei", serif;
   padding: 25px;
   background: white;
   border-radius: 8px;
@@ -344,7 +347,7 @@ onMounted(async () => {
   width: 280px;
   height: 150px;
   vertical-align: top;
-  font-family: "Microsoft JhengHei",serif;
+  font-family: "Microsoft JhengHei", serif;
 }
 
 .newsStyle {
@@ -487,5 +490,18 @@ onMounted(async () => {
   left: 20px;
   right: 20px;
   width: auto;
+}
+.news-image {
+  width: 150px;          /* 固定宽度 */
+  height: 150px;         /* 固定高度，与 .text 区域对齐 */
+  object-fit: cover;     /* 保持图片比例并填充容器 */
+  border-radius: 8px;    /* 圆角效果 */
+  margin-right: 15px;    /* 与右侧文字间隔 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* 轻微阴影提升层次感 */
+  transition: transform 0.3s ease; /* 悬停动画 */
+}
+
+.newsStyle:hover .news-image {
+  transform: scale(1.02); /* 悬停时轻微放大 */
 }
 </style>

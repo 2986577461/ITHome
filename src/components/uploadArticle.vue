@@ -2,33 +2,33 @@
   <Header></Header>
   <div class="container">
     <!-- 文章类型选择区域 -->
-    <form @submit.prevent="upload">
+    <form @submit.prevent="uploadArticle">
       <div class="type-selection">
         <h2>选择文章类型</h2>
         <div class="radio-group">
           <label class="radio-item">
-            <input type="radio" v-model="article.type" value="c" />
+            <input type="radio" v-model="article.type" value=1 />
             <span>C语言</span>
           </label>
           <label class="radio-item">
-            <input type="radio" v-model="article.type" value="html" />
+            <input type="radio" v-model="article.type" value=2 />
             <span>HTML</span>
           </label>
           <label class="radio-item">
-            <input type="radio" v-model="article.type" value="css" />
+            <input type="radio" v-model="article.type" value=3 />
             <span>CSS</span>
           </label>
           <label class="radio-item">
-            <input type="radio" v-model="article.type" value="js" />
+            <input type="radio" v-model="article.type" value=4 />
             <span>JavaScript</span>
           </label>
           <label class="radio-item">
-            <input type="radio" v-model="article.type" value="java" />
+            <input type="radio" v-model="article.type" value=5 />
             <span>Java</span>
           </label>
           <label class="radio-item">
-            <input type="radio" v-model="article.type" value="mysql" />
-            <span>MySQL</span>
+            <input type="radio" v-model="article.type" value=6 />
+            <span>MySql</span>
           </label>
         </div>
       </div>
@@ -76,12 +76,12 @@ import Header from "./Header.vue";
 import Foot from "./Foot.vue";
 import { onBeforeUnmount, onMounted, reactive, shallowRef } from "vue";
 import { Editor, Toolbar } from "@wangeditor/editor-for-vue"; //引入 第三方富文本框
-import { updateArticle, uploadArticle } from "@/axios/axios";
 import { ElMessage } from "element-plus";
 import { useRouter } from "vue-router";
 import { ElLoading } from "element-plus";
 import { article_store } from "@/store/updateArticle";
 import { user_store } from "@/store/user";
+import {update, upload} from "@/request/axiosForArticles.js";
 const articleStore = article_store();
 const userStore = user_store();
 // 编辑器实例，必须用 shallowRef
@@ -90,14 +90,13 @@ const router = useRouter();
 
 const article = reactive({
   id: null,
-  author: userStore.name,
-  authorId: userStore.studentID,
-  type: "c",
+  type: 1,
   head: "",
   content: "",
 });
 
-const upload = async () => {
+const uploadArticle = async () => {
+  
   if (article.content.length < 30) {
     ElMessage.error("文章内容太少！");
     return;
@@ -106,14 +105,15 @@ const upload = async () => {
     ElMessage.error("内容太多了，少写点吧");
     return;
   }
-  var resp;
-  if (article.id != null) {
-    console.log("触发");
-    resp = await updateArticle(article);
+  let resp;
+  if (article.id !== null) {
+    
+    resp = await update(article);
   } else {
-    resp = await uploadArticle(article);
+    
+    resp = await upload(article);
   }
-  if (resp.code == 200) {
+  if (resp.code === 200) {
     ElMessage.success("文章上传成功!");
     setTimeout(() => {
       const load = ElLoading.service({
@@ -299,15 +299,6 @@ onMounted(async () => {
 }
 
 /* 标题输入区域优化 */
-.title-input {
-  background: rgba(255, 255, 255, 0.95);
-  padding: 35px 45px;
-  border-radius: 24px;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-  margin-bottom: 35px;
-  position: relative;
-  overflow: hidden;
-}
 
 /* 标题输入框优化 */
 .title-field {
@@ -335,7 +326,7 @@ h2 {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   font-size: 26px !important;
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
   margin-bottom: 30px !important;
   animation: gradientText 6s linear infinite;
   background-size: 200% auto;
@@ -343,13 +334,13 @@ h2 {
 
 @keyframes gradientText {
   0% {
-    background-position: 0% 50%;
+    background-position: 0 50%;
   }
   50% {
     background-position: 100% 50%;
   }
   100% {
-    background-position: 0% 50%;
+    background-position: 0 50%;
   }
 }
 
@@ -431,10 +422,6 @@ h2 {
   background: linear-gradient(to right, #f8fafc, #f1f5f9) !important;
 }
 
-:deep(.w-e-toolbar) {
-  background: linear-gradient(to right, #f8fafc, #f1f5f9) !important;
-}
-
 :deep(.w-e-toolbar button) {
   border-radius: 10px !important;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -456,12 +443,6 @@ h2 {
 @media (max-width: 768px) {
   .container {
     padding: 20px;
-  }
-
-  .type-selection,
-  .title-input,
-  .editor-container {
-    padding: 25px;
   }
 
   .radio-group {

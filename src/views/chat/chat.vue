@@ -1,35 +1,38 @@
 <template>
-  <Header></Header>
+  <Header />
   <div class="chat-app">
     <div class="user-list">
       <div class="search-box">
         <input
-          v-model="searchQuery"
-          placeholder="搜索学员..."
-          class="search-input"
+            v-model="searchQuery"
+            placeholder="搜索学员..."
+            class="search-input"
         />
         <svg class="search-icon" viewBox="0 0 24 24">
           <path
-            d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 0 0 1.48-5.34c-.47-2.78-2.79-5-5.59-5.34a6.505 6.505 0 0 0-7.27 7.27c.34 2.8 2.56 5.12 5.34 5.59a6.5 6.5 0 0 0 5.34-1.48l.27.28v.79l4.25 4.25c.41.41 1.08.41 1.49 0 .41-.41.41-1.08 0-1.49L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+              d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 0 0 1.48-5.34c-.47-2.78-2.79-5-5.59-5.34a6.505 6.505 0 0 0-7.27 7.27c.34 2.8 2.56 5.12 5.34 5.59a6.5 6.5 0 0 0 5.34-1.48l.27.28v.79l4.25 4.25c.41.41 1.08.41 1.49 0 .41-.41.41-1.08 0-1.49L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
           />
         </svg>
       </div>
       <div class="user-list-content">
         <div
-          v-for="user in filteredUsers"
-          :key="user.id"
-          :class="['user-item', { active: currentChatUser?.id === user.id }]"
-          @click="selectUser(user)"
+            v-for="user in filteredUsers"
+            :key="user.studentId"
+            :class="['user-item', { active: currentChatUser?.studentId === user.studentId }]"
+            @click="selectUser(user)"
         >
           <div class="user-avatar">{{ getUserInitial(user.name) }}</div>
           <div class="user-info">
             <div class="user-name">{{ user.name }}</div>
             <div class="user-last-msg">
-              {{ getLastMessagePreview(user.id) }}
+              {{ getLastMessagePreview(user.studentId) }}
             </div>
           </div>
-          <div class="unread-count" v-if="getUnreadCount(user.id) > 0">
-            {{ getUnreadCount(user.id) }}
+          <div
+              class="unread-count"
+              v-if="chatStore.unreadCounts[user.studentId] > 0"
+          >
+            {{ chatStore.unreadCounts[user.studentId] }}
           </div>
         </div>
       </div>
@@ -48,11 +51,11 @@
 
       <div class="message-container" ref="messageContainer">
         <div
-          v-for="(message, index) in currentMessages"
-          :key="message.id || index"
-          :class="[
+            v-for="(message, index) in currentMessages"
+            :key="index"
+            :class="[
             'message',
-            message.sender === currentUser.id ? 'sent' : 'received',
+            message.sender === currentUser.studentId ? 'sent' : 'received'
           ]"
         >
           <div class="message-content">{{ message.content }}</div>
@@ -64,17 +67,17 @@
 
       <div class="message-input">
         <input
-          v-model="newMessage"
-          @keyup.enter="sendMessage"
-          placeholder="输入消息..."
-          :disabled="!currentChatUser"
+            v-model="newMessage"
+            @keyup.enter="sendMessage"
+            placeholder="输入消息..."
+            :disabled="!currentChatUser"
         />
         <button
-          @click="sendMessage"
-          :disabled="!currentChatUser || !newMessage.trim()"
+            @click="sendMessage"
+            :disabled="!currentChatUser || !newMessage.trim()"
         >
           <svg viewBox="0 0 24 24" class="send-icon">
-            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
           </svg>
         </button>
       </div>
@@ -83,420 +86,284 @@
 </template>
 
 <script setup>
-import {
-  ref,
-  computed,
-  onMounted,
-  nextTick,
-  watch,
-  onBeforeUnmount,
-} from "vue";
-import { user_store } from "@/store/user";
-import { baseURL } from "@/axios/axiosInit";
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { user_store } from '@/store/user'
+import { chat_store } from '@/store/chatStore'
+import Header from '@/components/Header.vue'
 import { ElMessage } from "element-plus";
-import Header from "@/components/Header.vue";
 
-const userStore = user_store();
+// Store
+const userStore = user_store()
+const chatStore = chat_store()
+
+// Refs
+const searchQuery = ref('')
+const currentChatUser = ref(null)
+const newMessage = ref('')
+const messageContainer = ref(null)
+
+// 新增等待状态
+const isWsInitializing = ref(true)
+
 // 当前用户信息
 const currentUser = computed(() => ({
-  id: userStore.studentID,
-  name: userStore.name,
-}));
-// 学员列表
-const users = ref([]);
+  studentId: userStore.studentId,
+  name: userStore.name
+}))
 
-// 搜索查询
-const searchQuery = ref("");
-
-// 当前选中的聊天用户
-const currentChatUser = ref(null);
-
-// 所有聊天记录 { userId: [messages] }
-// 消息结构：{ sender: Long, receiver: Long, content: String, timestamp: Long }
-const allMessages = ref({});
-
-// 当前显示的聊天记录
-const currentMessages = ref([]);
-
-// 新消息内容
-const newMessage = ref("");
-
-// WebSocket连接
-const socket = ref(null);
-const connected = ref(false);
-
-// DOM引用
-const messageContainer = ref(null);
-
-// WebSocket 重试相关
-const MAX_RETRIES = 10; // 最大重试次数
-const RETRY_INTERVAL_MS = 1000; // 初始重试间隔，毫秒
-let retryCount = 0; // 当前重试次数
-let retryTimeoutId = null; // 用于存储 setTimeout 的 ID
-
-// 过滤后的学员列表 - 确保不显示自己
+// 计算属性
 const filteredUsers = computed(() => {
-  return users.value.filter(
-    (user) =>
-      user.id !== currentUser.value.id && // 核心：过滤掉当前用户
+  return chatStore.onlineUsers.filter(user =>
+      user.studentId !== currentUser.value.studentId &&
       user.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-  );
-});
+  )
+})
 
-// 获取用户首字母
+const currentMessages = computed(() => {
+  if (!currentChatUser.value) return []
+  return chatStore.messages[currentChatUser.value.studentId] || []
+})
+
+// 方法
 const getUserInitial = (name) => {
-  return name ? name.charAt(0).toUpperCase() : "";
-};
+  return name ? name.charAt(0).toUpperCase() : ''
+}
 
-// 获取最后一条消息预览
 const getLastMessagePreview = (userId) => {
-  const messages = allMessages.value[userId] || [];
-  if (messages.length === 0) return "暂无消息";
-  const lastMsg = messages[messages.length - 1];
+  const messages = chatStore.messages[userId] || []
+  if (messages.length === 0) return '暂无消息'
+  const lastMsg = messages[messages.length - 1]
   return lastMsg.content.length > 15
-    ? lastMsg.content.substring(0, 15) + "..."
-    : lastMsg.content;
-};
+      ? lastMsg.content.substring(0, 15) + '...'
+      : lastMsg.content
+}
 
-// 获取未读消息数
-const getUnreadCount = (userId) => {
-  const messages = allMessages.value[userId] || [];
-  return messages.filter((msg) => msg.sender === userId && !msg.read).length;
-};
-
-// 格式化消息时间
 const formatMessageTime = (timestamp) => {
-  if (!timestamp) return "";
-  const date = new Date(timestamp);
-  // 可以根据需要调整时间格式，例如显示日期和时间
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-};
+  if (!timestamp) return ''
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
 
-// 选择聊天用户
-const selectUser = async (user) => {
-  currentChatUser.value = user;
-  markMessagesAsRead(user.id);
-  currentMessages.value = allMessages.value[user.id] || [];
-  scrollToBottom();
-};
+const selectUser = (user) => {
+  currentChatUser.value = user
+  chatStore.markMessagesAsRead(user.studentId)
+  nextTick(scrollToBottom)
+}
 
-// 标记消息为已读
-const markMessagesAsRead = (userId) => {
-  if (!allMessages.value[userId]) return;
-  allMessages.value[userId] = allMessages.value[userId].map((msg) => {
-    if (msg.sender === userId && !msg.read) {
-      return { ...msg, read: true };
-    }
-    return msg;
-  });
-};
-
-// 发送消息
-const sendMessage = async () => {
-  if (!newMessage.value.trim() || !currentChatUser.value) return;
+const sendMessage = () => {
+  if (!newMessage.value.trim() || !currentChatUser.value) return
 
   const message = {
-    sender: currentUser.value.id,
-    receiver: currentChatUser.value.id,
+    sender: currentUser.value.studentId,
+    receiver: currentChatUser.value.studentId,
     content: newMessage.value,
-    messageType: "CHAT",
-  };
-
-  if (!allMessages.value[currentChatUser.value.id]) {
-    allMessages.value[currentChatUser.value.id] = [];
-  }
-  allMessages.value[currentChatUser.value.id].push(message);
-
-  currentMessages.value = allMessages.value[currentChatUser.value.id];
-
-  if (socket.value && connected.value) {
-    socket.value.send(JSON.stringify(message));
-  } else {
-    ElMessage.error("WebSocket连接未建立，无法发送消息。");
+    timestamp: Date.now(),
+    messageType: 'CHAT'
   }
 
-  newMessage.value = "";
-  scrollToBottom();
-};
+  // 添加到本地消息列表
+  chatStore.addSentMessage(currentChatUser.value.studentId, message)
 
-// 滚动到底部
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (messageContainer.value) {
-      messageContainer.value.scrollTop = messageContainer.value.scrollHeight;
+  // 发送WebSocket消息
+  if (chatStore.socket && chatStore.connected) {
+    try {
+      chatStore.socket.send(JSON.stringify(message))
+    } catch (error) {
+      console.error("发送消息失败:", error)
+      ElMessage.error("消息发送失败，请检查连接")
     }
-  });
-};
-
-// 初始化WebSocket连接（带重试机制）
-const initWebSocket = async () => {
-  // 如果已经连接，则不再尝试
-  if (
-    connected.value &&
-    socket.value &&
-    socket.value.readyState === WebSocket.OPEN
-  ) {
-    console.log("WebSocket已连接，无需重新建立。");
-    return;
+  } else {
+    ElMessage.error("WebSocket连接未建立，无法发送消息")
   }
 
-  // 每次尝试连接前，清除之前的重试定时器
-  if (retryTimeoutId) {
-    clearTimeout(retryTimeoutId);
-    retryTimeoutId = null;
+  newMessage.value = ''
+  nextTick(scrollToBottom)
+}
+
+const scrollToBottom = () => {
+  if (messageContainer.value) {
+    messageContainer.value.scrollTop = messageContainer.value.scrollHeight
+  }
+}
+
+onMounted(async () => {
+  // 等待WebSocket初始化
+  const maxAttempts = 10
+  let attempts = 0
+
+  while (!chatStore.socket && attempts < maxAttempts) {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    attempts++
   }
 
-  if (!userStore.studentID || !userStore.name) {
-    console.warn(
-      `用户数据未准备好 (ID: ${userStore.studentID}, Name: ${userStore.name})，${RETRY_INTERVAL_MS}ms 后重试...`
-    );
-    // 如果用户数据未准备好，立即安排下一次重试，不计入 retryCount
-    retryTimeoutId = setTimeout(initWebSocket, RETRY_INTERVAL_MS);
-    return;
-  }
+  if (chatStore.socket) {
+    isWsInitializing.value = false
 
-  // 检查是否达到最大重试次数
-  if (retryCount >= MAX_RETRIES) {
-    console.error("达到最大WebSocket重试次数，连接失败。");
-    ElMessage.error("聊天服务连接失败，请刷新页面或稍后重试。");
-    return;
-  }
-
-  console.log(`尝试建立WebSocket连接 (第 ${retryCount + 1} 次)...`);
-
-  const encodedUserName = encodeURIComponent(userStore.name);
-  const wsUrl = `ws://${baseURL}/ws/${userStore.studentID}/${encodedUserName}`;
-  // const wsUrl = `ws://${baseURL}/ws/${202300573}/${"靳玉超"}`;
-
-  try {
-    socket.value = new WebSocket(wsUrl);
-
-    socket.value.onopen = () => {
-      connected.value = true;
-      console.log("WebSocket连接已建立！");
-      retryCount = 0; // 重置重试次数
-    };
-
-    socket.value.onmessage = (event) => {
+    const messageHandler = (event) => {
       try {
-        const message = JSON.parse(event.data);
+        const message = JSON.parse(event.data)
 
-        if (message.messageType === "ONLINE_USER_LIST_UPDATE") {
-          console.log("收到在线用户列表更新:", message.onlineUsers);
-          users.value = message.onlineUsers || [];
-        } else if (message.receiver === currentUser.value.id) {
-          const senderId = message.sender;
-          if (!allMessages.value[senderId]) {
-            allMessages.value[senderId] = [];
-          }
-          allMessages.value[senderId].push({ ...message, read: false });
+        if (message.messageType === 'ONLINE_USER_LIST_UPDATE') {
+          chatStore.updateOnlineUsers(message.onlineUsers || [])
+          return
+        }
 
-          if (currentChatUser.value && currentChatUser.value.id === senderId) {
-            currentMessages.value = allMessages.value[senderId];
-            scrollToBottom();
-            markMessagesAsRead(senderId);
+        if (message.receiver === currentUser.value.studentId) {
+          chatStore.addMessage(message.sender, message)
+
+          if (currentChatUser.value?.studentId === message.sender) {
+            chatStore.markMessagesAsRead(message.sender)
           }
+
+          scrollToBottom()
         }
       } catch (e) {
-        console.error("解析WebSocket消息错误:", e);
+        console.error('消息解析错误:', e)
       }
-    };
-
-    socket.value.onclose = () => {
-      connected.value = false;
-      console.warn("WebSocket连接已关闭。");
-      // 连接关闭后，如果不是用户主动关闭，尝试重连
-      if (retryCount < MAX_RETRIES) {
-        retryCount++;
-        const delay = RETRY_INTERVAL_MS * Math.pow(2, retryCount - 1); // 指数退避
-        console.log(`WebSocket将在 ${delay}ms 后尝试重连...`);
-        retryTimeoutId = setTimeout(initWebSocket, delay);
-      } else {
-        console.error("WebSocket重连失败，达到最大重试次数。");
-        ElMessage.error("聊天服务连接断开，请刷新页面或稍后重试。");
-      }
-    };
-
-    socket.value.onerror = (error) => {
-      console.error("WebSocket错误:", error);
-      connected.value = false;
-      // 错误发生时，也会触发 onclose，所以重连逻辑主要放在 onclose 中处理
-      // 这里的 reject 可以在 onMounted 中捕获，用于首次连接失败
-    };
-  } catch (error) {
-    // 这捕获的是 new WebSocket() 自身抛出的同步错误，不常见
-    console.error("创建WebSocket对象失败:", error);
-    if (retryCount < MAX_RETRIES) {
-      retryCount++;
-      const delay = RETRY_INTERVAL_MS * Math.pow(2, retryCount - 1);
-      console.log(`创建WebSocket失败，将在 ${delay}ms 后尝试重试...`);
-      retryTimeoutId = setTimeout(initWebSocket, delay);
-    } else {
-      ElMessage.error("无法建立WebSocket连接，请检查网络或联系管理员。");
     }
-  }
-};
 
-// 生命周期钩子
-onMounted(() => {
-  // 首次尝试连接，会检查用户数据并启动重试机制
-  initWebSocket();
-});
+    chatStore.socket.addEventListener('message', messageHandler)
 
-onBeforeUnmount(() => {
-  if (socket.value && socket.value.readyState === WebSocket.OPEN) {
-    socket.value.close();
-  }
-  // 清除任何未执行的重试定时器
-  if (retryTimeoutId) {
-    clearTimeout(retryTimeoutId);
-    retryTimeoutId = null;
-  }
-});
-
-// 监听 currentChatUser 变化，以更新 currentMessages
-watch(currentChatUser, (newVal) => {
-  if (newVal) {
-    currentMessages.value = allMessages.value[newVal.id] || [];
-    scrollToBottom();
+    return () => {
+      chatStore.socket?.removeEventListener('message', messageHandler)
+    }
   } else {
-    currentMessages.value = [];
+    console.warn("WebSocket初始化超时")
+    isWsInitializing.value = false
   }
-});
+
+  scrollToBottom()
+})
+
+// 监听在线用户列表变化
+watch(() => chatStore.onlineUsers, (newUsers) => {
+  console.log("在线用户列表已更新:", newUsers)
+}, { deep: true })
+
+// 监听当前聊天用户变化
+watch(currentChatUser, (newUser) => {
+  if (newUser) {
+    chatStore.markMessagesAsRead(newUser.studentId)
+    nextTick(scrollToBottom)
+  }
+})
 </script>
 
 <style scoped>
-/* 你的 CSS 样式保持不变 */
+/* 原有的样式保持不变 */
 .chat-app {
   display: flex;
-  height: calc(100vh - 60px); /* 假设 Header 高度 60px */
-  border: 1px solid #ccc;
-  overflow: hidden;
+  height: calc(100vh - 60px);
 }
 
 .user-list {
-  width: 280px;
+  width: 300px;
   border-right: 1px solid #eee;
-  padding: 10px;
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
 }
 
 .search-box {
+  padding: 15px;
   position: relative;
-  margin-bottom: 15px;
 }
 
 .search-input {
   width: 100%;
-  padding: 10px 10px 10px 40px; /* 留出左侧空间给图标 */
-  border: 1px solid #ddd;
+  padding: 8px 15px 8px 35px;
   border-radius: 20px;
-  font-size: 1em;
-  box-sizing: border-box;
+  border: 1px solid #ddd;
+  outline: none;
 }
 
 .search-icon {
   position: absolute;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 20px;
-  height: 20px;
-  fill: #888;
+  left: 25px;
+  top: 23px;
+  width: 16px;
+  height: 16px;
+  fill: #999;
 }
 
 .user-list-content {
-  flex-grow: 1;
+  flex: 1;
   overflow-y: auto;
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
-}
-
-.user-list-content::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera*/
 }
 
 .user-item {
   display: flex;
-  align-items: center;
-  padding: 12px 10px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 12px 15px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  align-items: center;
+  border-bottom: 1px solid #f5f5f5;
 }
 
 .user-item:hover {
-  background-color: #f5f5f5;
+  background-color: #f9f9f9;
 }
 
 .user-item.active {
-  background-color: #e6f7ff; /* 选中状态背景色 */
-  border-left: 3px solid #007bff; /* 选中状态左边框 */
-  padding-left: 7px; /* 调整填充以适应边框 */
+  background-color: #eef6ff;
 }
 
 .user-avatar {
-  width: 45px;
-  height: 45px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background-color: #007bff;
+  background-color: #4a89dc;
   color: white;
   display: flex;
-  justify-content: center;
   align-items: center;
-  font-weight: bold;
-  font-size: 1.2em;
+  justify-content: center;
   margin-right: 12px;
-  flex-shrink: 0; /* 防止头像被压缩 */
+  font-weight: bold;
 }
 
 .user-info {
-  flex-grow: 1;
-  overflow: hidden; /* 隐藏溢出内容 */
+  flex: 1;
+  min-width: 0;
 }
 
 .user-name {
-  font-weight: bold;
-  font-size: 1.1em;
-  color: #333;
+  font-weight: 500;
+  margin-bottom: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .user-last-msg {
-  font-size: 0.9em;
-  color: #888;
+  color: #999;
+  font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 2px;
 }
 
 .unread-count {
-  background-color: #ff4d4f; /* 红色 */
+  background-color: #ff4d4f;
   color: white;
-  border-radius: 12px; /* 更圆 */
-  padding: 4px 8px;
-  font-size: 0.8em;
-  margin-left: 10px;
-  min-width: 24px; /* 最小宽度，保证圆形 */
-  text-align: center;
-  flex-shrink: 0;
+  border-radius: 10px;
+  min-width: 20px;
+  height: 20px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
 }
 
 .chat-area {
-  flex-grow: 1;
+  flex: 1;
   display: flex;
   flex-direction: column;
 }
 
 .chat-header {
-  padding: 15px 20px;
+  padding: 15px;
   border-bottom: 1px solid #eee;
-  background-color: #f7f7f7;
   display: flex;
   align-items: center;
 }
@@ -510,132 +377,93 @@ watch(currentChatUser, (newVal) => {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: #1890ff;
+  background-color: #4a89dc;
   color: white;
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+  margin-right: 12px;
   font-weight: bold;
-  margin-right: 10px;
-  font-size: 1.1em;
 }
 
 .chat-user-name {
-  font-weight: bold;
-  font-size: 1.2em;
-  color: #333;
+  font-weight: 500;
 }
 
 .select-user-prompt {
-  flex-grow: 1;
-  text-align: center;
-  color: #888;
-  font-size: 1.1em;
+  color: #999;
 }
 
 .message-container {
-  flex-grow: 1;
-  padding: 15px 20px;
+  flex: 1;
+  padding: 15px;
   overflow-y: auto;
-  background-color: #fdfdfd;
-  display: flex;
-  flex-direction: column; /* 保持消息从上到下排列 */
-  gap: 10px; /* 消息间距 */
-}
-
-/* 加载更多按钮样式移除 */
-.load-more {
-  text-align: center;
-  margin-bottom: 10px;
-}
-
-.load-more-btn {
-  background-color: #e9e9e9;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 0.9em;
-  color: #555;
-  transition: background-color 0.2s;
-}
-
-.load-more-btn:hover {
-  background-color: #ddd;
+  background-color: #f5f5f5;
 }
 
 .message {
-  display: flex;
-  flex-direction: column;
-  max-width: 60%;
-  padding: 10px 15px;
-  border-radius: 15px;
-  word-wrap: break-word;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  margin-bottom: 15px;
+  max-width: 70%;
 }
 
 .message.sent {
-  align-self: flex-end; /* 右对齐 */
-  background-color: #e1ffc7; /* 发送消息的背景色 */
-  color: #333;
-  border-bottom-right-radius: 2px; /* 模拟聊天气泡尖角 */
+  margin-left: auto;
+  text-align: right;
 }
 
 .message.received {
-  align-self: flex-start; /* 左对齐 */
-  background-color: #ffffff; /* 接收消息的背景色 */
-  color: #333;
-  border-bottom-left-radius: 2px; /* 模拟聊天气泡尖角 */
+  margin-right: auto;
 }
 
 .message-content {
-  font-size: 1em;
-  margin-bottom: 5px;
+  display: inline-block;
+  padding: 10px 15px;
+  border-radius: 18px;
+  background-color: white;
+  word-break: break-word;
+}
+
+.message.sent .message-content {
+  background-color: #4a89dc;
+  color: white;
 }
 
 .message-time {
-  font-size: 0.75em;
+  font-size: 12px;
   color: #999;
-  text-align: right; /* 时间右对齐 */
+  margin-top: 5px;
 }
 
 .message-input {
-  display: flex;
-  padding: 15px 20px;
+  padding: 15px;
   border-top: 1px solid #eee;
-  background-color: #f7f7f7;
+  display: flex;
 }
 
 .message-input input {
-  flex-grow: 1;
+  flex: 1;
   padding: 10px 15px;
-  border: 1px solid #ddd;
   border-radius: 20px;
-  font-size: 1em;
+  border: 1px solid #ddd;
+  outline: none;
   margin-right: 10px;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .message-input button {
-  background-color: #007bff;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #4a89dc;
   color: white;
   border: none;
-  border-radius: 20px;
-  padding: 10px 20px;
   cursor: pointer;
-  font-size: 1em;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s ease;
-}
-
-.message-input button:hover:not(:disabled) {
-  background-color: #0056b3;
 }
 
 .message-input button:disabled {
-  background-color: #cccccc;
+  background-color: #ccc;
   cursor: not-allowed;
 }
 
