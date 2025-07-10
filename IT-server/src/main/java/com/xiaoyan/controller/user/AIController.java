@@ -3,7 +3,9 @@ package com.xiaoyan.controller.user;
 
 import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.context.BaseContext;
+import com.xiaoyan.dto.MessageDTO;
 import com.xiaoyan.properties.JwtProperties;
+import com.xiaoyan.result.Result;
 import com.xiaoyan.service.AIService;
 import com.xiaoyan.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
@@ -12,7 +14,10 @@ import jakarta.annotation.Resource;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
@@ -42,13 +47,19 @@ public class AIController {
         Claims claims = JwtUtil.parseJWT(jwtProperties.getSecretKey(), token);
         Object object = claims.get(JwtClaimsConstant.USER_ID);
         Object object1 = claims.get(JwtClaimsConstant.ADMIN_ID);
-        Integer studentId;
+        int studentId;
         if (object != null)
-            studentId = Integer.valueOf(object.toString());
+            studentId = Integer.parseInt(object.toString());
         else
-            studentId = Integer.valueOf(object1.toString());
+            studentId = Integer.parseInt(object1.toString());
 
         BaseContext.setCurrentStudentId(studentId);
+    }
+
+    @PostMapping("assistant-answer")
+    public Result<String> saveAnswer(@RequestBody MessageDTO messageDTO) {
+        aiService.saveAnswer(messageDTO);
+        return Result.success();
     }
 
 

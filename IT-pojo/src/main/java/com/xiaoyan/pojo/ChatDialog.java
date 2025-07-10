@@ -18,12 +18,10 @@ public class ChatDialog implements Serializable {
     private Integer id;
 
     @NotBlank(message = "[]不能为空")
-    @Size(max = 20, message = "编码长度不能超过20")
-    private String sender;
+    private Integer senderId;
 
     @NotBlank(message = "[]不能为空")
-    @Size(max = 20, message = "编码长度不能超过20")
-    private String receiver;
+    private Integer receiverId;
 
     @NotBlank(message = "[]不能为空")
     @Size(max = 3000, message = "编码长度不能超过3000")

@@ -11,6 +11,12 @@
 
     <artifactId>IT-server</artifactId>
     <name>IT-server</name>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <java.version>21</java.version>
+    </properties>
     <dependencies>
 
 
@@ -116,7 +122,7 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
-            <version>3.2.2</version>
+            <version>3.4.2</version>
         </dependency>
     </dependencies>
 

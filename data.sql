@@ -1,4 +1,3 @@
-drop database ITHome;
 CREATE DATABASE IF NOT EXISTS `ITHome` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 use ITHome;
 CREATE TABLE it_student
@@ -110,9 +109,10 @@ CREATE TABLE career_student
 create table ai_dialog
 (
     id               int primary key auto_increment,
-    sender           varchar(20)   not null,
-    content          varchar(3000) not null,
-    create_date_time datetime      not null
+    senderId         int            not null,
+    content          varchar(3000)  not null,
+    answer           varchar(3000) not null,
+    create_date_time datetime       not null
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
@@ -120,10 +120,10 @@ create table ai_dialog
 create table chat_dialog
 (
     id               int primary key auto_increment,
-    sender           varchar(20)   not null,
-    receiver         varchar(20)   not null,
+    senderId         int           not null,
+    receiverId       int           not null,
     content          varchar(3000) not null,
     create_date_time datetime      not null
-)ENGINE = InnoDB
- DEFAULT CHARSET = utf8mb4
- COLLATE = utf8mb4_unicode_ci;
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
