@@ -120,7 +120,6 @@ const download = async (url, name) => {
 onMounted(async () => {
   const res = await getAll(); //加载文章文字
   resources.splice(0, 0, ...res.data); //返回文字
-  console.log(res.data)
 });
 </script>
 

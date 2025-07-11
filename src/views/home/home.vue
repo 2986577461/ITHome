@@ -69,7 +69,6 @@ const handlePageChange = (page) => {
 onMounted(async () => {
   const res = await getAll();
   news.splice(0, news.length, ...res.data);
-  console.log(res.data)
 });
 </script>
 

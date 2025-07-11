@@ -5,7 +5,7 @@ import path from "path";
 export default defineConfig({
   plugins: [vue()], // 合并插件配置
   build: {
-    outDir: "dist",
+    outDir: "static_pages",
   },
   server: {
     host: "0.0.0.0", // 允许外部 IP 访问

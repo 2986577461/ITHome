@@ -106,11 +106,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
-import axios from 'axios';
+import {ref, onMounted, nextTick} from 'vue';
 import VueMarkdown from 'vue-markdown-render';
-import Header from "@/components/Header.vue"; // 确保此路径正确
-import axiosInstance from "@/request/axiosInit.js"; // 确保此路径正确
+import Header from "@/components/Header.vue";
+import {baseURL} from "@/request/axiosInit.js";
+import {saveAnswer} from "@/request/axiosForAI.js"; // 确保此路径正确
 
 const userInput = ref('');
 const messages = ref([]);
@@ -288,10 +288,10 @@ const sendMessage = async () => {
 
   try {
     const eventSource = new EventSource(
-        `http://localhost:8080/user/ai-dialog?message=${encodeURIComponent(userMessage.content)}&token=${localStorage.getItem("token")}`
+        `http://${baseURL}/user/ai-dialog?message=${encodeURIComponent(userMessage.content)}&token=${encodeURIComponent(localStorage.getItem("token"))}`
     );
 
-    eventSource.onmessage = (event) => {
+    eventSource.onmessage = async (event) => {
       let rawData = event.data;
 
       // 修复：处理可能的双重 data: 前缀
@@ -302,6 +302,11 @@ const sendMessage = async () => {
       // **宝宝，看这里，我帮你加了对 '[DONE]' 的判断！**
       if (rawData === '[DONE]') {
         eventSource.close(); // 关闭 EventSource
+        //保存回答
+        const answer = {
+          message: messages.value[currentAIMessageIndex.value].content
+        }
+        await saveAnswer(answer);
         loading.value = false; // 停止加载状态
         return; // 不再尝试解析 JSON
       }

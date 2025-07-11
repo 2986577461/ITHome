@@ -60,8 +60,9 @@ const removeDialog = () => {
 const download = async () => {
   // 下载学生信息
   const resp = await downloadExcel();
+  console.log(resp)
   // 创建一个 Blob 对象
-  const blob = new Blob([resp.data], {type: "application/vnd.ms-excel"});
+  const blob = new Blob([resp], {type: "application/vnd.ms-excel"});
   // 创建一个 URL 对象
   const url = window.URL.createObjectURL(blob);
   // 创建一个链接元素
@@ -107,7 +108,6 @@ const remove = async () => {
 
 onMounted(async () => {
   const resp = await getAll(); // 获取数据
-  console.log(resp.data);
   governStore.member.splice(0, governStore.member.length, ...resp.data);
 
   resourceCount.value = (await getResourcesCount()).data;

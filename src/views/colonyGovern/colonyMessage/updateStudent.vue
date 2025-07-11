@@ -81,7 +81,6 @@ const submitUpdate = async () => {
   const resp = await update(
       updateStudent.value
   );
-  console.log(resp);
   ElMessage.success("更新成功");
   governStore.updateStudentVisible = false;
 };
