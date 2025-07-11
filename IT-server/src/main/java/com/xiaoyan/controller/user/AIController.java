@@ -9,6 +9,7 @@ import com.xiaoyan.result.Result;
 import com.xiaoyan.service.AIService;
 import com.xiaoyan.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import lombok.AllArgsConstructor;
@@ -36,7 +37,9 @@ public class AIController {
     private JwtProperties jwtProperties;
 
     @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "流式输出AI回答")
     public Flux<String> streamAiResponse(String message, String token) {
+        //临时token校验
         temporaryJwtParse(token);
 
         return aiService.streamChatCompletion(BaseContext.getCurrentStudentId(), message)
@@ -57,6 +60,7 @@ public class AIController {
     }
 
     @PostMapping("assistant-answer")
+    @Operation(summary = "保存AI回答")
     public Result<String> saveAnswer(@RequestBody MessageDTO messageDTO) {
         aiService.saveAnswer(messageDTO);
         return Result.success();

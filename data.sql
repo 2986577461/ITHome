@@ -83,13 +83,15 @@ CREATE TABLE newcomer
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
 
-create table student_medal
+create table student_medals
 (
-    id         int primary key auto_increment,
-    head       varchar(20)  not null,
-    student_id int          not null,
-    medal_url  varchar(100) not null,
-    introduce  varchar(200) not null
+    id               int primary key auto_increment,
+    head             varchar(20) not null,
+    student_id       int         not null,
+    grade            tinyint(1)  not null,
+    student_file_id  int         not null,
+    create_date_time datetime    not null,
+    deleted         tinyint(1)     not null  default 0
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
@@ -109,10 +111,10 @@ CREATE TABLE career_student
 create table ai_dialog
 (
     id               int primary key auto_increment,
-    senderId         int            not null,
-    content          varchar(3000)  not null,
+    sender_id        int           not null,
+    content          varchar(3000) not null,
     answer           varchar(3000) not null,
-    create_date_time datetime       not null
+    create_date_time datetime      not null
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
@@ -120,10 +122,26 @@ create table ai_dialog
 create table chat_dialog
 (
     id               int primary key auto_increment,
-    senderId         int           not null,
-    receiverId       int           not null,
+    sender_id        int           not null,
+    receiver_id      int           not null,
     content          varchar(3000) not null,
     create_date_time datetime      not null
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
+
+
+create table student_file
+(
+    id               int primary key auto_increment,
+    student_id       int                 not null,
+    original_name    varchar(200)        not null,
+    object_name      varchar(200) unique not null,
+    file_url         varchar(200)        not null,
+    file_size        bigint              not null,
+    file_type        varchar(30)         not null,
+    create_date_time datetime            not null,
+    deleted          tinyint(1) default 0
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;

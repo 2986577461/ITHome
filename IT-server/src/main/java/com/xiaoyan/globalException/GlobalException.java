@@ -49,7 +49,7 @@ public class GlobalException {
     }
 
     @ExceptionHandler
-    public Result<String> exceptionHandler(RuntimeException ex) {
+    public Result<String> exceptionHandler(Exception ex) {
         return Result.error(ex.getMessage());
     }
 }

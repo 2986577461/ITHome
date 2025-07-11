@@ -13,12 +13,12 @@ public class MessageConstant {
     public static final String NAME_MISMATCH="姓名不匹配";
     public static final String USER_NOT_LOGIN = "用户未登录";
     public static final String LOGIN_FAILED = "登录失败";
-    public static final String UPLOAD_FAILED = "文件上传失败";
+    public static final String FILE_DELETE_FAILED = "文件删除失败";
     public static final String PASSWORD_EDIT_FAILED = "密码修改失败";
     public static final String ARTICLE_NO_EXISITS="文章不存在";
-    public static final String OLEY_OPRATION_YOUR_OWN_ARTICLE="只允许操作你自己的文章";
+    public static final String ILLEGAL_OPERATION="非法操作";
     public static final String REPEATREQUEST="重复申请";
     public static final String VERIFICATION_CODE_MISMATCH="验证码不匹配";
-    public static final String PARAPETER_ERROR="参数错误";
+    public static final String PARAMETER_ERROR ="参数错误";
 
 }

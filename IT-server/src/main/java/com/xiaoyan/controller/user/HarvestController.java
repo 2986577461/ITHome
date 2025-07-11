@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @Slf4j
-@RestController
+//@RestController
 @RequestMapping("user/harvest")
 @AllArgsConstructor
 public class HarvestController {

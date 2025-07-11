@@ -9,7 +9,7 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface UserMapper extends BaseMapper<Student> {
 
-    @Select("update it_student set " +
+    @Update("update it_student set " +
             "resource_count=resource_count+1 where student_id=#{studentId}")
     void addReourceCountByID(Integer studentId);
 

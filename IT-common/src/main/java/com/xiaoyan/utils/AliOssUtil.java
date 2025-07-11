@@ -22,12 +22,40 @@ public class AliOssUtil {
 
 
     /**
-     * 文件上传
+     * 文件删除
      *
-     * @param bytes
-     * @param objectName
-     * @return
+     * @param objectName 要删除的文件在OSS中的完整路径/名称 (例如: "images/photo.jpg")
+     * @return true表示删除成功，false表示删除失败
      */
+    public boolean delete(String objectName) {
+        // 创建OSSClient实例。
+        OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
+
+        try {
+            // 删除文件。
+            ossClient.deleteObject(bucketName, objectName);
+            log.info("文件 {} 从 OSS 删除成功。", objectName);
+            return true;
+        } catch (OSSException oe) {
+            log.error("Caught an OSSException during delete operation. "
+                            + "Error Message: {}, Error Code: {}, Request ID: {}, Host ID: {}",
+                    oe.getErrorMessage(), oe.getErrorCode(), oe.getRequestId(), oe.getHostId());
+            // 抛出运行时异常，让上层处理，或者根据需要返回false
+            throw new RuntimeException("文件删除失败: " + oe.getErrorMessage(), oe);
+            // return false; // 如果你想返回false而不是抛出异常
+        } catch (ClientException ce) {
+            log.error("Caught a ClientException during delete operation. "
+                    + "Error Message: {}", ce.getMessage());
+            // 抛出运行时异常
+            throw new RuntimeException("文件删除失败: 客户端网络或内部问题", ce);
+            // return false; // 如果你想返回false而不是抛出异常
+        } finally {
+            if (ossClient != null) {
+                ossClient.shutdown();
+            }
+        }
+    }
+
     public String upload(byte[] bytes, String objectName) {
 
         // 创建OSSClient实例。
@@ -67,4 +95,5 @@ public class AliOssUtil {
 
         return stringBuilder.toString();
     }
+
 }

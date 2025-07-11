@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,7 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("total")
+@RequestMapping("admin/total")
 @AllArgsConstructor
 public class TotalController {
 
@@ -31,6 +32,7 @@ public class TotalController {
      * - usagePercentage: 堆内存使用百分比 (保留三位小数)
      */
     @GetMapping("/jvm/memory-heap")
+    @Operation(summary = "获取内存使用情况：使用字节、最大字节、使用率")
     public Map<String, String> getJvmHeapMemory() {
         Map<String, Double> metrics = new HashMap<>();
         Gauge usedHeapGauge = meterRegistry.find("jvm.memory.used").tag("area", "heap").gauge();
@@ -60,6 +62,7 @@ public class TotalController {
      * - systemCpuUsage: 整个系统的CPU使用率 (0.0-1.0，保留三位小数)
      */
     @GetMapping("/jvm/cpu-usage")
+    @Operation(summary = "获取CPU使用情况：进程CPU占用、系统CPU占用")
     public Map<String, String> getJvmCpuUsage() {
         Map<String, Double> cpuMetrics = new HashMap<>();
         Gauge processCpuGauge = meterRegistry.find("process.cpu.usage").gauge();
@@ -85,6 +88,7 @@ public class TotalController {
      * - peakThreads: JVM运行以来的峰值线程数
      */
     @GetMapping("/jvm/threads-count")
+    @Operation(summary = "获取JVM线程的活跃数、守护线程数、峰值线程数")
     public Map<String,Double> getJvmThreadsCount() {
         Map<String, Double> threadMetrics = new HashMap<>();
         Gauge liveThreadsGauge = meterRegistry.find("jvm.threads.live").gauge();

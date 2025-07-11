@@ -49,7 +49,7 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
         Student student = userMapper.selectById(newcomer.getStudentId());
 
         if (student != null)
-            throw new RuntimeException(MessageConstant.REPEATREQUEST);
+            throw new ParameterException(MessageConstant.REPEATREQUEST);
 
         newcomerMapper.deleteById(id);
 

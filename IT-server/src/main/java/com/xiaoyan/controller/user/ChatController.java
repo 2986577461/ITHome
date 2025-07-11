@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@RequestMapping("user/chat")
+//@RequestMapping("user/chat")
 @AllArgsConstructor
 @Tag(name = "聊天管理")
 public class ChatController {
