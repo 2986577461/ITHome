@@ -28,14 +28,14 @@ INSERT INTO it_student(student_id, name, sex, major, class_name, academy, positi
 
 CREATE TABLE resources
 (
-    id                int AUTO_INCREMENT primary key,
-    head              varchar(100) not null,
-    introduce         varchar(500) NOT NULL,
-    student_id        int          not null,
-    file_name         varchar(50)  not null,
-    file_url          varchar(300) not null,
-    cover_url         varchar(300) not null,
-    release_date_time datetime     not null
+    id                    int AUTO_INCREMENT primary key,
+    head                  varchar(100) not null,
+    introduce             varchar(500) NOT NULL,
+    student_id            int          not null,
+    student_file_cover_id int          not null,
+    student_file_file_id  int          not null,
+    release_date_time     datetime     not null,
+    deleted               tinyint(1)   not null default 0
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
@@ -91,7 +91,7 @@ create table student_medals
     grade            tinyint(1)  not null,
     student_file_id  int         not null,
     create_date_time datetime    not null,
-    deleted         tinyint(1)     not null  default 0
+    deleted          tinyint(1)  not null default 0
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
@@ -139,7 +139,7 @@ create table student_file
     object_name      varchar(200) unique not null,
     file_url         varchar(200)        not null,
     file_size        bigint              not null,
-    file_type        varchar(30)         not null,
+    file_type        varchar(80)         not null,
     create_date_time datetime            not null,
     deleted          tinyint(1) default 0
 ) ENGINE = InnoDB

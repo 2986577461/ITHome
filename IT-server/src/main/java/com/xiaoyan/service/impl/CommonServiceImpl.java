@@ -59,4 +59,17 @@ public class CommonServiceImpl implements CommonService {
             throw new RuntimeException(MessageConstant.FILE_DELETE_FAILED);
         studentFileMapper.deleteByObjectName(objectName);
     }
+
+    /**
+     * 生成带签名的下载URL
+     *
+     * @param objectName       OSS上的文件路径/名称
+     * @param expirationMillis URL的过期时间（毫秒），例如 3600 * 1000 = 1小时
+     * @return 带签名的下载URL
+     */
+    public String generatePresignedDownloadUrl(String objectName, long expirationMillis) {
+        StudentFile studentFile = studentFileMapper.selectbyObjectName(objectName);
+        return aliOssUtil.getDownloadUrl(objectName,
+                studentFile.getOriginalName(), expirationMillis);
+    }
 }

@@ -1,9 +1,10 @@
 package com.xiaoyan.pojo;
 
-
-import com.xiaoyan.conmon.BaseEntity;
-import jakarta.validation.constraints.NotBlank;
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 
 import java.io.Serializable;
@@ -11,6 +12,9 @@ import java.time.LocalDateTime;
 
 
 @Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class Resources implements Serializable {
 
     private Integer id;
@@ -19,13 +23,14 @@ public class Resources implements Serializable {
 
     private String introduce;
 
-    private String fileUrl;
+    private Integer studentFileCoverId;
 
-    private String fileName;
-
-    private String coverUrl;
+    private Integer studentFileFileId;
 
     private LocalDateTime releaseDateTime;
 
     private Integer studentId;
+
+    @TableLogic
+    private Boolean deleted;
 }

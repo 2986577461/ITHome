@@ -15,7 +15,7 @@ public class MessageConstant {
     public static final String LOGIN_FAILED = "登录失败";
     public static final String FILE_DELETE_FAILED = "文件删除失败";
     public static final String PASSWORD_EDIT_FAILED = "密码修改失败";
-    public static final String ARTICLE_NO_EXISITS="文章不存在";
+    public static final String RRSOURCES_NO_EXISITS ="资源不存在";
     public static final String ILLEGAL_OPERATION="非法操作";
     public static final String REPEATREQUEST="重复申请";
     public static final String VERIFICATION_CODE_MISMATCH="验证码不匹配";

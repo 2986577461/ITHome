@@ -6,18 +6,24 @@ import com.aliyun.oss.model.GeneratePresignedUrlRequest;
 import com.aliyun.oss.model.ResponseHeaderOverrides;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.annotation.AutoFillFields;
+import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
+import com.xiaoyan.dto.ResourcesDTO;
+import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ResourcesMapper;
+import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.mapper.UserMapper;
 import com.xiaoyan.pojo.Resources;
+import com.xiaoyan.pojo.StudentFile;
+import com.xiaoyan.service.CommonService;
 import com.xiaoyan.service.ResourcesService;
 import com.xiaoyan.utils.AliOssUtil;
 import com.xiaoyan.vo.ResourcesVO;
-import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -35,6 +41,10 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
     private UserMapper userMapper;
 
+    private CommonService commonService;
+
+    private StudentFileMapper studentFileMapper;
+
     @Override
     public Long getCount() {
         return this.count();
@@ -45,7 +55,18 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         List<Resources> resources = resourcesMapper.selectList(null);
         List<ResourcesVO> list = new ArrayList<>();
         for (Resources resource : resources) {
+            Integer studentFileCoverId = resource.getStudentFileCoverId();
+            Integer studentFileFileId = resource.getStudentFileFileId();
+            Integer studentId = resource.getStudentId();
+
             ResourcesVO resourcesVO = new ResourcesVO();
+            resourcesVO.setCoverUrl(studentFileMapper.selectById(studentFileCoverId).getFileUrl());
+            StudentFile file = studentFileMapper.selectById(studentFileFileId);
+            resourcesVO.setFileUrl(file.getFileUrl());
+            resourcesVO.setFileName(file.getOriginalName());
+            resourcesVO.setStudentName(userMapper.selectByStudentId(studentId).getName());
+            resourcesVO.setObjectName(file.getObjectName());
+
             BeanUtils.copyProperties(resource, resourcesVO);
             list.add(resourcesVO);
         }
@@ -54,58 +75,45 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
     @Override
     @AutoFillFields(AutoFillFields.OpType.INSERT)
-    public void saveResource(Resources resources) {
-        resources.setStudentId(BaseContext.getCurrentStudentId());
-        resources.setReleaseDateTime(LocalDateTime.now());
-        resourcesMapper.insert(resources);
-        userMapper.addReourceCountByID(BaseContext.getCurrentStudentId());
+    public void saveResource(ResourcesDTO resourcesDTO) {
+        try {
+            Integer coverId = commonService.upload(resourcesDTO.getCover());
+            Integer fileId = commonService.upload(resourcesDTO.getFile());
+            Integer currentStudentId = BaseContext.getCurrentStudentId();
+
+            resourcesMapper.insert(Resources.builder().
+                    head(resourcesDTO.getHead()).
+                    introduce(resourcesDTO.getIntroduce()).
+                    studentId(currentStudentId).
+                    studentFileCoverId(coverId).
+                    studentFileFileId(fileId).
+                    releaseDateTime(LocalDateTime.now()).build());
+
+            userMapper.addReourceCountByID(currentStudentId);
+        } catch (Exception e) {
+            log.error("保存资源失败：", e); // 详细打印异常栈
+            // 抛出自定义业务异常，让Controller可以捕获并返回更友好的错误信息
+            throw new RuntimeException("资源上传或保存失败，请稍后再试", e);
+        }
     }
 
     @Override
-    public void deleteById(String id) {
+    public void deleteById(Integer id) {
+        Resources resources = resourcesMapper.selectById(id);
+        if (resources == null)
+            throw new ParameterException(MessageConstant.RRSOURCES_NO_EXISITS);
+
+        if (!resources.getStudentId().equals(BaseContext.getCurrentStudentId()))
+            throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
+
+
+        StudentFile cover = studentFileMapper.selectById(resources.getStudentFileCoverId());
+        commonService.delete(cover.getObjectName());
+        StudentFile file = studentFileMapper.selectById(resources.getStudentFileFileId());
+        commonService.delete(file.getObjectName());
+
         resourcesMapper.deleteById(id);
     }
-
-    private AliOssUtil aliOssUtil;
-
-    /**
-     * 生成带签名的下载URL
-     *
-     * @param objectName       OSS上的文件路径/名称
-     * @param friendlyFileName 你希望用户下载时看到的文件名
-     * @param expirationMillis URL的过期时间（毫秒），例如 3600 * 1000 = 1小时
-     * @return 带签名的下载URL
-     */
-    public String generatePresignedDownloadUrl(String objectName, String friendlyFileName, long expirationMillis) {
-        // 创建GeneratePresignedUrlRequest对象
-        GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(aliOssUtil.getBucketName(), objectName);
-
-        // 设置签名URL的有效时间
-        Date expiration = new Date(System.currentTimeMillis() + expirationMillis);
-        request.setExpiration(expiration);
-
-        // 设置Content-Disposition，指定下载的文件名
-        ResponseHeaderOverrides responseHeaders = new ResponseHeaderOverrides();
-        // 对文件名进行URL编码，并符合RFC 6266标准
-        String encodedFriendlyName = new String(friendlyFileName.getBytes(StandardCharsets.UTF_8),
-                StandardCharsets.ISO_8859_1);
-        responseHeaders.setContentDisposition("attachment; filename=\"" + encodedFriendlyName + "\"");
-        // 如果需要，也可以设置Content-Type，但OSS通常会根据文件后缀自动设置
-        // responseHeaders.setContentType("application/octet-stream"); // 或者根据实际文件类型
-
-        request.setResponseHeaders(responseHeaders);
-
-        String endpoint = aliOssUtil.getEndpoint();
-        String accessKeyId = aliOssUtil.getAccessKeyId();
-        String accessKeySecret = aliOssUtil.getAccessKeySecret();
-
-        OSS oss = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
-
-        // 生成签名URL
-        URL signedUrl = oss.generatePresignedUrl(request);
-        return signedUrl.toString();
-    }
-
 
 
 }

@@ -71,6 +71,7 @@ public class MedalsServiceImpl implements MedalsService {
     }
 
     @Override
+
     public void save(StudentMedalsDTO studentMedalsDTO) throws IOException {
         StudentMedals studentMedals = new StudentMedals();
         BeanUtils.copyProperties(studentMedalsDTO,studentMedals,"id");

@@ -10,6 +10,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -32,6 +34,7 @@ public class MedalsController {
 
     @GetMapping("all")
     @Operation(summary = "获取所有奖项")
+    @Cacheable(cacheNames = "allMedals")
     public Result<List<StudentMedalsVO>> getAll() {
         List<StudentMedalsVO> medalsVO= medalsService.getAll();
         return Result.success(medalsVO);
@@ -39,6 +42,7 @@ public class MedalsController {
 
     @GetMapping
     @Operation(summary = "获取当前用户奖项")
+    @Cacheable(cacheNames = "currentUserMedals")
     public Result<List<StudentMedalsVO>> getCurrentUserMedals() {
         List<StudentMedalsVO> currentUserMedals = medalsService.getCurrentUserMedals();
         return Result.success(currentUserMedals);
@@ -46,6 +50,7 @@ public class MedalsController {
 
     @PostMapping
     @Operation(summary = "上传奖项")
+    @CacheEvict(cacheNames = {"currentUserMedals","allMedals"},allEntries = true)
     public Result<String> save(@ModelAttribute @Valid StudentMedalsDTO medalsDTO) throws IOException {
         log.info("上传奖项:{}{}",medalsDTO.getHead(), MedalsGradeType.fromCode(medalsDTO.getGrade()).getDescription());
         medalsService.save(medalsDTO);
@@ -54,6 +59,7 @@ public class MedalsController {
 
     @DeleteMapping("{id}")
     @Operation(summary = "给定id删除自己的奖项")
+    @CacheEvict(cacheNames = {"currentUserMedals","allMedals"},allEntries = true)
     public Result<String> remove(@PathVariable Integer id) {
         medalsService.remove(id);
         return Result.success();

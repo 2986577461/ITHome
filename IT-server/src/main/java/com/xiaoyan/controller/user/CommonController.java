@@ -2,37 +2,38 @@ package com.xiaoyan.controller.user;
 
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.CommonService;
-import com.xiaoyan.vo.FileVO;
 import io.swagger.v3.oas.annotations.Operation;
-import jakarta.validation.constraints.NotNull;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.IOException;
 
 
 @Slf4j
-@RestController("user/common")
+@RestController
+@RequestMapping("user/common")
 @AllArgsConstructor
+@Tag(name = "公共组件")
 public class CommonController {
 
     private CommonService commonService;
 
-//    @PostMapping("/upload")
-    @Operation(summary = "上传资料到远程OSS")
-    public Result<FileVO> upload(@NotNull MultipartFile file) throws IOException {
-        log.info("文件上传:{}", file);
-        commonService.upload(file);
-        return Result.success();
-    }
 
-    //todo暂不注册
-//    @DeleteMapping("{objectName}")
-    public Result<String> delete(@PathVariable String objectName){
-        commonService.delete(objectName);
-        return Result.success();
+    /**
+     * 获取带签名的文件下载URL
+     * 前端通过这个URL直接从OSS下载文件，并能显示正确的文件名
+     *
+     * @param objectName   OSS上的文件路径/名称 (e.g., uploads/uuid-xxx.png)
+     * @return 包含预签名URL的响应
+     */
+    @GetMapping("/url")
+    @Operation(summary = "获取带签名的url下载链接")
+    public Result<String> getSignedDownloadUrl(String objectName) {
+        long expirationMillis = 60 * 1000;
+        String signedUrl = commonService.generatePresignedDownloadUrl(
+                objectName,  expirationMillis);
+        return Result.success(signedUrl);
     }
 }

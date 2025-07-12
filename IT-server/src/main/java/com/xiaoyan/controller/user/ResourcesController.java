@@ -1,8 +1,7 @@
 package com.xiaoyan.controller.user;
 
 
-import com.xiaoyan.dto.ResourceDTO;
-import com.xiaoyan.pojo.Resources;
+import com.xiaoyan.dto.ResourcesDTO;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.ResourcesService;
 import com.xiaoyan.vo.ResourcesVO;
@@ -11,10 +10,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.List;
 
 @Slf4j
@@ -30,41 +31,26 @@ public class ResourcesController {
 
     @GetMapping("all")
     @Operation(summary = "返回所有资料")
+    @Cacheable(cacheNames = "resourcesList")
     public Result<List<ResourcesVO>> getList() {
         List<ResourcesVO> list = resourcesService.getList();
         return Result.success(list);
     }
 
     @DeleteMapping("{id}")
-    public Result<String> deleteByid(@PathVariable String id) {
+    @Operation(summary = "删除自己的资料")
+    @CacheEvict(cacheNames = "resourcesList", allEntries = true)
+    public Result<String> deleteByid(@PathVariable Integer id) {
         resourcesService.deleteById(id);
         return Result.success();
     }
 
     @PostMapping
-    public Result<String> saveResource(@RequestBody @Valid ResourceDTO resourceDTO) {
-        log.info("保存文章：{}", resourceDTO);
-        Resources resources = new Resources();
-        BeanUtils.copyProperties(resourceDTO, resources);
-
-        resourcesService.saveResource(resources);
-
+    @Operation(summary = "上传资料")
+    @CacheEvict(cacheNames = "resourcesList", allEntries = true)
+    public Result<String> saveResource(@ModelAttribute @Valid ResourcesDTO resourcesDTO) throws IOException {
+        resourcesService.saveResource(resourcesDTO);
         return Result.success();
     }
 
-    /**
-     * 获取带签名的文件下载URL
-     * 前端通过这个URL直接从OSS下载文件，并能显示正确的文件名
-     *
-     * @param objectName   OSS上的文件路径/名称 (e.g., uploads/uuid-xxx.png)
-     * @param friendlyName 你希望用户下载时看到的文件名 (e.g., 报告.pdf)
-     * @return 包含预签名URL的响应
-     */
-    @GetMapping("/url")
-    public Result<String> getSignedDownloadUrl(String objectName, String friendlyName) {
-        long expirationMillis = 60 * 1000;
-        String signedUrl = resourcesService.generatePresignedDownloadUrl(
-                objectName, friendlyName, expirationMillis);
-        return Result.success(signedUrl);
-    }
 }

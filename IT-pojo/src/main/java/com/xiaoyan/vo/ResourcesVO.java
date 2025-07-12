@@ -2,12 +2,13 @@ package com.xiaoyan.vo;
 
 import lombok.Data;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Data
-public class ResourcesVO {
+public class ResourcesVO implements Serializable {
 
-    private Long id;
+    private Integer id;
 
     private String head;
 
@@ -16,6 +17,8 @@ public class ResourcesVO {
     private LocalDateTime releaseDateTime;
 
     private String fileName;
+
+    private String objectName;
 
     private String fileUrl;
 
