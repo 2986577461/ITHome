@@ -8,16 +8,16 @@
         <h2>学习资料</h2>
       </div>
       <el-anchor
-        :container="containerRef"
-        direction="vertical"
-        :offset="30"
-        type="default"
+          :container="containerRef"
+          direction="vertical"
+          :offset="30"
+          type="default"
       >
         <el-anchor-link
-          v-for="(item, index) in resources"
-          :key="index"
-          :href="`#part${index}`"
-          @click="handleClick"
+            v-for="(item, index) in resources"
+            :key="index"
+            :href="`#part${index}`"
+            @click="handleClick"
         >
           <div class="nav-item">
             <div class="nav-index">{{ index + 1 }}</div>
@@ -32,10 +32,10 @@
       <div class="main-content">
         <!-- 资源列表 -->
         <div
-          v-for="(item, index) in resources"
-          :key="item.releaseTime"
-          :id="`part${index}`"
-          class="resource-item"
+            v-for="(item, index) in resources"
+            :key="item.releaseDateTime"
+            :id="`part${index}`"
+            class="resource-item"
         >
           <div class="resource-content">
             <div class="resource-header">
@@ -44,9 +44,9 @@
             <div class="resource-body">
               <div class="resource-image">
                 <img
-                  :src="item.coverUrl"
-                  :alt="item.head"
-                  class="fixed-image"
+                    :src="item.coverUrl"
+                    :alt="item.head"
+                    class="fixed-image"
                 />
               </div>
               <div class="resource-right">
@@ -55,11 +55,11 @@
                 </div>
 
                 <button
-                  class="download-button"
-                  @click="download(item.fileUrl, item.fileName)"
+                    class="download-button"
+                    @click="download(item.objectName,item.fileName)"
                 >
                   <el-icon :size="24">
-                    <Download />
+                    <Download/>
                   </el-icon>
                   <span>下载资料</span>
                 </button>
@@ -71,9 +71,9 @@
       <Foot></Foot>
     </div>
     <div
-      class="uploadBt"
-      @click="uploadStore.loadFile_visible = true"
-      v-if="condition"
+        class="uploadBt"
+        @click="uploadStore.loadFile_visible = true"
+        v-if="condition"
     >
       上传
     </div>
@@ -84,16 +84,17 @@
 <script lang="ts" setup>
 import uploadVue from "@/components/uploadResources.vue";
 import Header from "@/components/Header.vue";
-import { reactive, onMounted, ref } from "vue";
+import {reactive, onMounted, ref} from "vue";
 import Foot from "@/components/Foot.vue";
-import { Download } from "@element-plus/icons-vue";
-import { user_store } from "@/store/user";
-import { storeToRefs } from "pinia";
-import { upload_sotre } from "@/store/upload";
-import {getDownloadUrl,getAll} from "@/request/axiosForResources"
+import {Download} from "@element-plus/icons-vue";
+import {user_store} from "@/store/user";
+import {storeToRefs} from "pinia";
+import {upload_sotre} from "@/store/upload";
+import {getDownloadUrl, getAll} from "@/request/axiosForResources"
+
 const uploadStore = upload_sotre();
 const userStore = user_store();
-let { condition } = storeToRefs(userStore);
+let {condition} = storeToRefs(userStore);
 const containerRef = ref<HTMLElement | null>(null);
 
 const resources = reactive([]);
@@ -103,15 +104,11 @@ const handleClick = (e) => {
 };
 
 
-const download = async (url, name) => {
-  const urlObj = new URL(url);
-  const pathname = urlObj.pathname; // 获取路径部分：/a5b8f572-f785-408d-915f-e22983c9c80b.jpeg
-  const objectName = pathname.substring(pathname.lastIndexOf("/") + 1); // 获取最后一个斜杠后的部分
-  const resp = await getDownloadUrl(objectName, name);
-
+const download = async (objectName, friendlyName) => {
+  const resp = await getDownloadUrl(objectName);
   const link = document.createElement("a");
   link.href = resp.data;
-  link.download = name; // 设置下载文件名
+  link.download = friendlyName; // 设置下载文件名
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

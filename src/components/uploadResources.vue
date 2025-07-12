@@ -142,13 +142,12 @@
 
 <script lang="ts" setup>
 import {reactive, ref} from "vue";
-import {save} from "@/request/axiosForResources";
 import {storeToRefs} from "pinia";
 import {ElMessage} from "element-plus";
 import type {UploadProps} from "element-plus";
 import {upload_sotre} from "@/store/upload";
 import {ElUpload, ElButton} from "element-plus";
-import {saveIntroduce} from "@/request/axiosForResources";
+import {uploadResource} from "@/request/axiosForResources";
 
 const uploadStore = upload_sotre();
 const {loadFile_visible} = storeToRefs(uploadStore);
@@ -158,9 +157,6 @@ const fileList = ref([]);
 const resource = reactive({
   head: "",
   introduce: "",
-  fileUrl: "",
-  coverUrl: "",
-  fileName: "",
 });
 
 const submitUpload = async () => {
@@ -174,16 +170,10 @@ const submitUpload = async () => {
   }
   let formData = new FormData();
   formData.append("file", fileList.value[0].raw);
-  const file = await save(formData);
-
-  formData = new FormData();
-  formData.append("file", coverFileList.value[0].raw);
-  const cover = await save(formData);
-
-  resource.fileUrl = file.data.fileUrl;
-  resource.coverUrl = cover.data.fileUrl;
-  resource.fileName = file.data.fileName;
-  await saveIntroduce(resource);
+  formData.append("cover", coverFileList.value[0].raw);
+  formData.append("head",resource.head);
+  formData.append("introduce",resource.introduce)
+  await uploadResource(formData);
 
   ElMessage.success("上传成功");
 
