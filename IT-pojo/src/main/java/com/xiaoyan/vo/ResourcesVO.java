@@ -14,6 +14,8 @@ public class ResourcesVO implements Serializable {
 
     private String introduce;
 
+    private Integer studentId;
+
     private LocalDateTime releaseDateTime;
 
     private String fileName;

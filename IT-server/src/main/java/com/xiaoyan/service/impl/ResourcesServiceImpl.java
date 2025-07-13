@@ -1,9 +1,5 @@
 package com.xiaoyan.service.impl;
 
-import com.aliyun.oss.OSS;
-import com.aliyun.oss.OSSClientBuilder;
-import com.aliyun.oss.model.GeneratePresignedUrlRequest;
-import com.aliyun.oss.model.ResponseHeaderOverrides;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.annotation.AutoFillFields;
 import com.xiaoyan.constant.MessageConstant;
@@ -17,18 +13,13 @@ import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.CommonService;
 import com.xiaoyan.service.ResourcesService;
-import com.xiaoyan.utils.AliOssUtil;
 import com.xiaoyan.vo.ResourcesVO;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 
@@ -70,6 +61,9 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
             BeanUtils.copyProperties(resource, resourcesVO);
             list.add(resourcesVO);
         }
+
+        list.sort((o1, o2) -> o2.getReleaseDateTime().compareTo(o1.getReleaseDateTime()));
+
         return list;
     }
 

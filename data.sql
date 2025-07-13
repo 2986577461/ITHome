@@ -108,13 +108,26 @@ CREATE TABLE career_student
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
 
+
+create table ai_dialog_session
+(
+    id                    int primary key auto_increment,
+    title                 varchar(20),
+    student_id            int        not null,
+    create_date_time      datetime   not null,
+    last_active_date_time datetime   not null,
+    deleted               tinyint(1) not null default 0
+)ENGINE = InnoDB
+ DEFAULT CHARSET = utf8mb4
+ COLLATE = utf8mb4_unicode_ci;
 create table ai_dialog
 (
     id               int primary key auto_increment,
-    sender_id        int           not null,
-    content          varchar(3000) not null,
-    answer           varchar(3000) not null,
-    create_date_time datetime      not null
+    session_id         int         not null,
+    sender_type      varchar(20) not null,
+    content          text        not null,
+    create_date_time datetime    not null,
+    deleted          tinyint(1)  not null default 0
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
