@@ -15,7 +15,7 @@
       >
         <el-anchor-link
             v-for="(item, index) in resources"
-            :key="index"
+            :key="item.releaseDateTime"
             :href="`#part${index}`"
             @click="handleClick"
         >
@@ -27,17 +27,41 @@
       </el-anchor>
     </el-scrollbar>
 
-    <!-- 主内容区域         这个ref绑定了element-plus的anchor组件-->
     <div class="main" ref="containerRef">
       <div class="main-content">
-        <!-- 资源列表 -->
         <div
             v-for="(item, index) in resources"
-            :key="item.releaseDateTime"
+            :key="index"
             :id="`part${index}`"
             class="resource-item"
         >
           <div class="resource-content">
+            <div class="more">
+              <el-dropdown
+                  trigger="hover"
+                  style="cursor: pointer;"
+                  v-show="item.studentId == userStore.studentId"
+              >
+                <el-icon size="20">
+                  <MoreFilled/>
+                </el-icon>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item
+                        @click="
+                      resourceToDelete = item.id;
+                      removeDialogVisible = true;
+                    "
+                    >
+                      <el-icon>
+                        <Delete/>
+                      </el-icon>
+                      <span>删除</span>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
             <div class="resource-header">
               <h2>{{ item.head }}</h2>
             </div>
@@ -56,7 +80,7 @@
 
                 <button
                     class="download-button"
-                    @click="download(item.objectName,item.fileName)"
+                    @click="download(item.objectName)"
                 >
                   <el-icon :size="24">
                     <Download/>
@@ -78,6 +102,30 @@
       上传
     </div>
     <uploadVue></uploadVue>
+    <el-dialog
+        v-model="removeDialogVisible"
+        title="确认删除"
+        width="30%"
+        top="30vh"
+        :before-close="
+      () => {
+        removeDialogVisible = false;
+        resourceToDelete = null;
+      }">
+      <span>确定要删除吗？</span>
+      <template #footer>
+      <span class="dialog-footer">
+        <el-button
+            @click="
+            removeDialogVisible = false;
+            resourceToDelete = null;
+          "
+        >取消</el-button
+        >
+        <el-button type="danger" @click="handleDelete">确定</el-button>
+      </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -86,16 +134,22 @@ import uploadVue from "@/components/uploadResources.vue";
 import Header from "@/components/Header.vue";
 import {reactive, onMounted, ref} from "vue";
 import Foot from "@/components/Foot.vue";
-import {Download} from "@element-plus/icons-vue";
+import {Delete, Download, MoreFilled} from "@element-plus/icons-vue";
 import {user_store} from "@/store/user";
 import {storeToRefs} from "pinia";
 import {upload_sotre} from "@/store/upload";
 import {getDownloadUrl, getAll} from "@/request/axiosForResources"
+import {ElDialog, ElMessage} from "element-plus";
+import {deleteById} from "@/request/axiosForResources"
 
 const uploadStore = upload_sotre();
 const userStore = user_store();
 let {condition} = storeToRefs(userStore);
 const containerRef = ref<HTMLElement | null>(null);
+
+const removeDialogVisible = ref(false);
+const resourceToDelete = ref(null);
+
 
 const resources = reactive([]);
 
@@ -103,12 +157,29 @@ const handleClick = (e) => {
   e.preventDefault();
 };
 
+const handleDelete = async () => {
+  if (!resourceToDelete.value) return;
+  await deleteById(resourceToDelete.value);
 
-const download = async (objectName, friendlyName) => {
+  ElMessage.success("删除成功");
+
+  const index = resources.findIndex(
+      (article) => article.id === resourceToDelete.value
+  );
+  if (index > -1) {
+    resources.splice(index, 1);
+  }
+
+  removeDialogVisible.value = false;
+  resourceToDelete.value = null;
+}
+
+
+const download = async (objectName) => {
   const resp = await getDownloadUrl(objectName);
   const link = document.createElement("a");
   link.href = resp.data;
-  link.download = friendlyName; // 设置下载文件名
+  // link.download = friendlyName; // 设置下载文件名
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -179,6 +250,11 @@ onMounted(async () => {
 .nav-item:hover .nav-index {
   background: #409eff;
   color: white;
+}
+
+.more {
+  text-align: right;
+  padding: 10px 10px;
 }
 
 .asideText {
@@ -258,7 +334,7 @@ onMounted(async () => {
 }
 
 .resource-content {
-  padding: 3%;
+  padding: 0 0 3% 3%;
 }
 
 .resource-header h2 {

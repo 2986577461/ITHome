@@ -36,10 +36,8 @@
 import { ref } from "vue";
 import { visible_store } from "@/store/visible";
 import { ElMessage } from "element-plus";
-import { user_store } from "@/store/user";
 import {updatePassword} from "@/request/axiosForUser.js";
 const visibleStore = visible_store();
-const userStore = user_store();
 const oldPassword = ref("");
 const newPassword = ref("");
 const handleSubmit = async () => {

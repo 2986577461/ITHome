@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export const baseHost = "www.myzyitzj.cn";
-export const baseURL = "www.myzyitzj.cn/ithome";
+export const baseURL = "www.myzyitzj.cn/ithome"
 const axiosInstance = axios.create({
     baseURL: "http://" + baseURL,
     // 设置请求超时时间60秒

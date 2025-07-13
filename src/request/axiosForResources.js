@@ -15,6 +15,10 @@ export const uploadResource = async (introduce) => {
     });
 };
 
+export const deleteById = async (id) => {
+    return await axiosInstance.delete("user/resources/" + id);
+}
+
 export const getDownloadUrl = async (object) => {
     return await axiosInstance.get("user/common/url", {
         params: {objectName: object},

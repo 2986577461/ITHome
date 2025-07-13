@@ -69,9 +69,9 @@
       v-model="loadFile_visible"
       :show-close="false"
       top="8vh"
-      style="border-radius: 20px; width: 800px"
-  >
+      style="border-radius: 20px; width: 800px">
     <div class="main">
+
       <div class="head">学习资料上传</div>
       <div class="contentForm">
         <el-form label-width="auto">
@@ -143,14 +143,14 @@
 <script lang="ts" setup>
 import {reactive, ref} from "vue";
 import {storeToRefs} from "pinia";
-import {ElMessage} from "element-plus";
+import {ElLoading, ElMessage} from "element-plus";
 import type {UploadProps} from "element-plus";
 import {upload_sotre} from "@/store/upload";
 import {ElUpload, ElButton} from "element-plus";
-import {uploadResource} from "@/request/axiosForResources";
-
+import {uploadResource} from '@/request/axiosForResources'
 const uploadStore = upload_sotre();
 const {loadFile_visible} = storeToRefs(uploadStore);
+
 
 const coverFileList = ref([]);
 const fileList = ref([]);
@@ -160,14 +160,23 @@ const resource = reactive({
 });
 
 const submitUpload = async () => {
+  const load = ElLoading.service({
+    fullscreen: true,
+    text: "上传中",
+    background: "rgba(122, 122, 122, 0.8)",
+  });
   if (coverFileList.value.length === 0 || fileList.value.length === 0) {
     ElMessage.error("请上传封面和文件");
+    load.close()
     return;
   }
   if (resource.head === "" || resource.introduce === "") {
     ElMessage.error("请填写标题和简介");
+    load.close()
     return;
   }
+
+
   let formData = new FormData();
   formData.append("file", fileList.value[0].raw);
   formData.append("cover", coverFileList.value[0].raw);
@@ -178,6 +187,7 @@ const submitUpload = async () => {
   ElMessage.success("上传成功");
 
   setTimeout(() => {
+    load.close();
     location.reload();
   }, 700);
 };

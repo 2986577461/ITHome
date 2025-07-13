@@ -24,7 +24,7 @@ export const update = async (studentMessage) => {
 };
 
 export const updatePassword = async (resetPassword) => {
-    return await axiosInstance.patch("user/users", resetPassword);
+    return await axiosInstance.put("user/users", resetPassword);
 };
 
 //聊天获取用户列表

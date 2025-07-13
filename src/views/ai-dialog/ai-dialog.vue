@@ -110,7 +110,7 @@ import {ref, onMounted, nextTick} from 'vue';
 import VueMarkdown from 'vue-markdown-render';
 import Header from "@/components/Header.vue";
 import {baseURL} from "@/request/axiosInit.js";
-import {saveAnswer} from "@/request/axiosForAI.js"; // 确保此路径正确
+import { saveAnswer} from "@/request/axiosForAI.js"; // 确保此路径正确
 
 const userInput = ref('');
 const messages = ref([]);
@@ -288,7 +288,7 @@ const sendMessage = async () => {
 
   try {
     const eventSource = new EventSource(
-        `http://${baseURL}/user/ai-dialog?message=${encodeURIComponent(userMessage.content)}&token=${encodeURIComponent(localStorage.getItem("token"))}`
+        `http://${baseURL}/user/ai-dialog?&sessionId=1&message=${encodeURIComponent(userMessage.content)}&token=${encodeURIComponent(localStorage.getItem("token"))}`
     );
 
     eventSource.onmessage = async (event) => {
@@ -304,7 +304,8 @@ const sendMessage = async () => {
         eventSource.close(); // 关闭 EventSource
         //保存回答
         const answer = {
-          message: messages.value[currentAIMessageIndex.value].content
+          message: messages.value[currentAIMessageIndex.value].content,
+          sessionId:1
         }
         await saveAnswer(answer);
         loading.value = false; // 停止加载状态
@@ -333,7 +334,7 @@ const sendMessage = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
   initParticles();
   animateParticles();
   window.addEventListener('resize', initParticles);
