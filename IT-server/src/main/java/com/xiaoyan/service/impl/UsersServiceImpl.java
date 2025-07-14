@@ -44,8 +44,8 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     private UserMapper userMapper;
 
     @Override
-    public StudentVO getUser() {
-        Student student = userMapper.selectByStudentId(BaseContext.getCurrentStudentId());
+    public StudentVO getUser(Integer studentId) {
+        Student student = userMapper.selectByStudentId(studentId);
         StudentVO studentVO = new StudentVO();
         BeanUtils.copyProperties(student, studentVO);
 
@@ -99,8 +99,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     }
 
     @Override
-    public void updatePassword(PasswordDTO passwordDTO) {
-        Integer studentId = BaseContext.getCurrentStudentId();
+    public void updatePassword(PasswordDTO passwordDTO, Integer studentId) {
         userMapper.updatePasswordByStudentId(
                 studentId, encoder.encode(passwordDTO.getPassword()));
     }

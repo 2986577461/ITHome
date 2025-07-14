@@ -48,7 +48,7 @@ public class JwtUserTokenInterceptor implements HandlerInterceptor {
             BaseContext.setCurrentStudentId(studentId);
             return true;
 
-        } catch (Exception ex) {
+        } catch (RuntimeException ex) {
             response.setStatus(401);
             return false;
         }

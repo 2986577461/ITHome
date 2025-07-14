@@ -3,7 +3,6 @@ package com.xiaoyan.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.annotation.AutoFillFields;
 import com.xiaoyan.constant.MessageConstant;
-import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.ResourcesDTO;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ResourcesMapper;
@@ -69,21 +68,20 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
     @Override
     @AutoFillFields(AutoFillFields.OpType.INSERT)
-    public void saveResource(ResourcesDTO resourcesDTO) {
+    public void saveResource(ResourcesDTO resourcesDTO, Integer studentId) {
         try {
             Integer coverId = commonService.upload(resourcesDTO.getCover());
             Integer fileId = commonService.upload(resourcesDTO.getFile());
-            Integer currentStudentId = BaseContext.getCurrentStudentId();
 
             resourcesMapper.insert(Resources.builder().
                     head(resourcesDTO.getHead()).
                     introduce(resourcesDTO.getIntroduce()).
-                    studentId(currentStudentId).
+                    studentId(studentId).
                     studentFileCoverId(coverId).
                     studentFileFileId(fileId).
                     releaseDateTime(LocalDateTime.now()).build());
 
-            userMapper.addReourceCountByID(currentStudentId);
+            userMapper.addReourceCountByID(studentId);
         } catch (Exception e) {
             log.error("保存资源失败：", e); // 详细打印异常栈
             // 抛出自定义业务异常，让Controller可以捕获并返回更友好的错误信息
@@ -92,12 +90,12 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public void deleteById(Integer id) {
+    public void deleteById(Integer id, Integer studentId) {
         Resources resources = resourcesMapper.selectById(id);
         if (resources == null)
             throw new ParameterException(MessageConstant.RRSOURCES_NO_EXISITS);
 
-        if (!resources.getStudentId().equals(BaseContext.getCurrentStudentId()))
+        if (!resources.getStudentId().equals(studentId))
             throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
 
 
@@ -107,6 +105,8 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         commonService.delete(file.getObjectName());
 
         resourcesMapper.deleteById(id);
+
+        userMapper.decreaceResourceCount(studentId);
     }
 
 

@@ -13,7 +13,7 @@ import java.util.List;
 
 public interface UsersService {
 
-    StudentVO getUser();
+    StudentVO getUser(Integer studentId);
 
     StudentVO login(LoginDTO message);
 
@@ -23,7 +23,7 @@ public interface UsersService {
 
     void update(Student student);
 
-    void updatePassword(PasswordDTO passwordDTO);
+    void updatePassword(PasswordDTO passwordDTO,Integer studentId);
 
     ResponseEntity<byte[]> downloadExcel() throws IOException;
 

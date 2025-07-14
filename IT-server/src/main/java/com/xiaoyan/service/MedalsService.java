@@ -1,7 +1,6 @@
 package com.xiaoyan.service;
 
 import com.xiaoyan.dto.StudentMedalsDTO;
-import com.xiaoyan.pojo.StudentMedals;
 import com.xiaoyan.vo.StudentMedalsVO;
 
 import java.io.IOException;
@@ -11,9 +10,9 @@ public interface MedalsService {
 
     List<StudentMedalsVO> getAll();
 
-    List<StudentMedalsVO> getCurrentUserMedals();
+    List<StudentMedalsVO> getUserMedals(Integer studentId);
 
     void save(StudentMedalsDTO studentMedalsDTO) throws IOException;
 
-    void remove(Integer id);
+    void remove(Integer id,Integer studentId);
 }

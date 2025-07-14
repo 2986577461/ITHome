@@ -1,6 +1,7 @@
 package com.xiaoyan.controller.user;
 
 
+import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.ResourcesDTO;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.ResourcesService;
@@ -31,25 +32,30 @@ public class ResourcesController {
 
     @GetMapping("all")
     @Operation(summary = "返回所有资料")
-    @Cacheable(cacheNames = "resourcesList")
+    @Cacheable(value = "resourcesList", key = "'resourcesList'")
     public Result<List<ResourcesVO>> getList() {
+        log.info("返回所有资料");
         List<ResourcesVO> list = resourcesService.getList();
         return Result.success(list);
     }
 
     @DeleteMapping("{id}")
     @Operation(summary = "删除自己的资料")
-    @CacheEvict(cacheNames = "resourcesList", allEntries = true)
+    @CacheEvict(cacheNames = {"resourcesList", "resourcesCount"}, allEntries = true)
     public Result<String> deleteByid(@PathVariable Integer id) {
-        resourcesService.deleteById(id);
+        Integer studentId = BaseContext.getCurrentStudentId();
+        log.info("用户{}删除自己的资料{}", studentId, id);
+        resourcesService.deleteById(id, studentId);
         return Result.success();
     }
 
     @PostMapping
     @Operation(summary = "上传资料")
-    @CacheEvict(cacheNames = "resourcesList", allEntries = true)
+    @CacheEvict(cacheNames = {"resourcesList", "resourcesCount", "userList"}, allEntries = true)
     public Result<String> saveResource(@ModelAttribute @Valid ResourcesDTO resourcesDTO) throws IOException {
-        resourcesService.saveResource(resourcesDTO);
+        Integer studentId = BaseContext.getCurrentStudentId();
+        log.info("用户{}上传文章{}",studentId,resourcesDTO);
+        resourcesService.saveResource(resourcesDTO, studentId);
         return Result.success();
     }
 

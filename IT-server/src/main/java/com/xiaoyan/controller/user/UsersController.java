@@ -2,6 +2,7 @@ package com.xiaoyan.controller.user;
 
 import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.constant.PositionConstant;
+import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.LoginDTO;
 import com.xiaoyan.dto.PasswordDTO;
 
@@ -40,21 +41,25 @@ public class UsersController {
     @PutMapping
     @Operation(summary = "修改密码")
     public Result<String> updateStudent(@RequestBody @Valid PasswordDTO passwordDTO) {
-        userService.updatePassword(passwordDTO);
+        Integer studentId = BaseContext.getCurrentStudentId();
+        log.info("用户{}修改密码为:{}",studentId,passwordDTO);
+        userService.updatePassword(passwordDTO, studentId);
         return Result.success();
     }
 
     @GetMapping
     @Operation(summary = "返回当前学生信息")
     public Result<StudentVO> getUser() {
-        StudentVO user = userService.getUser();
+        Integer studentId = BaseContext.getCurrentStudentId();
+        log.info("用户信息回显:{}",studentId);
+        StudentVO user = userService.getUser(studentId);
         return Result.success(user);
     }
 
     @PostMapping("login")
     @Operation(summary = "账号密码登录")
     public Result<StudentVO> login(@RequestBody @Valid LoginDTO message) {
-
+        log.info("用户登录{}",message);
         StudentVO studentVO = userService.login(message);
 
         String position = studentVO.getPosition();

@@ -3,8 +3,10 @@ package com.xiaoyan.vo;
 
 import lombok.Data;
 
+import java.io.Serializable;
+
 @Data
-public class StudentMedalsVO {
+public class StudentMedalsVO implements Serializable {
 
     private Integer id;
 

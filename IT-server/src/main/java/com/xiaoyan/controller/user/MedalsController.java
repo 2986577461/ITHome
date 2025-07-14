@@ -1,5 +1,6 @@
 package com.xiaoyan.controller.user;
 
+import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.StudentMedalsDTO;
 import com.xiaoyan.enumeration.MedalsGradeType;
 import com.xiaoyan.result.Result;
@@ -34,17 +35,20 @@ public class MedalsController {
 
     @GetMapping("all")
     @Operation(summary = "获取所有奖项")
-    @Cacheable(cacheNames = "allMedals")
+    @Cacheable(value = "allMedals",key = "'allMedals'")
     public Result<List<StudentMedalsVO>> getAll() {
+        log.info("获取所有奖项");
         List<StudentMedalsVO> medalsVO= medalsService.getAll();
         return Result.success(medalsVO);
     }
 
     @GetMapping
     @Operation(summary = "获取当前用户奖项")
-    @Cacheable(cacheNames = "currentUserMedals")
+    @Cacheable(value = "currentUserMedals",key = "'currentUserMedals'")
     public Result<List<StudentMedalsVO>> getCurrentUserMedals() {
-        List<StudentMedalsVO> currentUserMedals = medalsService.getCurrentUserMedals();
+        Integer studentId = BaseContext.getCurrentStudentId();
+        log.info("获取用户{}的奖项",studentId);
+        List<StudentMedalsVO> currentUserMedals = medalsService.getUserMedals(studentId);
         return Result.success(currentUserMedals);
     }
 
@@ -52,6 +56,7 @@ public class MedalsController {
     @Operation(summary = "上传奖项")
     @CacheEvict(cacheNames = {"currentUserMedals","allMedals"},allEntries = true)
     public Result<String> save(@ModelAttribute @Valid StudentMedalsDTO medalsDTO) throws IOException {
+        log.info("上传奖项:{}",medalsDTO);
         log.info("上传奖项:{}{}",medalsDTO.getHead(), MedalsGradeType.fromCode(medalsDTO.getGrade()).getDescription());
         medalsService.save(medalsDTO);
         return Result.success();
@@ -61,7 +66,9 @@ public class MedalsController {
     @Operation(summary = "给定id删除自己的奖项")
     @CacheEvict(cacheNames = {"currentUserMedals","allMedals"},allEntries = true)
     public Result<String> remove(@PathVariable Integer id) {
-        medalsService.remove(id);
+        Integer studentId = BaseContext.getCurrentStudentId();
+        log.info("用户{}删除了奖项{}",studentId,id);
+        medalsService.remove(id, studentId);
         return Result.success();
     }
 }

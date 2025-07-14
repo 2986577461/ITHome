@@ -5,10 +5,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import lombok.ToString;
 import org.springframework.web.multipart.MultipartFile;
 
 
 @Data
+@ToString
 public class StudentMedalsDTO {
 
     private Integer id;

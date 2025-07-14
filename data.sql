@@ -51,21 +51,6 @@ CREATE TABLE article
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
-INSERT INTO `article`
-VALUES (1, 1, 'test',
-        '<p><span style=\"font-family: 黑体;\">这是测试用例</span><span style=\"font-size: 13px; font-family: 黑体;\">发生的</span></p><p><span style=\"font-size: 22px; font-family: 黑体;\">发生的🙃</span></p>',
-        '202300573', '2025-06-12 08:48:32', '2025-06-12 21:25:37'),
-       (2, 2, 'hh', '<p>fasd<span style=\"color: rgb(0, 0, 0);\">fasdfasdfasdfasdfasdfasd</span></p>', '202300573',
-        '2025-06-12 08:50:39', '2025-06-12 08:50:39'),
-       (3, 3, 'fast',
-        '<p>fasdfasdfa<span style=\"color: rgb(0, 0, 0);\">fasdfasdfafasdfasdfafasdfasdfa</span></p>', '202300573',
-        '2025-06-12 08:51:17', '2025-06-12 08:51:17'),
-       (4, 2, 'fff',
-        '<p>a<span style=\"color: rgb(0, 0, 0);\">aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</span></p>',
-        '202300573', '2025-06-12 08:52:25', '2025-06-12 08:52:25'),
-       (5, 4, 'mysql基础多表查询',
-        '<p style=\"text-align: left;\"><span style=\"font-size: 19px; font-family: 标楷体;\">select t1.department_name \'部门名称\' t2.name \'员工姓名\'</span></p><p style=\"text-align: left;\"><span style=\"font-size: 19px; font-family: 标楷体;\">from department t1 join employees t2</span></p><p style=\"text-align: left;\"><span style=\"font-size: 19px; font-family: 标楷体;\">where t2.department_id=t1.department_id;</span></p>',
-        '202300573', '2025-06-12 08:56:41', '2025-06-12 08:56:41');
 
 CREATE TABLE newcomer
 (

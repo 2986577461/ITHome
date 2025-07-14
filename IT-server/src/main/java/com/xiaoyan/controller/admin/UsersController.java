@@ -13,6 +13,9 @@ import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,7 +33,9 @@ public class UsersController {
 
     @GetMapping("all")
     @Operation(summary = "返回所有学生信息")
+    @Cacheable(value = "userList",key = "'userList'")
     public Result<List<StudentVO>> getAll() {
+        log.info("返回所有学生信息");
         List<StudentVO> list = userService.getAll();
         return Result.success(list);
     }
@@ -38,22 +43,25 @@ public class UsersController {
     @GetMapping("excel")
     @Operation(summary = "下载学员花名册")
     public ResponseEntity<byte[]> downloadExcel() throws IOException {
+        log.info("下载花名册");
         return userService.downloadExcel();
     }
 
 
     @DeleteMapping
     @Operation(summary = "删除学生,记得清理localStorage")
+    @CacheEvict(cacheNames = {"userList"},allEntries = true)
     public Result<String> removeStudents(@RequestBody List<Integer> ids) {
+        log.info("删除学生{}",ids);
         //todo JWT黑名单
         userService.removeStudents(ids);
         return Result.success();
     }
-
     @PutMapping
     @Operation(summary = "修改信息")
+    @CacheEvict(cacheNames = {"userList","articlesList"},allEntries = true)
     public Result<String> updateStudent(@RequestBody @Valid StudentDTO studentDTO) {
-
+        log.info("修改学生{}的信息",studentDTO);
         Student student = new Student();
         BeanUtils.copyProperties(studentDTO, student);
         userService.update(student);
