@@ -177,8 +177,8 @@ public class AiServiceImpl implements AiService {
                 createDateTime(LocalDateTime.now()).
                 build()
         );
-        Map<Integer, List<Map<String, String>>> sessionMap = messages.get(studentId);
-        List<Map<String, String>> list = sessionMap.get(sessionId);
+        ConcurrentMap<Integer, List<Map<String, String>>> sessionMap = messages.get(studentId);
+        List<Map<String, String>> list = sessionMap.computeIfAbsent(sessionId,integer -> new ArrayList<>());
         list.add(Map.of("role", "assistant", "content", message));
     }
 
