@@ -1,5 +1,8 @@
 package com.xiaoyan.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.MessageDTO;
@@ -9,13 +12,15 @@ import com.xiaoyan.mapper.AiDialogMapper;
 import com.xiaoyan.pojo.AiDialogSession;
 import com.xiaoyan.pojo.AiDialog;
 import com.xiaoyan.service.AiService;
-import com.xiaoyan.vo.AiDialogGroupVO;
+import com.xiaoyan.vo.AiDialogSessionVO;
 import com.xiaoyan.vo.AiDialogVO;
 import jakarta.annotation.Resource;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -24,6 +29,7 @@ import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +48,10 @@ public class AiServiceImpl implements AiService {
     @Resource
     private AiDialogSessionMapper aiDialogSessionMapper;
 
-    private static final ConcurrentMap<Integer, List<Map<String, String>>> messages =
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    //                                  用户id    会话id     上下文  消息        属性
+    private static final ConcurrentMap<Integer, ConcurrentMap<Integer, List<Map<String, String>>>> messages =
             new ConcurrentHashMap<>();
 
     private static final Map<String, String> SYSTEM_PERSONA_MESSAGE =
@@ -60,13 +69,18 @@ public class AiServiceImpl implements AiService {
                 .build();
     }
 
-    public Flux<String> streamChatCompletion(Integer studentId, Integer sessionId, String message) {
+    public Flux<String> streamChatCompletion(MessageDTO messageDTO, Integer studentId) {
+        Integer sessionId = messageDTO.getSessionId();
+        String message = messageDTO.getMessage();
         if (sessionId == null) {
-            sessionId = this.createSession();
+            sessionId = this.createSession(studentId);
         }
-        AiDialogSession group = aiDialogSessionMapper.selectById(sessionId);
-        if (group == null || !group.getStudentId().equals(studentId))
-            throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
+        Integer sessionId1 = sessionId;
+
+        //兼容旧id之家，取消身份判断
+//        AiDialogSession group = aiDialogSessionMapper.selectById(sessionId);
+//        if (group == null || !group.getStudentId().equals(studentId))
+//            throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
 
         LocalDateTime now = LocalDateTime.now();
         aiDialogMapper.insert(AiDialog.builder().
@@ -76,14 +90,17 @@ public class AiServiceImpl implements AiService {
                 content(message).build());
         aiDialogSessionMapper.updateLastActiveDateTime(sessionId, now);
 
-        List<Map<String, String>> conversation = messages.computeIfAbsent(studentId, k -> new ArrayList<>());
+        ConcurrentMap<Integer, List<Map<String, String>>> sessionMap = messages.computeIfAbsent(studentId,
+                k -> new ConcurrentHashMap<>());
+
+        List<Map<String, String>> conversation = sessionMap.computeIfAbsent(sessionId, integer -> new ArrayList<>());
         if (conversation.isEmpty()) {
             conversation.add(SYSTEM_PERSONA_MESSAGE);
         }
 
         if (conversation.size() > 14) {
-            conversation.removeFirst();
-            conversation.removeFirst();
+            conversation.remove(1);
+            conversation.remove(1);
         }
 
         conversation.add(Map.of("role", "user", "content", message));
@@ -93,43 +110,61 @@ public class AiServiceImpl implements AiService {
         requestBody.put("messages", conversation);
         requestBody.put("stream", true); // 启用流式响应
 
+        StringBuilder answer = new StringBuilder();
+
         try {
             return webClient.post()
                     .bodyValue(requestBody)
                     .accept(MediaType.TEXT_EVENT_STREAM) // 接受 SSE 流
                     .retrieve()
                     .bodyToFlux(String.class)
-                    .doOnNext(chunk -> {
+                    .doOnNext(fluxString -> {
+                        try {
+                            if (fluxString.equals("[DONE]"))
+                                return;
+                            JsonNode jsonNode = objectMapper.readTree(fluxString);
+                            String fluxSubString = jsonNode.path("choices")
+                                    .get(0)
+                                    .path("delta")
+                                    .path("content")
+                                    .asText();
+                            answer.append(fluxSubString);
+                        } catch (JsonProcessingException e) {
+                            throw new RuntimeException(e);
+                        }
                     })
-                    .doOnError(e -> log.error("Stream error", e));
-        } catch (Exception e) {
+                    .doOnError(e -> log.error("Stream error", e))
+                    .doOnComplete(() -> this.saveAnswer(answer.toString(), sessionId1, studentId));
+        } catch (RuntimeException e) {
             return Flux.error(e);
         }
     }
 
-    private Integer createSession() {
-        Integer currentStudentId = BaseContext.getCurrentStudentId();
+
+    @CacheEvict(value = "sessions", key = "#studentId")
+    public Integer createSession(Integer studentId) {
         LocalDateTime now = LocalDateTime.now();
 
-        return aiDialogSessionMapper.insert(AiDialogSession.
+        AiDialogSession session = AiDialogSession.
                 builder().
-                studentId(currentStudentId).
+                studentId(studentId).
                 createDateTime(now).
-                LastActiveDateTime(now).build());
+                LastActiveDateTime(now).build();
+
+        aiDialogSessionMapper.insert(session);
+        return session.getId();
     }
 
-    @Override
-    public void saveAnswer(MessageDTO messageDTO) {
-        Integer currentStudentId = BaseContext.getCurrentStudentId();
-        String answer = messageDTO.getMessage();
-        Integer sessionId = messageDTO.getSessionId();
+    @CacheEvict(value = "sessions", key = "#studentId")
+    public void saveAnswer(String message, Integer sessionId, Integer studentId) {
 
         AiDialogSession session = aiDialogSessionMapper.selectById(sessionId);
-        if ( !session.getStudentId().equals(currentStudentId))
-            throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
+        //兼容旧it之家前端
+//        if (!session.getStudentId().equals(studentId))
+//            throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
 
         if (session.getTitle() == null) {
-            String title = answer.substring(0, 20);
+            String title = message.substring(0, 20);
             aiDialogSessionMapper.updateTitleByGroupId(sessionId, title);
         }
 
@@ -137,25 +172,28 @@ public class AiServiceImpl implements AiService {
         aiDialogMapper.insert(AiDialog.
                 builder().
                 senderType("model").
-                content(answer).
+                content(message).
                 sessionId(sessionId).
                 createDateTime(LocalDateTime.now()).
                 build()
         );
-        List<Map<String, String>> list = messages.get(currentStudentId);
-        list.add(Map.of("role", "assistant", "content", answer));
+        Map<Integer, List<Map<String, String>>> sessionMap = messages.get(studentId);
+        List<Map<String, String>> list = sessionMap.get(sessionId);
+        list.add(Map.of("role", "assistant", "content", message));
     }
 
     @Override
-    public List<AiDialogGroupVO> getAll() {
+    @Cacheable(value = "sessions", key = "#studentId")
+    public List<AiDialogSessionVO> getAll(Integer studentId) {
         List<AiDialogSession> aiDialogSessions =
-                aiDialogSessionMapper.selectByStudentId(BaseContext.getCurrentStudentId());
-        List<AiDialogGroupVO> list = new ArrayList<>();
+                aiDialogSessionMapper.selectByStudentId(studentId);
+        List<AiDialogSessionVO> list = new ArrayList<>();
         for (AiDialogSession group : aiDialogSessions) {
-            AiDialogGroupVO vo = new AiDialogGroupVO();
+            AiDialogSessionVO vo = new AiDialogSessionVO();
             BeanUtils.copyProperties(group, vo);
             list.add(vo);
         }
+        list.sort((o1, o2) -> o2.getLastActiveDateTime().compareTo(o1.getLastActiveDateTime()));
         return list;
     }
 
@@ -164,6 +202,7 @@ public class AiServiceImpl implements AiService {
         AiDialogSession group = aiDialogSessionMapper.selectById(sessionId);
         if (!group.getStudentId().equals(BaseContext.getCurrentStudentId()))
             throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
+
         List<AiDialog> list = aiDialogMapper.selectBySessionId(sessionId);
         List<AiDialogVO> voList = new ArrayList<>();
         for (AiDialog dialog : list) {
@@ -171,17 +210,18 @@ public class AiServiceImpl implements AiService {
             BeanUtils.copyProperties(dialog, vo);
             voList.add(vo);
         }
+        voList.sort(Comparator.comparing(AiDialogVO::getCreateDateTime));
         return voList;
     }
 
     @Override
-    public void deleteSession(Integer sessionId) {
-        Integer currentStudentId = BaseContext.getCurrentStudentId();
+    @CacheEvict(value = "sessions", key = "#studentId")
+    public void deleteSession(Integer sessionId, Integer studentId) {
         AiDialogSession group = aiDialogSessionMapper.selectById(sessionId);
         if (group == null)
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
 
-        if (!group.getStudentId().equals(currentStudentId))
+        if (!group.getStudentId().equals(studentId))
             throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
 
         aiDialogSessionMapper.deleteById(sessionId);

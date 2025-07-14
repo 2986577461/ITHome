@@ -8,7 +8,7 @@ import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.AiService;
 import com.xiaoyan.utils.JwtUtil;
-import com.xiaoyan.vo.AiDialogGroupVO;
+import com.xiaoyan.vo.AiDialogSessionVO;
 import com.xiaoyan.vo.AiDialogVO;
 import io.jsonwebtoken.Claims;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,12 +41,27 @@ public class AIController {
 
     private JwtProperties jwtProperties;
 
+    @PostMapping(value = "send-message", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "发送问题,")
+    public Flux<String> streamAiResponse(@RequestBody @Valid MessageDTO messageDTO) {
+        Integer studentId = BaseContext.getCurrentStudentId();
+        log.info("{}从会话{}中询问AI:\"{}\"",studentId,messageDTO.getSessionId(),messageDTO.getMessage());
+        return aiService.streamChatCompletion(messageDTO, studentId)
+                .map(chunk -> "data: " + chunk + "\n");
+    }
+
     @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @Operation(summary = "发送问题，如果不携带sessionpId则创建新会话")
-    public Flux<String> streamAiResponse(String message, @Schema(description = "会话id") Integer sessionId, String token) {
+    @Operation(summary = "旧版本，不要调用")
+    @Deprecated(since="9", forRemoval=true)
+    public Flux<String> streamAiResponse2(String message, @Schema(description = "会话id") Integer sessionId, String token) {
         //临时token校验
         temporaryJwtParse(token);
-        return aiService.streamChatCompletion(BaseContext.getCurrentStudentId(), sessionId, message)
+
+        Integer studentId = BaseContext.getCurrentStudentId();
+        MessageDTO messageDTO = new MessageDTO();
+        messageDTO.setSessionId(sessionId);
+        messageDTO.setMessage(message);
+        return aiService.streamChatCompletion(messageDTO, studentId)
                 .map(chunk -> "data: " + chunk + "\n");
     }
 
@@ -63,23 +78,19 @@ public class AIController {
         BaseContext.setCurrentStudentId(studentId);
     }
 
-    @PostMapping("assistant-answer")
-    @Operation(summary = "保存AI回答")
-    public Result<String> saveAnswer(@RequestBody @Valid MessageDTO messageDTO) {
-        aiService.saveAnswer(messageDTO);
-        return Result.success();
-    }
-
     @GetMapping("all")
-    @Operation(summary = "获取当前用户左侧的所有会话")
-    public Result<List<AiDialogGroupVO>> getAll() {
-        List<AiDialogGroupVO> list = aiService.getAll();
+    @Operation(summary = "获取当前用户左侧的所有会话从最新到最旧")
+    public Result<List<AiDialogSessionVO>> getAll() {
+        Integer studentId = BaseContext.getCurrentStudentId();
+        log.info("获取{}左侧的所有对话",studentId);
+        List<AiDialogSessionVO> list = aiService.getAll(studentId);
         return Result.success(list);
     }
 
-    @GetMapping
+    @GetMapping("history")
     @Operation(summary = "给定会话id返回所有历史记录")
     public Result<List<AiDialogVO>> getMessages(Integer sessionId) {
+        log.info("获取会话{}的AI对话记录",sessionId);
         List<AiDialogVO> messages = aiService.getMessages(sessionId);
         return Result.success(messages);
     }
@@ -87,7 +98,8 @@ public class AIController {
     @DeleteMapping("{sessionId}")
     @Operation(summary = "删除指定会话")
     public Result<String> deleteSession(@PathVariable Integer sessionId) {
-        aiService.deleteSession(sessionId);
+        log.info("删除会话:{}",sessionId);
+        aiService.deleteSession(sessionId,BaseContext.getCurrentStudentId());
         return Result.success();
     }
 

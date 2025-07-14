@@ -8,6 +8,7 @@ import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.CommonService;
 import com.xiaoyan.utils.AliOssUtil;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 
+@Slf4j
 @Service
 @AllArgsConstructor
 public class CommonServiceImpl implements CommonService {
@@ -69,6 +71,7 @@ public class CommonServiceImpl implements CommonService {
      */
     public String generatePresignedDownloadUrl(String objectName, long expirationMillis) {
         StudentFile studentFile = studentFileMapper.selectbyObjectName(objectName);
+        log.info("下载文件:{}",studentFile.getOriginalName());
         return aliOssUtil.getDownloadUrl(objectName,
                 studentFile.getOriginalName(), expirationMillis);
     }

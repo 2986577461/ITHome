@@ -3,7 +3,9 @@ package com.xiaoyan.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.annotation.AutoFillFields;
+import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
+import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ArticleMapper;
 import com.xiaoyan.mapper.UserMapper;
 import com.xiaoyan.pojo.Article;
@@ -41,6 +43,8 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         article.setReleaseDateTime(LocalDateTime.now());
         article.setUpdatedDateTime(LocalDateTime.now());
         articleMapper.insert(article);
+
+        userMapper.addArticleCountById(BaseContext.getCurrentStudentId());
     }
 
     @Override
@@ -68,7 +72,17 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
     @Override
     public void delete(Integer id) {
+        Article article = articleMapper.selectById(id);
+        if(article==null)
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+
+        Integer studentId = BaseContext.getCurrentStudentId();
+
+        if(!article.getStudentId().equals(studentId))
+            throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
+
         articleMapper.deleteById(id);
+        userMapper.decreaceArticleCount(studentId);
     }
 
 

@@ -34,6 +34,7 @@ public class EmailController {
     @PostMapping("/send-code")
     @Operation(summary = "发送邮件")
     public Result<String> sendCode(@NotBlank String email) {
+        log.info("发送验证码:{}",email);
         emailService.sendVerificationCode(email);
         return Result.success("验证码已发送");
     }
@@ -42,6 +43,7 @@ public class EmailController {
     @PostMapping("/verify")
     @Operation(summary = "校验验证码")
     public Result<Boolean> verifyCode(@RequestBody @Valid EmailDTO emailDTO) {
+        log.info("校验验证码:{}",emailDTO);
         boolean isValid = emailService.verifyCode(emailDTO);
         if (!isValid)
             return Result.error(MessageConstant.VERIFICATION_CODE_MISMATCH);

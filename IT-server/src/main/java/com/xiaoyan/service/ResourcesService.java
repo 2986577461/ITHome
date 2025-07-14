@@ -15,7 +15,7 @@ public interface ResourcesService  {
 
     List<ResourcesVO> getList();
 
-    void saveResource(ResourcesDTO resourcesDTO) throws IOException;
+    void saveResource(ResourcesDTO resourcesDTO,Integer studentId) throws IOException;
 
-    void deleteById(Integer id);
+    void deleteById(Integer id,Integer studentId);
 }

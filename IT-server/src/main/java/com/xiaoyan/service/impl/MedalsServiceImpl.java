@@ -66,8 +66,8 @@ public class MedalsServiceImpl implements MedalsService {
 
 
     @Override
-    public List<StudentMedalsVO> getCurrentUserMedals() {
-        return this.getStudentMedalsVOS(BaseContext.getCurrentStudentId());
+    public List<StudentMedalsVO> getUserMedals(Integer studentId) {
+        return this.getStudentMedalsVOS(studentId);
     }
 
     @Override
@@ -87,13 +87,13 @@ public class MedalsServiceImpl implements MedalsService {
     }
 
     @Override
-    public void remove(Integer id) {
+    public void remove(Integer id, Integer studentId) {
         StudentMedals studentMedals = medalsMapper.selectById(id);
         if(studentMedals==null)
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
 
-        Integer studentId = studentMedals.getStudentId();
-        if(!Objects.equals(studentId, BaseContext.getCurrentStudentId()))
+        Integer studentId1 = studentMedals.getStudentId();
+        if(!Objects.equals(studentId1,studentId ))
             throw new PositionException(MessageConstant.ILLEGAL_OPERATION);
 
         Integer studentFileId = studentMedals.getStudentFileId();
