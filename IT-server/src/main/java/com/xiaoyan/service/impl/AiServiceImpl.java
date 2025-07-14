@@ -71,9 +71,13 @@ public class AiServiceImpl implements AiService {
 
     public Flux<String> streamChatCompletion(MessageDTO messageDTO, Integer studentId) {
         Integer sessionId = messageDTO.getSessionId();
-        String message = messageDTO.getMessage();
         if (sessionId == null) {
             sessionId = this.createSession(studentId);
+        } else {
+            AiDialogSession session = aiDialogSessionMapper.selectById(sessionId);
+            if (session == null) {
+                throw new ParameterException(MessageConstant.SESSION_NO_FOUND);
+            }
         }
         Integer sessionId1 = sessionId;
 
@@ -82,6 +86,7 @@ public class AiServiceImpl implements AiService {
 //        if (group == null || !group.getStudentId().equals(studentId))
 //            throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
 
+        String message = messageDTO.getMessage();
         LocalDateTime now = LocalDateTime.now();
         aiDialogMapper.insert(AiDialog.builder().
                 sessionId(sessionId).
@@ -178,7 +183,7 @@ public class AiServiceImpl implements AiService {
                 build()
         );
         ConcurrentMap<Integer, List<Map<String, String>>> sessionMap = messages.get(studentId);
-        List<Map<String, String>> list = sessionMap.computeIfAbsent(sessionId,integer -> new ArrayList<>());
+        List<Map<String, String>> list = sessionMap.computeIfAbsent(sessionId, integer -> new ArrayList<>());
         list.add(Map.of("role", "assistant", "content", message));
     }
 
@@ -200,10 +205,14 @@ public class AiServiceImpl implements AiService {
     @Override
     public List<AiDialogVO> getMessages(Integer sessionId) {
         AiDialogSession group = aiDialogSessionMapper.selectById(sessionId);
+        if (group == null)
+            throw new ParameterException(MessageConstant.RRSOURCES_NO_EXISITS);
         if (!group.getStudentId().equals(BaseContext.getCurrentStudentId()))
             throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
 
         List<AiDialog> list = aiDialogMapper.selectBySessionId(sessionId);
+        if (list == null)
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         List<AiDialogVO> voList = new ArrayList<>();
         for (AiDialog dialog : list) {
             AiDialogVO vo = new AiDialogVO();

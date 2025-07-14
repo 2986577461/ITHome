@@ -20,5 +20,6 @@ public class MessageConstant {
     public static final String REPEATREQUEST="重复申请";
     public static final String VERIFICATION_CODE_MISMATCH="验证码不匹配";
     public static final String PARAMETER_ERROR ="参数错误";
+    public static final String SESSION_NO_FOUND="会话没找到！";
 
 }

@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -88,8 +89,8 @@ public class AIController {
     }
 
     @GetMapping("history")
-    @Operation(summary = "给定会话id返回所有历史记录")
-    public Result<List<AiDialogVO>> getMessages(Integer sessionId) {
+    @Operation(summary = "给定会话id返回自己所有的历史记录")
+    public Result<List<AiDialogVO>> getMessages(@NotNull Integer sessionId) {
         log.info("获取会话{}的AI对话记录",sessionId);
         List<AiDialogVO> messages = aiService.getMessages(sessionId);
         return Result.success(messages);

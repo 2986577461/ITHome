@@ -19,13 +19,11 @@ public class AiDialogVO implements Serializable {
 
     private Integer id;
 
-    private Integer groupId;
+    private Integer sessionId;
 
-    private Integer senderId;
+    private Integer senderType;
 
     private String content;
-
-    private String answer;
 
     private LocalDateTime createDateTime;
 }
