@@ -5,9 +5,6 @@ import com.xiaoyan.dto.PasswordDTO;
 
 import com.xiaoyan.pojo.Student;
 import com.xiaoyan.vo.StudentVO;
-import org.springframework.http.ResponseEntity;
-
-import java.io.IOException;
 import java.util.List;
 
 
