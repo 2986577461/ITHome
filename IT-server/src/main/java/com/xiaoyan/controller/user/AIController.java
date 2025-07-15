@@ -7,6 +7,7 @@ import com.xiaoyan.dto.MessageDTO;
 import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.AiService;
+import com.xiaoyan.service.AiSessionService;
 import com.xiaoyan.utils.JwtUtil;
 import com.xiaoyan.vo.AiDialogSessionVO;
 import com.xiaoyan.vo.AiDialogVO;
@@ -42,8 +43,10 @@ public class AIController {
 
     private JwtProperties jwtProperties;
 
+    private AiSessionService aiSessionService;
+
     @PostMapping(value = "send-message", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @Operation(summary = "发送问题,")
+    @Operation(summary = "发送问题")
     public Flux<String> streamAiResponse(@RequestBody @Valid MessageDTO messageDTO) {
         Integer studentId = BaseContext.getCurrentStudentId();
         log.info("{}从会话{}中询问AI:\"{}\"",studentId,messageDTO.getSessionId(),messageDTO.getMessage());
@@ -84,7 +87,7 @@ public class AIController {
     public Result<List<AiDialogSessionVO>> getAll() {
         Integer studentId = BaseContext.getCurrentStudentId();
         log.info("获取{}左侧的所有对话",studentId);
-        List<AiDialogSessionVO> list = aiService.getAll(studentId);
+        List<AiDialogSessionVO> list = aiSessionService.getAll(studentId);
         return Result.success(list);
     }
 
@@ -92,7 +95,7 @@ public class AIController {
     @Operation(summary = "给定会话id返回自己所有的历史记录")
     public Result<List<AiDialogVO>> getMessages(@NotNull Integer sessionId) {
         log.info("获取会话{}的AI对话记录",sessionId);
-        List<AiDialogVO> messages = aiService.getMessages(sessionId);
+        List<AiDialogVO> messages = aiSessionService.getMessages(sessionId);
         return Result.success(messages);
     }
 
@@ -100,7 +103,7 @@ public class AIController {
     @Operation(summary = "删除指定会话")
     public Result<String> deleteSession(@PathVariable Integer sessionId) {
         log.info("删除会话:{}",sessionId);
-        aiService.deleteSession(sessionId,BaseContext.getCurrentStudentId());
+        aiSessionService.deleteSession(sessionId,BaseContext.getCurrentStudentId());
         return Result.success();
     }
 

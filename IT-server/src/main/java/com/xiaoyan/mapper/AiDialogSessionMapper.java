@@ -8,13 +8,13 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.ArrayList;
 
 @Mapper
 public interface AiDialogSessionMapper extends BaseMapper<AiDialogSession> {
 
     @Select("select * from ai_dialog_session where student_id=#{studentId} and deleted=0;")
-    List<AiDialogSession> selectByStudentId(Integer studentId);
+    ArrayList<AiDialogSession> selectByStudentId(Integer studentId);
 
     @Update("update ai_dialog_session set last_active_date_time=#{now} where id=#{id} and deleted=0")
     void updateLastActiveDateTime(Integer id, LocalDateTime now);

@@ -3,6 +3,7 @@ package com.xiaoyan.webConfig;
 import com.xiaoyan.interceptor.JwtAdminTokenInterceptor;
 import com.xiaoyan.interceptor.JwtUserTokenInterceptor;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +17,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 
+@Slf4j
 @Configuration
 public class InterceptorConfig implements WebMvcConfigurer {
 
@@ -48,14 +50,5 @@ public class InterceptorConfig implements WebMvcConfigurer {
                 .allowedMethods("*")
                 .allowCredentials(true) // 允许携带 Cookie
                 .maxAge(3600); // 预检请求缓存时间
-    }
-
-    @Bean
-    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
-        RedisTemplate<String, Object> template = new RedisTemplate<>();
-        template.setConnectionFactory(connectionFactory);
-        template.setKeySerializer(new StringRedisSerializer());
-        template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
-        return template;
     }
 }

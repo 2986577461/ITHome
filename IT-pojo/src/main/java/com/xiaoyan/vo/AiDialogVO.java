@@ -21,7 +21,7 @@ public class AiDialogVO implements Serializable {
 
     private Integer sessionId;
 
-    private Integer senderType;
+    private String  senderType;
 
     private String content;
 
