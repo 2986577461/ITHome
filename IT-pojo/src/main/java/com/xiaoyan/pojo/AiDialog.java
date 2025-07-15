@@ -1,5 +1,7 @@
 package com.xiaoyan.pojo;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -21,6 +23,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class AiDialog implements Serializable {
 
+    @TableId(type = IdType.AUTO)
     private Integer id;
 
     @NotBlank(message = "[]不能为空")

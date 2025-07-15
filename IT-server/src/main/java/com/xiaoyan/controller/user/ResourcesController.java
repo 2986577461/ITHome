@@ -11,8 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,7 +30,6 @@ public class ResourcesController {
 
     @GetMapping("all")
     @Operation(summary = "返回所有资料")
-    @Cacheable(value = "resourcesList", key = "'resourcesList'")
     public Result<List<ResourcesVO>> getList() {
         log.info("返回所有资料");
         List<ResourcesVO> list = resourcesService.getList();
@@ -41,7 +38,6 @@ public class ResourcesController {
 
     @DeleteMapping("{id}")
     @Operation(summary = "删除自己的资料")
-    @CacheEvict(cacheNames = {"resourcesList", "resourcesCount"}, allEntries = true)
     public Result<String> deleteByid(@PathVariable Integer id) {
         Integer studentId = BaseContext.getCurrentStudentId();
         log.info("用户{}删除自己的资料{}", studentId, id);
@@ -51,7 +47,6 @@ public class ResourcesController {
 
     @PostMapping
     @Operation(summary = "上传资料")
-    @CacheEvict(cacheNames = {"resourcesList", "resourcesCount", "userList"}, allEntries = true)
     public Result<String> saveResource(@ModelAttribute @Valid ResourcesDTO resourcesDTO) throws IOException {
         Integer studentId = BaseContext.getCurrentStudentId();
         log.info("用户{}上传文章{}",studentId,resourcesDTO);

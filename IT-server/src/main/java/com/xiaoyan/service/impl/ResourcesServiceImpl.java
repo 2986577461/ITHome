@@ -15,6 +15,8 @@ import com.xiaoyan.service.ResourcesService;
 import com.xiaoyan.vo.ResourcesVO;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -36,11 +38,13 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     private StudentFileMapper studentFileMapper;
 
     @Override
+    @Cacheable(value = "resourcesCount",key = "'resourcesCount'")
     public Long getCount() {
         return this.count();
     }
 
     @Override
+    @Cacheable(value = "resourcesList", key = "'resourcesList'")
     public List<ResourcesVO> getList() {
         List<Resources> resources = resourcesMapper.selectList(null);
         List<ResourcesVO> list = new ArrayList<>();
@@ -68,6 +72,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
     @Override
     @AutoFillFields(AutoFillFields.OpType.INSERT)
+    @CacheEvict(cacheNames = {"resourcesList", "resourcesCount", "userList"}, allEntries = true)
     public void saveResource(ResourcesDTO resourcesDTO, Integer studentId) {
         try {
             Integer coverId = commonService.upload(resourcesDTO.getCover());
@@ -90,6 +95,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
+    @CacheEvict(cacheNames = {"resourcesList", "resourcesCount"}, allEntries = true)
     public void deleteById(Integer id, Integer studentId) {
         Resources resources = resourcesMapper.selectById(id);
         if (resources == null)

@@ -28,7 +28,6 @@ public class ArticlesController {
 
     @GetMapping("all")
     @Operation(summary = "返回所有文章")
-    @Cacheable(value = "articlesList",key = "'articlesList'")
     public Result<List<ArticleVO>> getAll() {
         log.info("返回所有文章");
         List<ArticleVO> list = messageService.getAll();
@@ -37,7 +36,6 @@ public class ArticlesController {
 
     @PostMapping
     @Operation(summary = "上传文章")
-    @CacheEvict(cacheNames = {"articlesList","articlesCount","userList"}, allEntries = true)
     public Result<String> upload(@RequestBody @Valid ArticleDTO articleDTO) {
         log.info("上传文章：{}",articleDTO);
         Article article = new Article();
@@ -48,7 +46,6 @@ public class ArticlesController {
 
     @PutMapping
     @Operation(summary = "修改文章")
-    @CacheEvict(cacheNames = "articlesList", allEntries = true)
     public Result<String> update(@RequestBody ArticleDTO articleDTO) {
         log.info("修改文章:{}",articleDTO);
         Article article = new Article();
@@ -59,7 +56,6 @@ public class ArticlesController {
 
     @DeleteMapping("{id}")
     @Operation(summary = "删除文章")
-    @CacheEvict(cacheNames = {"articlesList","articlesCount"}, allEntries = true)
     public Result<String> delete(@PathVariable Integer id) {
         log.info("删除文章:{}",id);
         messageService.delete(id);

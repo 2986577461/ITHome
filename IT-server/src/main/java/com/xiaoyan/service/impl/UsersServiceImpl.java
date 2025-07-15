@@ -19,6 +19,8 @@ import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.BeanUtils;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -72,12 +74,14 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     }
 
     @Override
+    @CacheEvict(cacheNames = {"userList"},allEntries = true)
     public void removeStudents(List<Integer> ids) {
         userMapper.deleteByIds(ids);
     }
 
 
     @Override
+    @Cacheable(value = "userList",key = "'userList'")
     public List<StudentVO> getAll() {
         List<Student> students = userMapper.selectList(null);
         List<StudentVO> studentVOS = new ArrayList<>();
@@ -91,6 +95,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
 
     @Override
+    @CacheEvict(cacheNames = {"userList","articlesList"},allEntries = true)
     public void update(Student student) {
         String password = student.getPassword();
         if(password!=null)

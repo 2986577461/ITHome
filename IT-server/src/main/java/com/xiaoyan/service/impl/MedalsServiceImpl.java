@@ -17,6 +17,8 @@ import com.xiaoyan.service.MedalsService;
 import com.xiaoyan.vo.StudentMedalsVO;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -38,6 +40,7 @@ public class MedalsServiceImpl implements MedalsService {
     private UserMapper userMapper;
 
     @Override
+    @Cacheable(value = "allMedals",key = "'allMedals'")
     public List<StudentMedalsVO> getAll() {
         return getStudentMedalsVOS(null);
     }
@@ -66,12 +69,13 @@ public class MedalsServiceImpl implements MedalsService {
 
 
     @Override
+    @Cacheable(value = "currentUserMedals",key = "'currentUserMedals'")
     public List<StudentMedalsVO> getUserMedals(Integer studentId) {
         return this.getStudentMedalsVOS(studentId);
     }
 
     @Override
-
+    @CacheEvict(cacheNames = {"currentUserMedals","allMedals"},allEntries = true)
     public void save(StudentMedalsDTO studentMedalsDTO) throws IOException {
         StudentMedals studentMedals = new StudentMedals();
         BeanUtils.copyProperties(studentMedalsDTO,studentMedals,"id");
@@ -87,6 +91,7 @@ public class MedalsServiceImpl implements MedalsService {
     }
 
     @Override
+    @CacheEvict(cacheNames = {"currentUserMedals","allMedals"},allEntries = true)
     public void remove(Integer id, Integer studentId) {
         StudentMedals studentMedals = medalsMapper.selectById(id);
         if(studentMedals==null)

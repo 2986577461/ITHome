@@ -1,5 +1,7 @@
 package com.xiaoyan.pojo;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,6 +19,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class Resources implements Serializable {
 
+    @TableId(type = IdType.AUTO)
     private Integer id;
 
     private String head;

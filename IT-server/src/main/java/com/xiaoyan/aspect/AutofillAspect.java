@@ -2,14 +2,10 @@ package com.xiaoyan.aspect;
 
 
 import com.xiaoyan.annotation.AutoFillFields;
-import com.xiaoyan.conmon.BaseEntity;
-import com.xiaoyan.context.BaseContext;
-import com.xiaoyan.vo.StudentVO;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 
 @Aspect
 @Component

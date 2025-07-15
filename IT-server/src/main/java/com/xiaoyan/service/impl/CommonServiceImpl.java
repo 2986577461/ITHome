@@ -57,8 +57,7 @@ public class CommonServiceImpl implements CommonService {
 
     @Override
     public void delete(String objectName) {
-        if (!aliOssUtil.delete(objectName))
-            throw new RuntimeException(MessageConstant.FILE_DELETE_FAILED);
+        aliOssUtil.delete(objectName);
         studentFileMapper.deleteByObjectName(objectName);
     }
 

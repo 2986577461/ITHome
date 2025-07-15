@@ -30,14 +30,12 @@ public class AliOssUtil {
      * 文件删除
      *
      * @param objectName 要删除的文件在OSS中的完整路径/名称 (例如: "images/photo.jpg")
-     * @return true表示删除成功，false表示删除失败
      */
-    public boolean delete(String objectName) {
+    public void delete(String objectName) {
         try {
             // 删除文件。
             ossClient.deleteObject(bucketName, objectName);
             log.info("文件 {} 从 OSS 删除成功。", objectName);
-            return true;
         } catch (OSSException oe) {
             log.error("Caught an OSSException during delete operation. "
                             + "Error Message: {}, Error Code: {}, Request ID: {}, Host ID: {}",

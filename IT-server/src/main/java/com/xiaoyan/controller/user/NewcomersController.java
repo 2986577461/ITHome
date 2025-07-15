@@ -25,7 +25,6 @@ public class NewcomersController {
 
     @PostMapping("/apply-join")
     @Operation(summary = "申请加入协会")
-    @CacheEvict(cacheNames = "newcomers",allEntries = true)
     public Result<String> applyJoin(@RequestBody @Valid NewComerDTO newComerDTO) {
         log.info("申请加入协会:{}",newComerDTO);
         Newcomer newcomer = new Newcomer();

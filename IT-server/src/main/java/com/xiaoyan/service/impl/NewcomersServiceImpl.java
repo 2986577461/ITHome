@@ -15,6 +15,8 @@ import com.xiaoyan.service.NewcomersService;
 import com.xiaoyan.vo.NewcomerVO;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -36,11 +38,13 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
     private UserMapper userMapper;
 
     @Override
+    @CacheEvict(cacheNames = "newcomers", allEntries = true)
     public void refuseNewcomer(Integer id) {
       newcomerMapper.deleteById(id);
     }
 
     @Override
+    @CacheEvict(cacheNames = {"newcomers", "userList"}, allEntries = true)
     public void agreeNewcomer(Integer id) {
         Newcomer newcomer = newcomerMapper.selectById(id);
         if (newcomer == null)
@@ -62,6 +66,7 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
     }
 
     @Override
+    @CacheEvict(cacheNames = "newcomers",allEntries = true)
     public void applyJoin(Newcomer newComer) {
         Integer studentId = newComer.getStudentId();
         if (newcomerMapper.selectByStudentId(studentId) != null)
@@ -73,6 +78,7 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
     }
 
     @Override
+    @Cacheable(value = "newcomers",key = "'newcomers'")
     public List<NewcomerVO> getAll() {
         List<Newcomer> list = this.list();
         List<NewcomerVO> newcomerVOS = new ArrayList<>();

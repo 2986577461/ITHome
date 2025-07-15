@@ -2,7 +2,6 @@ package com.xiaoyan.controller.user;
 
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.dto.EmailDTO;
-import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.EmailService;
 import com.xiaoyan.service.impl.EmailServiceImpl;

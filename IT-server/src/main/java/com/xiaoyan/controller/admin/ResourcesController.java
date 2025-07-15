@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,7 +24,6 @@ public class ResourcesController {
 
     @GetMapping("count")
     @Operation(summary = "获取资料总数")
-    @Cacheable(value = "resourcesCount",key = "'resourcesCount'")
     public Result<Long> getCount() {
         log.info("获取资料总数");
         Long count = resourcesService.getCount();

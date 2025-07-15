@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaoyan.constant.MessageConstant;
-import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.MessageDTO;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.AiDialogSessionMapper;
@@ -13,16 +12,11 @@ import com.xiaoyan.pojo.AiDialogSession;
 import com.xiaoyan.pojo.AiDialog;
 import com.xiaoyan.service.AiService;
 import com.xiaoyan.service.AiSessionService;
-import com.xiaoyan.vo.AiDialogSessionVO;
-import com.xiaoyan.vo.AiDialogVO;
 import jakarta.annotation.Resource;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -49,7 +43,7 @@ public class AiServiceImpl implements AiService {
     @Value("${xiaoyan.context-length}")
     private Integer contextLength;
 
-    @Autowired
+    @Resource
     private AiSessionService aiSessionService;
 
     @Resource
@@ -82,9 +76,8 @@ public class AiServiceImpl implements AiService {
             sessionId = aiSessionService.createSession(studentId);
         } else {
             AiDialogSession session = aiDialogSessionMapper.selectById(sessionId);
-            if (session == null) {
+            if (session == null)
                 throw new ParameterException(MessageConstant.SESSION_NO_FOUND);
-            }
         }
         Integer sessionId1 = sessionId;
 

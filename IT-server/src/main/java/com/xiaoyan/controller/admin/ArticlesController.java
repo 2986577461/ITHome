@@ -24,7 +24,6 @@ public class ArticlesController {
 
     @GetMapping
     @Operation(summary = "获取文章总数")
-    @Cacheable(value = "articlesCount",key = "'articlesCount'")
     public Result<Long> getCount() {
         log.info("获取文章总数");
         return Result.success(messageService.getCount());

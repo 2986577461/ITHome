@@ -5,6 +5,8 @@ import java.io.Serializable;
 
 import java.util.Date;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -14,6 +16,7 @@ import lombok.Data;
 @Data
 public class ChatDialog implements Serializable {
 
+    @TableId(type = IdType.AUTO)
     @NotNull(message = "[]不能为空")
     private Integer id;
 

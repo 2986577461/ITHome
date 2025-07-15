@@ -39,11 +39,11 @@ public class JwtUserTokenInterceptor implements HandlerInterceptor {
             Claims claims = JwtUtil.parseJWT(jwtProperties.getSecretKey(), token);
             Object object = claims.get(JwtClaimsConstant.USER_ID);
             Object object1 = claims.get(JwtClaimsConstant.ADMIN_ID);
-            Integer studentId;
+            int studentId;
             if (object != null)
-                studentId = Integer.valueOf(object.toString());
+                studentId = Integer.parseInt(object.toString());
             else
-                studentId = Integer.valueOf(object1.toString());
+                studentId = Integer.parseInt(object1.toString());
 
             BaseContext.setCurrentStudentId(studentId);
             return true;
