@@ -14,5 +14,5 @@ public interface MedalsService {
 
     void save(StudentMedalsDTO studentMedalsDTO) throws IOException;
 
-    void remove(Integer id,Integer studentId);
+    void remove(Long id,Integer studentId);
 }

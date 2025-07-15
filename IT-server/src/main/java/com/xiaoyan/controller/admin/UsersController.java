@@ -3,6 +3,7 @@ package com.xiaoyan.controller.admin;
 import com.xiaoyan.dto.StudentDTO;
 import com.xiaoyan.pojo.Student;
 import com.xiaoyan.result.Result;
+import com.xiaoyan.service.CommonService;
 import com.xiaoyan.service.UsersService;
 
 import com.xiaoyan.vo.StudentVO;
@@ -30,6 +31,8 @@ public class UsersController {
 
     private UsersService userService;
 
+    private CommonService commonService;
+
     @GetMapping("all")
     @Operation(summary = "返回所有学生信息")
     public Result<List<StudentVO>> getAll() {
@@ -42,13 +45,13 @@ public class UsersController {
     @Operation(summary = "下载学员花名册")
     public ResponseEntity<byte[]> downloadExcel() throws IOException {
         log.info("下载花名册");
-        return userService.downloadExcel();
+        return commonService.downloadExcel();
     }
 
 
     @DeleteMapping
     @Operation(summary = "删除学生,记得清理localStorage")
-    public Result<String> removeStudents(@RequestBody List<Integer> ids) {
+    public Result<String> removeStudents(@RequestBody List<Long> ids) {
         log.info("删除学生{}",ids);
         //todo JWT黑名单
         userService.removeStudents(ids);

@@ -57,7 +57,7 @@ public class AIController {
     @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "旧版本，不要调用")
     @Deprecated(since="9", forRemoval=true)
-    public Flux<String> streamAiResponse2(String message, @Schema(description = "会话id") Integer sessionId, String token) {
+    public Flux<String> streamAiResponse2(String message, @Schema(description = "会话id") Long sessionId, String token) {
         //临时token校验
         temporaryJwtParse(token);
 
@@ -93,7 +93,7 @@ public class AIController {
 
     @GetMapping("history")
     @Operation(summary = "给定会话id返回自己所有的历史记录")
-    public Result<List<AiDialogVO>> getMessages(@NotNull Integer sessionId) {
+    public Result<List<AiDialogVO>> getMessages(@NotNull Long sessionId) {
         log.info("获取会话{}的AI对话记录",sessionId);
         List<AiDialogVO> messages = aiSessionService.getMessages(sessionId);
         return Result.success(messages);
@@ -101,7 +101,7 @@ public class AIController {
 
     @DeleteMapping("{sessionId}")
     @Operation(summary = "删除指定会话")
-    public Result<String> deleteSession(@PathVariable Integer sessionId) {
+    public Result<String> deleteSession(@PathVariable Long sessionId) {
         log.info("删除会话:{}",sessionId);
         aiSessionService.deleteSession(sessionId,BaseContext.getCurrentStudentId());
         return Result.success();

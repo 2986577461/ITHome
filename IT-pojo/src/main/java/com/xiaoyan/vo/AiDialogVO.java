@@ -17,9 +17,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class AiDialogVO implements Serializable {
 
-    private Integer id;
+    private Long id;
 
-    private Integer sessionId;
+    private Long sessionId;
 
     private String  senderType;
 

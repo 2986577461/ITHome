@@ -8,8 +8,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,7 +23,7 @@ public class NewcomersController {
 
     @DeleteMapping("{id}")
     @Operation(summary = "拒绝申请")
-    public Result<String> refuseNewcomer(@PathVariable @NotNull Integer id) {
+    public Result<String> refuseNewcomer(@PathVariable @NotNull Long id) {
         log.info("拒绝新学员{}的申请",id);
         memberService.refuseNewcomer(id);
         return Result.success();
@@ -33,7 +31,7 @@ public class NewcomersController {
 
     @PutMapping("{id}")
     @Operation(summary = "同意申请")
-    public Result<String> agreeNewcomer(@PathVariable @NotNull Integer id) {
+    public Result<String> agreeNewcomer(@PathVariable @NotNull Long id) {
         log.info("同意新学员{}的申请",id);
         memberService.agreeNewcomer(id);
         return Result.success();

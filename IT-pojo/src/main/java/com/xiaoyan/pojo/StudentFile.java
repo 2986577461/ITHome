@@ -17,9 +17,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class StudentFile {
 
-    //用于回显id
-    @TableId(value = "id",type = IdType.AUTO)
-    private Integer id;
+    @TableId(value = "id")
+    private Long id;
 
     private Integer studentId;
 

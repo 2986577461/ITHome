@@ -49,8 +49,8 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         List<Resources> resources = resourcesMapper.selectList(null);
         List<ResourcesVO> list = new ArrayList<>();
         for (Resources resource : resources) {
-            Integer studentFileCoverId = resource.getStudentFileCoverId();
-            Integer studentFileFileId = resource.getStudentFileFileId();
+            Long studentFileCoverId = resource.getStudentFileCoverId();
+            Long studentFileFileId = resource.getStudentFileFileId();
             Integer studentId = resource.getStudentId();
 
             ResourcesVO resourcesVO = new ResourcesVO();
@@ -75,8 +75,8 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     @CacheEvict(cacheNames = {"resourcesList", "resourcesCount", "userList"}, allEntries = true)
     public void saveResource(ResourcesDTO resourcesDTO, Integer studentId) {
         try {
-            Integer coverId = commonService.upload(resourcesDTO.getCover());
-            Integer fileId = commonService.upload(resourcesDTO.getFile());
+            Long coverId = commonService.upload(resourcesDTO.getCover());
+            Long fileId = commonService.upload(resourcesDTO.getFile());
 
             resourcesMapper.insert(Resources.builder().
                     head(resourcesDTO.getHead()).
@@ -96,7 +96,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
     @Override
     @CacheEvict(cacheNames = {"resourcesList", "resourcesCount"}, allEntries = true)
-    public void deleteById(Integer id, Integer studentId) {
+    public void deleteById(Long id, Integer studentId) {
         Resources resources = resourcesMapper.selectById(id);
         if (resources == null)
             throw new ParameterException(MessageConstant.RRSOURCES_NO_EXISITS);

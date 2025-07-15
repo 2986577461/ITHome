@@ -13,5 +13,5 @@ public class MessageDTO {
     @Size(max = 3000, message = "编码长度不能超过3000")
     private String message;
 
-    private Integer sessionId;
+    private Long sessionId;
 }

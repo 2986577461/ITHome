@@ -11,7 +11,7 @@ import lombok.ToString;
 public class StudentDTO {
 
     @NotNull
-    private Integer id;
+    private Long id;
 
     private Integer studentId;
 

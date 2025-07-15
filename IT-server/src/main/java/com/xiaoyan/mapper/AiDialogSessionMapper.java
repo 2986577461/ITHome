@@ -17,8 +17,8 @@ public interface AiDialogSessionMapper extends BaseMapper<AiDialogSession> {
     ArrayList<AiDialogSession> selectByStudentId(Integer studentId);
 
     @Update("update ai_dialog_session set last_active_date_time=#{now} where id=#{id} and deleted=0")
-    void updateLastActiveDateTime(Integer id, LocalDateTime now);
+    void updateLastActiveDateTime(Long id, LocalDateTime now);
 
     @Update("update ai_dialog_session set title=#{title} where id=#{id} and deleted=0")
-    void updateTitleByGroupId(Integer id, String title);
+    void updateTitleByGroupId(Long id, String title);
 }

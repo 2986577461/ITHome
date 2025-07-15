@@ -82,7 +82,7 @@ public class MedalsServiceImpl implements MedalsService {
 
         studentMedals.setStudentId(BaseContext.getCurrentStudentId());
 
-        Integer id = commonService.upload(studentMedalsDTO.getMedalFile());
+        Long id = commonService.upload(studentMedalsDTO.getMedalFile());
         studentMedals.setStudentFileId(id);
 
         studentMedals.setCreateDateTime(LocalDateTime.now());
@@ -92,7 +92,7 @@ public class MedalsServiceImpl implements MedalsService {
 
     @Override
     @CacheEvict(cacheNames = {"currentUserMedals","allMedals"},allEntries = true)
-    public void remove(Integer id, Integer studentId) {
+    public void remove(Long id, Integer studentId) {
         StudentMedals studentMedals = medalsMapper.selectById(id);
         if(studentMedals==null)
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
@@ -101,7 +101,7 @@ public class MedalsServiceImpl implements MedalsService {
         if(!Objects.equals(studentId1,studentId ))
             throw new PositionException(MessageConstant.ILLEGAL_OPERATION);
 
-        Integer studentFileId = studentMedals.getStudentFileId();
+        Long studentFileId = studentMedals.getStudentFileId();
         StudentFile studentFile = studentFileMapper.selectById(studentFileId);
         String objectName = studentFile.getObjectName();
         commonService.delete(objectName);

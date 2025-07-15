@@ -30,7 +30,7 @@ public class AiSessionServiceImpl implements AiSessionService {
     private AiDialogMapper aiDialogMapper;
 
     @CacheEvict(cacheNames = "sessions", key = "#studentId")
-    public Integer createSession(Integer studentId) {
+    public Long createSession(Integer studentId) {
         LocalDateTime now = LocalDateTime.now();
 
         AiDialogSession session = AiDialogSession.
@@ -45,7 +45,7 @@ public class AiSessionServiceImpl implements AiSessionService {
 
     @Override
     @CacheEvict(value = "sessions", key = "#studentId")
-    public void deleteSession(Integer sessionId, Integer studentId) {
+    public void deleteSession(Long sessionId, Integer studentId) {
         AiDialogSession group = aiDialogSessionMapper.selectById(sessionId);
         if (group == null)
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
@@ -58,7 +58,7 @@ public class AiSessionServiceImpl implements AiSessionService {
     }
 
     @Override
-    public List<AiDialogVO> getMessages(Integer sessionId) {
+    public List<AiDialogVO> getMessages(Long sessionId) {
         AiDialogSession group = aiDialogSessionMapper.selectById(sessionId);
         if (group == null)
             throw new ParameterException(MessageConstant.RRSOURCES_NO_EXISITS);

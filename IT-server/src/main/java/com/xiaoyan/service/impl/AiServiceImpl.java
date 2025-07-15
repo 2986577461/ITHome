@@ -52,7 +52,7 @@ public class AiServiceImpl implements AiService {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     //                                  用户id    会话id     上下文  消息        属性
-    private static final ConcurrentMap<Integer, ConcurrentMap<Integer, List<Map<String, String>>>> messages =
+    private static final ConcurrentMap<Integer, ConcurrentMap<Long, List<Map<String, String>>>> messages =
             new ConcurrentHashMap<>();
 
     private static final Map<String, String> SYSTEM_PERSONA_MESSAGE =
@@ -71,7 +71,7 @@ public class AiServiceImpl implements AiService {
     }
 
     public Flux<String> streamChatCompletion(MessageDTO messageDTO, Integer studentId) {
-        Integer sessionId = messageDTO.getSessionId();
+        Long sessionId = messageDTO.getSessionId();
         if (sessionId == null) {
             sessionId = aiSessionService.createSession(studentId);
         } else {
@@ -79,7 +79,7 @@ public class AiServiceImpl implements AiService {
             if (session == null)
                 throw new ParameterException(MessageConstant.SESSION_NO_FOUND);
         }
-        Integer sessionId1 = sessionId;
+        Long sessionId1 = sessionId;
 
         //兼容旧id之家，取消身份判断
 //        AiDialogSession group = aiDialogSessionMapper.selectById(sessionId);
@@ -95,7 +95,7 @@ public class AiServiceImpl implements AiService {
                 content(message).build());
         aiDialogSessionMapper.updateLastActiveDateTime(sessionId, now);
 
-        ConcurrentMap<Integer, List<Map<String, String>>> sessionMap = messages.computeIfAbsent(studentId,
+        ConcurrentMap<Long, List<Map<String, String>>> sessionMap = messages.computeIfAbsent(studentId,
                 k -> new ConcurrentHashMap<>());
 
         List<Map<String, String>> conversation = sessionMap.computeIfAbsent(sessionId, integer -> new ArrayList<>());
@@ -146,7 +146,7 @@ public class AiServiceImpl implements AiService {
     }
 
 
-    public void saveAnswer(String message, String title, Integer sessionId, Integer studentId) {
+    public void saveAnswer(String message, String title, Long sessionId, Integer studentId) {
 
         AiDialogSession session = aiDialogSessionMapper.selectById(sessionId);
         //兼容旧it之家前端
@@ -165,7 +165,7 @@ public class AiServiceImpl implements AiService {
                 createDateTime(LocalDateTime.now()).
                 build()
         );
-        ConcurrentMap<Integer, List<Map<String, String>>> sessionMap = messages.get(studentId);
+        ConcurrentMap<Long, List<Map<String, String>>> sessionMap = messages.get(studentId);
         List<Map<String, String>> list = sessionMap.computeIfAbsent(sessionId, integer -> new ArrayList<>());
         list.add(Map.of("role", "assistant", "content", message));
     }

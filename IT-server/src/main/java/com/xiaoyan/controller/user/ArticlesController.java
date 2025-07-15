@@ -56,7 +56,7 @@ public class ArticlesController {
 
     @DeleteMapping("{id}")
     @Operation(summary = "删除文章")
-    public Result<String> delete(@PathVariable Integer id) {
+    public Result<String> delete(@PathVariable Long id) {
         log.info("删除文章:{}",id);
         messageService.delete(id);
         return Result.success();

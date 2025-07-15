@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Data
 public class ResourcesVO implements Serializable {
 
-    private Integer id;
+    private Long id;
 
     private String head;
 

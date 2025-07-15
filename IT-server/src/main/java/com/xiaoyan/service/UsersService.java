@@ -17,14 +17,12 @@ public interface UsersService {
 
     StudentVO login(LoginDTO message);
 
-    void removeStudents(List<Integer> ids);
+    void removeStudents(List<Long> ids);
 
     List<StudentVO> getAll();
 
     void update(Student student);
 
     void updatePassword(PasswordDTO passwordDTO,Integer studentId);
-
-    ResponseEntity<byte[]> downloadExcel() throws IOException;
 
 }

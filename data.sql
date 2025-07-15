@@ -1,8 +1,10 @@
+drop database ITHome;
 CREATE DATABASE IF NOT EXISTS `ITHome` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 use ITHome;
 CREATE TABLE it_student
 (
-    id             int PRIMARY KEY auto_increment,
+    id             bigint PRIMARY KEY,
     student_id     int              not null,
     name           VARCHAR(20)      NOT NULL,
     sex            ENUM ('男','女') NOT NULL,
@@ -17,23 +19,23 @@ CREATE TABLE it_student
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
-INSERT INTO it_student(student_id, name, sex, major, class_name, academy, position, article_count, resource_count,
+INSERT INTO it_student(id, student_id, name, sex, major, class_name, academy, position,
                        password)
-values ('202300156', '程小伟', '1', '软件技术', '232班', '电子与信息', '副会长', 0, 0,
+values (1, '202300156', '程小伟', '1', '软件技术', '232班', '电子与信息', '副会长',
         '$2a$10$8OVqXgG4u2RNTSFD0NB2KOBRn8ZAv3EX4nxFQfmJUcqRLRsAoeVYO');
-INSERT INTO it_student(student_id, name, sex, major, class_name, academy, position, article_count, resource_count,
+INSERT INTO it_student(id, student_id, name, sex, major, class_name, academy, position,
                        password)
-    VALUE ('202300573', '超超', '1', '软件技术', '232班', '电子与信息', '会长', 0, 0,
+    VALUE (2, '202300573', '超超', '1', '软件技术', '232班', '电子与信息', '会长',
            '$2a$10$8OVqXgG4u2RNTSFD0NB2KOBRn8ZAv3EX4nxFQfmJUcqRLRsAoeVYO');
 
 CREATE TABLE resources
 (
-    id                    int AUTO_INCREMENT primary key,
+    id                    bigint primary key,
     head                  varchar(100) not null,
     introduce             varchar(500) NOT NULL,
     student_id            int          not null,
-    student_file_cover_id int          not null,
-    student_file_file_id  int          not null,
+    student_file_cover_id bigint       not null,
+    student_file_file_id  bigint       not null,
     release_date_time     datetime     not null,
     deleted               tinyint(1)   not null default 0
 ) ENGINE = InnoDB
@@ -41,7 +43,7 @@ CREATE TABLE resources
   COLLATE = utf8mb4_unicode_ci;
 CREATE TABLE article
 (
-    id                INT AUTO_INCREMENT primary key,
+    id                bigint primary key,
     type              tinyint(1)    not null,
     head              varchar(100)  not null,
     content           varchar(5000) not null,
@@ -54,7 +56,7 @@ CREATE TABLE article
 
 CREATE TABLE newcomer
 (
-    id                    int PRIMARY KEY AUTO_INCREMENT,
+    id                    bigint PRIMARY KEY,
     student_id            int              NOT NULL,
     name                  varchar(20)      not null,
     sex                   ENUM ('男','女') NOT NULL,
@@ -70,11 +72,11 @@ CREATE TABLE newcomer
 
 create table student_medals
 (
-    id               int primary key auto_increment,
+    id               bigint primary key,
     head             varchar(20) not null,
     student_id       int         not null,
     grade            tinyint(1)  not null,
-    student_file_id  int         not null,
+    student_file_id  bigint      not null,
     create_date_time datetime    not null,
     deleted          tinyint(1)  not null default 0
 ) ENGINE = InnoDB
@@ -83,7 +85,7 @@ create table student_medals
 
 CREATE TABLE career_student
 (
-    id                  int primary key auto_increment,
+    id                  bigint primary key,
     student_id          int          not null,
     familiar_technology varchar(100) not null,
     content             varchar(500) not null,
@@ -96,19 +98,19 @@ CREATE TABLE career_student
 
 create table ai_dialog_session
 (
-    id                    int primary key auto_increment,
+    id                    bigint primary key,
     title                 varchar(20),
     student_id            int        not null,
     create_date_time      datetime   not null,
     last_active_date_time datetime   not null,
     deleted               tinyint(1) not null default 0
-)ENGINE = InnoDB
- DEFAULT CHARSET = utf8mb4
- COLLATE = utf8mb4_unicode_ci;
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
 create table ai_dialog
 (
-    id               int primary key auto_increment,
-    session_id         int         not null,
+    id               bigint primary key,
+    session_id       bigint      not null,
     sender_type      varchar(20) not null,
     content          text        not null,
     create_date_time datetime    not null,
@@ -119,7 +121,7 @@ create table ai_dialog
 
 create table chat_dialog
 (
-    id               int primary key auto_increment,
+    id               bigint primary key,
     sender_id        int           not null,
     receiver_id      int           not null,
     content          varchar(3000) not null,
@@ -131,7 +133,7 @@ create table chat_dialog
 
 create table student_file
 (
-    id               int primary key auto_increment,
+    id               bigint primary key,
     student_id       int                 not null,
     original_name    varchar(200)        not null,
     object_name      varchar(200) unique not null,

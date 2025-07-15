@@ -15,7 +15,7 @@ public interface ArticlesService {
 
     List<ArticleVO> getAll();
 
-    void delete(Integer id);
+    void delete(Long id);
 
     void update( Article article);
 }

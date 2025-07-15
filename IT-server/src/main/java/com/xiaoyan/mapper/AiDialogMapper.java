@@ -12,8 +12,8 @@ import java.util.List;
 public interface AiDialogMapper extends BaseMapper<AiDialog> {
 
     @Select("select * from ai_dialog where session_id=#{sessionId} and deleted=0;")
-    List<AiDialog> selectBySessionId(Integer sessionId);
+    List<AiDialog> selectBySessionId(Long sessionId);
 
     @Update("update ai_dialog set deleted=1 where session_id=#{sessionId} and deleted=0")
-    void deleteBySessionId(Integer sessionId);
+    void deleteBySessionId(Long sessionId);
 }

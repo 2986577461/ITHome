@@ -6,11 +6,11 @@ import com.xiaoyan.vo.AiDialogVO;
 import java.util.List;
 
 public interface AiSessionService {
-    Integer createSession(Integer studentId);
+    Long createSession(Integer studentId);
 
-    void deleteSession(Integer sessionId,Integer studentId);
+    void deleteSession(Long sessionId,Integer studentId);
 
-    List<AiDialogVO> getMessages(Integer sessionId);
+    List<AiDialogVO> getMessages(Long sessionId);
 
     List<AiDialogSessionVO> getAll(Integer studentId);
 

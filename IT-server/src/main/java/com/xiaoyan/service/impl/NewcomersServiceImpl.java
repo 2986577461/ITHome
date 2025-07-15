@@ -39,13 +39,13 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
 
     @Override
     @CacheEvict(cacheNames = "newcomers", allEntries = true)
-    public void refuseNewcomer(Integer id) {
+    public void refuseNewcomer(Long id) {
       newcomerMapper.deleteById(id);
     }
 
     @Override
     @CacheEvict(cacheNames = {"newcomers", "userList"}, allEntries = true)
-    public void agreeNewcomer(Integer id) {
+    public void agreeNewcomer(Long id) {
         Newcomer newcomer = newcomerMapper.selectById(id);
         if (newcomer == null)
             throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);

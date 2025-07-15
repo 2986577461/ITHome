@@ -7,9 +7,9 @@ import java.util.List;
 
 public interface NewcomersService {
 
-    void refuseNewcomer(Integer id);
+    void refuseNewcomer(Long id);
 
-    void agreeNewcomer(Integer id);
+    void agreeNewcomer(Long id);
 
     void applyJoin(Newcomer newComer);
 

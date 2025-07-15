@@ -10,7 +10,7 @@ import java.io.Serializable;
 @ToString
 public class StudentVO implements Serializable {
 
-    private Integer id;
+    private Long id;
 
     private Integer studentId;
 

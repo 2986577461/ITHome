@@ -22,8 +22,8 @@ import java.io.Serializable;
 @TableName(value = "it_student")
 public class Student implements Serializable {
 
-    @TableId(type = IdType.AUTO)
-    private Integer id;
+    @TableId("id")
+    private Long id;
 
     @TableField(updateStrategy = FieldStrategy.NOT_EMPTY)
     private Integer studentId;

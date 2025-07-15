@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Data
 public class ArticleVO implements Serializable {
     
-    private Integer id;
+    private Long id;
 
     private String name;
 

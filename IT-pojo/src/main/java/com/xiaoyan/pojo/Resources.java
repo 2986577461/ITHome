@@ -19,16 +19,16 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class Resources implements Serializable {
 
-    @TableId(type = IdType.AUTO)
-    private Integer id;
+    @TableId("id")
+    private Long id;
 
     private String head;
 
     private String introduce;
 
-    private Integer studentFileCoverId;
+    private Long studentFileCoverId;
 
-    private Integer studentFileFileId;
+    private Long studentFileFileId;
 
     private LocalDateTime releaseDateTime;
 

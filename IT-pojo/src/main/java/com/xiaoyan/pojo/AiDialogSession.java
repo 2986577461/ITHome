@@ -17,8 +17,8 @@ import java.time.LocalDateTime;
 @Builder
 public class AiDialogSession {
 
-    @TableId(value = "id",type = IdType.AUTO)
-    private Integer id;
+    @TableId("id")
+    private Long id;
 
     private String title;
 
@@ -29,5 +29,5 @@ public class AiDialogSession {
     private LocalDateTime LastActiveDateTime;
 
     @TableLogic
-    private Integer deleted;
+    private Boolean deleted;
 }

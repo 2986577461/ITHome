@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 @Data
 public class AiDialogSessionVO implements Serializable {
 
-    private Integer id;
+    private Long id;
 
     private String title;
 

@@ -60,7 +60,7 @@ public class MedalsController {
 
     @DeleteMapping("{id}")
     @Operation(summary = "给定id删除自己的奖项")
-    public Result<String> remove(@PathVariable Integer id) {
+    public Result<String> remove(@PathVariable Long id) {
         Integer studentId = BaseContext.getCurrentStudentId();
         log.info("用户{}删除了奖项{}",studentId,id);
         medalsService.remove(id, studentId);

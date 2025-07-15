@@ -5,7 +5,6 @@ import com.xiaoyan.dto.ResourcesDTO;
 import com.xiaoyan.vo.ResourcesVO;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.util.List;
 
 @Service
@@ -17,5 +16,5 @@ public interface ResourcesService  {
 
     void saveResource(ResourcesDTO resourcesDTO,Integer studentId);
 
-    void deleteById(Integer id,Integer studentId);
+    void deleteById(Long id,Integer studentId);
 }

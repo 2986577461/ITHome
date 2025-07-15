@@ -77,7 +77,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
     @Override
     @CacheEvict(cacheNames = {"articlesList","articlesCount"}, allEntries = true)
-    public void delete(Integer id) {
+    public void delete(Long id) {
         Article article = articleMapper.selectById(id);
         if(article==null)
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);

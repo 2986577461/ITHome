@@ -1,6 +1,5 @@
 package com.xiaoyan.pojo;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import jakarta.validation.constraints.NotBlank;
@@ -23,23 +22,17 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class AiDialog implements Serializable {
 
-    @TableId(type = IdType.AUTO)
-    private Integer id;
+    @TableId("id")
+    private Long id;
 
-    @NotBlank(message = "[]不能为空")
-    @Size(max = 3000, message = "编码长度不能超过3000")
     private String content;
 
-    @NotBlank(message = "[]不能为空")
-    @Size(max = 20, message = "编码长度不能超过20")
     private String senderType;
 
-    @NotNull(message = "[]不能为空")
-    private Integer sessionId;
+    private Long sessionId;
 
-    @NotNull(message = "[]不能为空")
     private LocalDateTime createDateTime;
 
     @TableLogic
-    private Integer deleted;
+    private Boolean deleted;
 }

@@ -13,7 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 @ToString
 public class StudentMedalsDTO {
 
-    private Integer id;
+    private Long id;
 
     @Schema(description = "奖项名称")
     @NotBlank

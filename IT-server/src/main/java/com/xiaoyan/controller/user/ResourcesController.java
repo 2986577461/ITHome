@@ -38,7 +38,7 @@ public class ResourcesController {
 
     @DeleteMapping("{id}")
     @Operation(summary = "删除自己的资料")
-    public Result<String> deleteByid(@PathVariable Integer id) {
+    public Result<String> deleteByid(@PathVariable Long id) {
         Integer studentId = BaseContext.getCurrentStudentId();
         log.info("用户{}删除自己的资料{}", studentId, id);
         resourcesService.deleteById(id, studentId);

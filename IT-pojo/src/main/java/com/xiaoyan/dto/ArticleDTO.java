@@ -13,7 +13,7 @@ import lombok.ToString;
 public class ArticleDTO {
 
     @Schema(description = "上传文章不需要id，修改需要")
-    private Integer id;
+    private Long id;
 
     @NotNull(message="[]不能为空")
     private Integer type;
