@@ -22,4 +22,5 @@ public class MessageConstant {
     public static final String PARAMETER_ERROR ="参数错误";
     public static final String SESSION_NO_FOUND="会话没找到！";
 
+
 }

@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 
+/**
+ * @author yuchao
+ */
 @RestController("adminArticles")
 @RequestMapping("admin/articles")
 @Tag(name = "文章管理")

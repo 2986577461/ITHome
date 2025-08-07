@@ -10,7 +10,7 @@ import java.io.Serializable;
 @ToString
 public class StudentDialogVO implements Serializable {
 
-    private String  studentId;
+    private Integer studentId;
 
     private String name;
 }

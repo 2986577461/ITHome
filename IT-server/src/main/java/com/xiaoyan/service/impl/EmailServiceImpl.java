@@ -19,7 +19,7 @@ public class EmailServiceImpl implements EmailService {
     @Resource
     private JavaMailSender mailSender;
 
-    public final static Map<String , CodeInfo> codePool = new ConcurrentHashMap<>();
+    public final static Map<String , CodeInfo> CODE_POOL = new ConcurrentHashMap<>();
 
     @Value("${spring.mail.username}")
     private String fromEmail;
@@ -41,11 +41,12 @@ public class EmailServiceImpl implements EmailService {
      *
      * @param email 目标邮箱
      */
+    @Override
     public void sendVerificationCode(String email) {
         // 1. 生成6位随机验证码
         String code = String.format("%06d", (int) (Math.random() * 1000000));
 
-        codePool.put(email, new CodeInfo(code, System.currentTimeMillis()+5*60*1000));
+        CODE_POOL.put(email, new CodeInfo(code, System.currentTimeMillis()+5*60*1000));
 
         // 3. 发送邮件
         SimpleMailMessage message = new SimpleMailMessage();
@@ -56,12 +57,15 @@ public class EmailServiceImpl implements EmailService {
         mailSender.send(message);
     }
 
+    @Override
     public boolean verifyCode(EmailDTO emailDTO) {
         String email = emailDTO.getEmail();
         String inputCode = emailDTO.getCode();
 
-        CodeInfo codeInfo = codePool.get(email);
-        if (codeInfo == null) return false;
+        CodeInfo codeInfo = CODE_POOL.get(email);
+        if (codeInfo == null) {
+            return false;
+        }
         // 检查未过期且验证码匹配
 
         return System.currentTimeMillis() <= codeInfo.getExpireTime()

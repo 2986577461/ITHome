@@ -15,8 +15,6 @@ import com.xiaoyan.service.NewcomersService;
 import com.xiaoyan.vo.NewcomerVO;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -25,52 +23,55 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * @author yuchao
+ */
 @Service
 @AllArgsConstructor
 @Validated
 public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
         implements NewcomersService {
 
-    private static final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+    private static final BCryptPasswordEncoder ENCODER = new BCryptPasswordEncoder();
 
     private NewcomerMapper newcomerMapper;
 
     private UserMapper userMapper;
 
     @Override
-    @CacheEvict(cacheNames = "newcomers", allEntries = true)
     public void refuseNewcomer(Long id) {
       newcomerMapper.deleteById(id);
     }
 
     @Override
-    @CacheEvict(cacheNames = {"newcomers", "userList"}, allEntries = true)
     public void agreeNewcomer(Long id) {
         Newcomer newcomer = newcomerMapper.selectById(id);
-        if (newcomer == null)
+        if (newcomer == null) {
             throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
+        }
 
-        Student student = userMapper.selectById(newcomer.getStudentId());
+        Student student = userMapper.selectByStudentId(newcomer.getStudentId());
 
-        if (student != null)
+        if (student != null) {
             throw new ParameterException(MessageConstant.REPEATREQUEST);
+        }
 
         newcomerMapper.deleteById(id);
 
         student = new Student();
         BeanUtils.copyProperties(newcomer, student, "id");
-        student.setPassword(encoder.encode(PasswordConstant.STUDENT_PASSWORD));
+        student.setPassword(ENCODER.encode(PasswordConstant.STUDENT_PASSWORD));
         student.setPosition(PositionConstant.STUDENT);
 
         userMapper.insert(student);
     }
 
     @Override
-    @CacheEvict(cacheNames = "newcomers",allEntries = true)
     public void applyJoin(Newcomer newComer) {
         Integer studentId = newComer.getStudentId();
-        if (newcomerMapper.selectByStudentId(studentId) != null)
+        if (newcomerMapper.selectByStudentId(studentId) != null) {
             throw new RepeatRuestException(MessageConstant.REPEATREQUEST);
+        }
 
         newComer.setApplicationDateTime(LocalDateTime.now());
 
@@ -78,16 +79,15 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
     }
 
     @Override
-    @Cacheable(value = "newcomers",key = "'newcomers'")
     public List<NewcomerVO> getAll() {
         List<Newcomer> list = this.list();
-        List<NewcomerVO> newcomerVOS = new ArrayList<>();
+        List<NewcomerVO> newcomerVos = new ArrayList<>();
         for (Newcomer newcomer : list) {
             NewcomerVO newcomerVO = new NewcomerVO();
             BeanUtils.copyProperties(newcomer, newcomerVO);
-            newcomerVOS.add(newcomerVO);
+            newcomerVos.add(newcomerVO);
         }
 
-        return newcomerVOS;
+        return newcomerVos;
     }
 }

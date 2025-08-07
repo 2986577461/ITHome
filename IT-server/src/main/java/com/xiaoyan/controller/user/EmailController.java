@@ -44,18 +44,11 @@ public class EmailController {
     public Result<Boolean> verifyCode(@RequestBody @Valid EmailDTO emailDTO) {
         log.info("校验验证码:{}",emailDTO);
         boolean isValid = emailService.verifyCode(emailDTO);
-        if (!isValid)
+        if (!isValid) {
             return Result.error(MessageConstant.VERIFICATION_CODE_MISMATCH);
+        }
 
-        EmailServiceImpl.codePool.remove(emailDTO.getEmail());
-//  todo
-//        //登录成功后，生成jwt令牌
-//        Map<String, Object> claims = new HashMap<>();
-//        claims.put(jwtProperties.getTokenName(), emailDTO.getEmail());
-//        String token = JwtUtil.createJWT(
-//                jwtProperties.getSecretKey(),
-//                jwtProperties.getTtl(),
-//                claims);
+        EmailServiceImpl.CODE_POOL.remove(emailDTO.getEmail());
 
 
         return Result.success();

@@ -125,7 +125,8 @@ create table chat_dialog
     sender_id        int           not null,
     receiver_id      int           not null,
     content          varchar(3000) not null,
-    create_date_time datetime      not null
+    create_date_time datetime      not null,
+    deleted         tinyint(1) not null  default 0
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;

@@ -2,8 +2,10 @@ package com.xiaoyan.controller.user;
 
 
 import com.xiaoyan.constant.JwtClaimsConstant;
+import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.MessageDTO;
+import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.AiService;
@@ -32,6 +34,9 @@ import reactor.core.publisher.Flux;
 import java.util.List;
 
 
+/**
+ * @author yuchao
+ */
 @RestController
 @RequestMapping("/user/ai-dialog")
 @AllArgsConstructor
@@ -49,14 +54,14 @@ public class AIController {
     @Operation(summary = "发送问题")
     public Flux<String> streamAiResponse(@RequestBody @Valid MessageDTO messageDTO) {
         Integer studentId = BaseContext.getCurrentStudentId();
-        log.info("{}从会话{}中询问AI:\"{}\"",studentId,messageDTO.getSessionId(),messageDTO.getMessage());
+        log.info("{}从会话{}中询问AI:\"{}\"", studentId, messageDTO.getSessionId(), messageDTO.getMessage());
         return aiService.streamChatCompletion(messageDTO, studentId)
                 .map(chunk -> "data: " + chunk + "\n");
     }
 
     @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "旧版本，不要调用")
-    @Deprecated(since="9", forRemoval=true)
+    @Deprecated(since = "9", forRemoval = true)
     public Flux<String> streamAiResponse2(String message, @Schema(description = "会话id") Long sessionId, String token) {
         //临时token校验
         temporaryJwtParse(token);
@@ -70,14 +75,18 @@ public class AIController {
     }
 
     private void temporaryJwtParse(String token) {
+        if (token == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
         Claims claims = JwtUtil.parseJWT(jwtProperties.getSecretKey(), token);
         Object object = claims.get(JwtClaimsConstant.USER_ID);
         Object object1 = claims.get(JwtClaimsConstant.ADMIN_ID);
         int studentId;
-        if (object != null)
+        if (object != null) {
             studentId = Integer.parseInt(object.toString());
-        else
+        } else {
             studentId = Integer.parseInt(object1.toString());
+        }
 
         BaseContext.setCurrentStudentId(studentId);
     }
@@ -86,7 +95,7 @@ public class AIController {
     @Operation(summary = "获取当前用户左侧的所有会话从最新到最旧")
     public Result<List<AiDialogSessionVO>> getAll() {
         Integer studentId = BaseContext.getCurrentStudentId();
-        log.info("获取{}左侧的所有对话",studentId);
+        log.info("获取{}左侧的所有对话", studentId);
         List<AiDialogSessionVO> list = aiSessionService.getAll(studentId);
         return Result.success(list);
     }
@@ -94,7 +103,7 @@ public class AIController {
     @GetMapping("history")
     @Operation(summary = "给定会话id返回自己所有的历史记录")
     public Result<List<AiDialogVO>> getMessages(@NotNull Long sessionId) {
-        log.info("获取会话{}的AI对话记录",sessionId);
+        log.info("获取会话{}的AI对话记录", sessionId);
         List<AiDialogVO> messages = aiSessionService.getMessages(sessionId);
         return Result.success(messages);
     }
@@ -102,8 +111,8 @@ public class AIController {
     @DeleteMapping("{sessionId}")
     @Operation(summary = "删除指定会话")
     public Result<String> deleteSession(@PathVariable Long sessionId) {
-        log.info("删除会话:{}",sessionId);
-        aiSessionService.deleteSession(sessionId,BaseContext.getCurrentStudentId());
+        log.info("删除会话:{}", sessionId);
+        aiService.deleteSession(sessionId, BaseContext.getCurrentStudentId());
         return Result.success();
     }
 

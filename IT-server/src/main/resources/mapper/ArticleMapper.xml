@@ -6,31 +6,4 @@
 
 <mapper namespace="com.xiaoyan.mapper.ArticleMapper">
 
-<!--    <update>-->
-<!--        UPDATE article-->
-<!--        <set>-->
-<!--            <if test="author!=null">-->
-<!--                author=#{author},-->
-<!--            </if>-->
-<!--            <if test="authorId!=null">-->
-<!--                author_id=#{authorId},-->
-<!--            </if>-->
-<!--            <if test="type!=null">-->
-<!--                type=#{type},-->
-<!--            </if>-->
-<!--            <if test="head!=null">-->
-<!--                head=#{head},-->
-<!--            </if>-->
-<!--            <if test="content!=null">-->
-<!--                content=#{content},-->
-<!--            </if>-->
-<!--            <if test="releaseDateTime!=null">-->
-<!--                release_date_time=#{releaseDateTime},-->
-<!--            </if>-->
-<!--            <if test="updateDateTime!=null">-->
-<!--                update_date_time=#{updateDateTime}-->
-<!--            </if>-->
-<!--        </set>-->
-<!--        WHERE id=#{id}-->
-<!--    </update>-->
 </mapper>

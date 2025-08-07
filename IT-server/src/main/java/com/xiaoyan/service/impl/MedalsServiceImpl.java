@@ -17,8 +17,6 @@ import com.xiaoyan.service.MedalsService;
 import com.xiaoyan.vo.StudentMedalsVO;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -27,6 +25,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * @author yuchao
+ */
 @Service
 @AllArgsConstructor
 public class MedalsServiceImpl implements MedalsService {
@@ -40,15 +41,14 @@ public class MedalsServiceImpl implements MedalsService {
     private UserMapper userMapper;
 
     @Override
-    @Cacheable(value = "allMedals",key = "'allMedals'")
     public List<StudentMedalsVO> getAll() {
-        return getStudentMedalsVOS(null);
+        return getstudentmedalsVos(null);
     }
 
-    private List<StudentMedalsVO> getStudentMedalsVOS(Integer studentId) {
+    private List<StudentMedalsVO> getstudentmedalsVos(Integer studentId) {
 
         List<StudentMedals> studentMedals = medalsMapper.selectByStudentId(studentId);
-        List<StudentMedalsVO> studentMedalsVOS=new ArrayList<>();
+        List<StudentMedalsVO> studentmedalsvos=new ArrayList<>();
 
         for (StudentMedals medal : studentMedals) {
 
@@ -62,20 +62,18 @@ public class MedalsServiceImpl implements MedalsService {
             Student student = userMapper.selectByStudentId(medal.getStudentId());
             medalsVO.setStudentName(student.getName());
 
-            studentMedalsVOS.add(medalsVO);
+            studentmedalsvos.add(medalsVO);
         }
-        return studentMedalsVOS;
+        return studentmedalsvos;
     }
 
 
     @Override
-    @Cacheable(value = "currentUserMedals",key = "'currentUserMedals'")
     public List<StudentMedalsVO> getUserMedals(Integer studentId) {
-        return this.getStudentMedalsVOS(studentId);
+        return this.getstudentmedalsVos(studentId);
     }
 
     @Override
-    @CacheEvict(cacheNames = {"currentUserMedals","allMedals"},allEntries = true)
     public void save(StudentMedalsDTO studentMedalsDTO) throws IOException {
         StudentMedals studentMedals = new StudentMedals();
         BeanUtils.copyProperties(studentMedalsDTO,studentMedals,"id");
@@ -91,15 +89,16 @@ public class MedalsServiceImpl implements MedalsService {
     }
 
     @Override
-    @CacheEvict(cacheNames = {"currentUserMedals","allMedals"},allEntries = true)
     public void remove(Long id, Integer studentId) {
         StudentMedals studentMedals = medalsMapper.selectById(id);
-        if(studentMedals==null)
+        if(studentMedals==null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
 
         Integer studentId1 = studentMedals.getStudentId();
-        if(!Objects.equals(studentId1,studentId ))
+        if(!Objects.equals(studentId1,studentId )) {
             throw new PositionException(MessageConstant.ILLEGAL_OPERATION);
+        }
 
         Long studentFileId = studentMedals.getStudentFileId();
         StudentFile studentFile = studentFileMapper.selectById(studentFileId);

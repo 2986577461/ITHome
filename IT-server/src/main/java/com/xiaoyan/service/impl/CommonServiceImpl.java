@@ -44,8 +44,9 @@ public class CommonServiceImpl implements CommonService {
     @Override
     public Long upload(MultipartFile file) throws IOException {
         String originalName = file.getOriginalFilename();
-        if (originalName == null)
+        if (originalName == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
 
         String suffix = originalName.substring(originalName.lastIndexOf("."));
 
@@ -83,6 +84,7 @@ public class CommonServiceImpl implements CommonService {
      * @param expirationMillis URL的过期时间（毫秒），例如 3600 * 1000 = 1小时
      * @return 带签名的下载URL
      */
+    @Override
     public String generatePresignedDownloadUrl(String objectName, long expirationMillis) {
         StudentFile studentFile = studentFileMapper.selectbyObjectName(objectName);
         log.info("下载文件:{}",studentFile.getOriginalName());
@@ -138,7 +140,8 @@ public class CommonServiceImpl implements CommonService {
         String fileName = "IT之家协会花名册.xlsx";
         // filename* 参数用于 UTF-8 编码的文件名，优先被现代浏览器识别
         // filename 参数用于兼容旧浏览器，通常使用 ISO-8859-1 编码（或直接使用原始字符串，由浏览器自行处理）
-        String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20"); // URL编码并处理空格
+        // URL编码并处理空格
+        String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
         String contentDisposition =
                 "attachment; filename=\"" + encodedFileName + "\"; filename*=utf-8''" + encodedFileName;
 

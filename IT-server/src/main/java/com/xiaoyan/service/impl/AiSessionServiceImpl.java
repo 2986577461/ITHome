@@ -12,8 +12,6 @@ import com.xiaoyan.vo.AiDialogSessionVO;
 import com.xiaoyan.vo.AiDialogVO;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -29,7 +27,7 @@ public class AiSessionServiceImpl implements AiSessionService {
 
     private AiDialogMapper aiDialogMapper;
 
-    @CacheEvict(cacheNames = "sessions", key = "#studentId")
+    @Override
     public Long createSession(Integer studentId) {
         LocalDateTime now = LocalDateTime.now();
 
@@ -44,15 +42,7 @@ public class AiSessionServiceImpl implements AiSessionService {
     }
 
     @Override
-    @CacheEvict(value = "sessions", key = "#studentId")
     public void deleteSession(Long sessionId, Integer studentId) {
-        AiDialogSession group = aiDialogSessionMapper.selectById(sessionId);
-        if (group == null)
-            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
-
-        if (!group.getStudentId().equals(studentId))
-            throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
-
         aiDialogSessionMapper.deleteById(sessionId);
         aiDialogMapper.deleteBySessionId(sessionId);
     }
@@ -60,14 +50,17 @@ public class AiSessionServiceImpl implements AiSessionService {
     @Override
     public List<AiDialogVO> getMessages(Long sessionId) {
         AiDialogSession group = aiDialogSessionMapper.selectById(sessionId);
-        if (group == null)
+        if (group == null) {
             throw new ParameterException(MessageConstant.RRSOURCES_NO_EXISITS);
-        if (!group.getStudentId().equals(BaseContext.getCurrentStudentId()))
+        }
+        if (!group.getStudentId().equals(BaseContext.getCurrentStudentId())) {
             throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
+        }
 
         List<AiDialog> list = aiDialogMapper.selectBySessionId(sessionId);
-        if (list == null)
+        if (list == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
         List<AiDialogVO> voList = new ArrayList<>();
         for (AiDialog dialog : list) {
             AiDialogVO vo = new AiDialogVO();
@@ -78,7 +71,7 @@ public class AiSessionServiceImpl implements AiSessionService {
         return voList;
     }
 
-    @Cacheable(value = "sessions", key = "#studentId")
+    @Override
     public ArrayList<AiDialogSessionVO> getAll(Integer studentId) {
         ArrayList<AiDialogSession> aiDialogSessions =
                 aiDialogSessionMapper.selectByStudentId(studentId);

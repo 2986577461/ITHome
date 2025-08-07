@@ -6,6 +6,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import lombok.Data;
 
 
@@ -23,4 +24,6 @@ public class ChatDialog implements Serializable {
 
     private LocalDateTime createDateTime;
 
+    @TableLogic
+    private Boolean deleted;
 }

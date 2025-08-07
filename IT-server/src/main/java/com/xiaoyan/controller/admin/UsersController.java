@@ -51,7 +51,6 @@ public class UsersController {
     @Operation(summary = "删除学生,记得清理localStorage")
     public Result<String> removeStudents(@RequestBody List<Long> ids) {
         log.info("删除学生{}",ids);
-        //todo JWT黑名单
         userService.removeStudents(ids);
         return Result.success();
     }

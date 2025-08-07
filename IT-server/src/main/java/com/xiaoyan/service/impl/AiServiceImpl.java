@@ -14,6 +14,7 @@ import com.xiaoyan.service.AiService;
 import com.xiaoyan.service.AiSessionService;
 import jakarta.annotation.Resource;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -23,8 +24,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,16 +49,15 @@ public class AiServiceImpl implements AiService {
     @Resource
     private AiDialogSessionMapper aiDialogSessionMapper;
 
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     //                                  用户id    会话id     上下文  消息        属性
-    private static final ConcurrentMap<Integer, ConcurrentMap<Long, List<Map<String, String>>>> messages =
-            new ConcurrentHashMap<>();
+    private static final ConcurrentMap<Integer, ConcurrentMap<Long, List<Map<String, String>>>>
+            MESSAGES = new ConcurrentHashMap<>();
 
     private static final Map<String, String> SYSTEM_PERSONA_MESSAGE =
             Map.of("role", "system", "content", """
                     你的人设:IT之家社团网站的助手
-                    回答风格:可爱型
                     回答格式:纯文本,内容控制在3000个字符内""");
 
     public AiServiceImpl(WebClient.Builder webClientBuilder,
@@ -69,14 +69,16 @@ public class AiServiceImpl implements AiService {
                 .build();
     }
 
-    public Flux<String> streamChatCompletion(MessageDTO messageDTO, Integer studentId) {
+    @Override
+    public Flux<String> streamChatCompletion(MessageDTO messageDTO, @NotNull Integer studentId) {
         Long sessionId = messageDTO.getSessionId();
         if (sessionId == null) {
             sessionId = aiSessionService.createSession(studentId);
         } else {
             AiDialogSession session = aiDialogSessionMapper.selectById(sessionId);
-            if (session == null)
+            if (session == null) {
                 throw new ParameterException(MessageConstant.SESSION_NO_FOUND);
+            }
         }
         Long sessionId1 = sessionId;
 
@@ -85,6 +87,7 @@ public class AiServiceImpl implements AiService {
 //        if (group == null || !group.getStudentId().equals(studentId))
 //            throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
 
+        //插入问题
         String message = messageDTO.getMessage();
         LocalDateTime now = LocalDateTime.now();
         aiDialogMapper.insert(AiDialog.builder().
@@ -92,18 +95,20 @@ public class AiServiceImpl implements AiService {
                 senderType("user").
                 createDateTime(now).
                 content(message).build());
+        //更新会话最后活跃时间
         aiDialogSessionMapper.updateLastActiveDateTime(sessionId, now);
 
-        ConcurrentMap<Long, List<Map<String, String>>> sessionMap = messages.computeIfAbsent(studentId,
-                k -> new ConcurrentHashMap<>());
-
-        List<Map<String, String>> conversation = sessionMap.computeIfAbsent(sessionId, integer -> new ArrayList<>());
+        ConcurrentMap<Long, List<Map<String, String>>> sessionMap = MESSAGES.
+                computeIfAbsent(studentId, k -> new ConcurrentHashMap<>());
+        List<Map<String, String>> conversation = sessionMap.
+                computeIfAbsent(sessionId, integer -> new LinkedList<>());
         if (conversation.isEmpty()) {
             conversation.add(SYSTEM_PERSONA_MESSAGE);
         }
 
-        if (conversation.size() > contextLength) {
-            conversation.remove(1);
+        // 确保不移除 SYSTEM_PERSONA_MESSAGE
+        while (conversation.size() > contextLength && conversation.size() > 1) {
+            // 总是移除第一个非系统消息
             conversation.remove(1);
         }
 
@@ -112,21 +117,24 @@ public class AiServiceImpl implements AiService {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", "deepseek-chat");
         requestBody.put("messages", conversation);
-        requestBody.put("stream", true); // 启用流式响应
+        // 启用流式响应
+        requestBody.put("stream", true);
 
         StringBuilder answer = new StringBuilder();
         String title = message.length() > 20 ? message.substring(0, 20) : message;
         try {
             return webClient.post()
                     .bodyValue(requestBody)
-                    .accept(MediaType.TEXT_EVENT_STREAM) // 接受 SSE 流
+                    // 接受 SSE 流
+                    .accept(MediaType.TEXT_EVENT_STREAM)
                     .retrieve()
                     .bodyToFlux(String.class)
                     .doOnNext(fluxString -> {
                         try {
-                            if (fluxString.equals("[DONE]"))
+                            if ("[DONE]".equals(fluxString)) {
                                 return;
-                            JsonNode jsonNode = objectMapper.readTree(fluxString);
+                            }
+                            JsonNode jsonNode = OBJECT_MAPPER.readTree(fluxString);
                             String fluxSubString = jsonNode.path("choices")
                                     .get(0)
                                     .path("delta")
@@ -142,6 +150,22 @@ public class AiServiceImpl implements AiService {
         } catch (RuntimeException e) {
             return Flux.error(e);
         }
+    }
+
+    @Override
+    public void deleteSession(Long sessionId, Integer studentId) {
+        AiDialogSession group = aiDialogSessionMapper.selectById(sessionId);
+        ConcurrentMap<Long, List<Map<String, String>>> sessionMap = MESSAGES.get(studentId);
+        if (group == null|| sessionMap ==null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
+
+        if (!group.getStudentId().equals(studentId)) {
+            throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
+        }
+
+        aiSessionService.deleteSession(sessionId, studentId);
+        sessionMap.remove(sessionId);
     }
 
 
@@ -164,8 +188,8 @@ public class AiServiceImpl implements AiService {
                 createDateTime(LocalDateTime.now()).
                 build()
         );
-        ConcurrentMap<Long, List<Map<String, String>>> sessionMap = messages.get(studentId);
-        List<Map<String, String>> list = sessionMap.computeIfAbsent(sessionId, integer -> new ArrayList<>());
+        ConcurrentMap<Long, List<Map<String, String>>> sessionMap = MESSAGES.get(studentId);
+        List<Map<String, String>> list = sessionMap.computeIfAbsent(sessionId, integer -> new LinkedList<>());
         list.add(Map.of("role", "assistant", "content", message));
     }
 }

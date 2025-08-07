@@ -15,8 +15,6 @@ import com.xiaoyan.service.ResourcesService;
 import com.xiaoyan.vo.ResourcesVO;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -24,6 +22,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 
+/**
+ * @author yuchao
+ */
 @Service
 @AllArgsConstructor
 public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources>
@@ -38,13 +39,11 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     private StudentFileMapper studentFileMapper;
 
     @Override
-    @Cacheable(value = "resourcesCount",key = "'resourcesCount'")
     public Long getCount() {
         return this.count();
     }
 
     @Override
-    @Cacheable(value = "resourcesList", key = "'resourcesList'")
     public List<ResourcesVO> getList() {
         List<Resources> resources = resourcesMapper.selectList(null);
         List<ResourcesVO> list = new ArrayList<>();
@@ -72,7 +71,6 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
     @Override
     @AutoFillFields(AutoFillFields.OpType.INSERT)
-    @CacheEvict(cacheNames = {"resourcesList", "resourcesCount", "userList"}, allEntries = true)
     public void saveResource(ResourcesDTO resourcesDTO, Integer studentId) {
         try {
             Long coverId = commonService.upload(resourcesDTO.getCover());
@@ -88,21 +86,23 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
             userMapper.addReourceCountByID(studentId);
         } catch (Exception e) {
-            log.error("保存资源失败：", e); // 详细打印异常栈
+            // 详细打印异常栈
+            log.error("保存资源失败：", e);
             // 抛出自定义业务异常，让Controller可以捕获并返回更友好的错误信息
             throw new RuntimeException("资源上传或保存失败，请稍后再试", e);
         }
     }
 
     @Override
-    @CacheEvict(cacheNames = {"resourcesList", "resourcesCount"}, allEntries = true)
     public void deleteById(Long id, Integer studentId) {
         Resources resources = resourcesMapper.selectById(id);
-        if (resources == null)
+        if (resources == null) {
             throw new ParameterException(MessageConstant.RRSOURCES_NO_EXISITS);
+        }
 
-        if (!resources.getStudentId().equals(studentId))
+        if (!resources.getStudentId().equals(studentId)) {
             throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
+        }
 
 
         StudentFile cover = studentFileMapper.selectById(resources.getStudentFileCoverId());

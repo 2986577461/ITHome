@@ -6,9 +6,9 @@ import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
-import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
@@ -20,11 +20,14 @@ import org.springframework.web.servlet.HandlerInterceptor;
  */
 @Component
 @Slf4j
+@AllArgsConstructor
 public class JwtUserTokenInterceptor implements HandlerInterceptor {
 
-    @Resource
     private JwtProperties jwtProperties;
 
+    private JwtWhiteList jwtWhiteList;
+
+    @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         //判断当前拦截到的是Controller的方法还是其他资源
         if (!(handler instanceof HandlerMethod)) {
@@ -40,10 +43,16 @@ public class JwtUserTokenInterceptor implements HandlerInterceptor {
             Object object = claims.get(JwtClaimsConstant.USER_ID);
             Object object1 = claims.get(JwtClaimsConstant.ADMIN_ID);
             int studentId;
-            if (object != null)
+            if (object != null) {
                 studentId = Integer.parseInt(object.toString());
-            else
+            } else {
                 studentId = Integer.parseInt(object1.toString());
+            }
+
+            if (!jwtWhiteList.validation(studentId, token)) {
+                response.setStatus(401);
+                return false;
+            }
 
             BaseContext.setCurrentStudentId(studentId);
             return true;

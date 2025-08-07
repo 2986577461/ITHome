@@ -25,15 +25,15 @@ public class HarvestServiceImpl implements HarvestService {
     @Override
     public List<HarvestVO> getAll() {
         List<Harvest> harvests = harvestMapper.selectList(null);
-        List<HarvestVO> harvestVOS = new ArrayList<>();
+        List<HarvestVO> harvestvos = new ArrayList<>();
         for (Harvest harvest : harvests) {
             HarvestVO harvestVO = new HarvestVO();
             BeanUtils.copyProperties(harvest, harvestVO);
 
             Student student = userMapper.selectByStudentId(harvest.getStudentId());
             harvestVO.setName(student.getName());
-            harvestVOS.add(harvestVO);
+            harvestvos.add(harvestVO);
         }
-        return harvestVOS;
+        return harvestvos;
     }
 }

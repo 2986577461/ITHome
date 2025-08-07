@@ -12,6 +12,9 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 
+/**
+ * @author yuchao
+ */
 @Slf4j
 @Configuration
 public class InterceptorConfig implements WebMvcConfigurer {
@@ -26,13 +29,13 @@ public class InterceptorConfig implements WebMvcConfigurer {
     private String[] location;
 
     @Value("${admit.url}")
-    private String[] admitURL;
+    private String[] admitUrl;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(jwtUserTokenInterceptor)
                 .addPathPatterns("/user/**")
-                .excludePathPatterns(admitURL);
+                .excludePathPatterns(admitUrl);
 
         registry.addInterceptor(jwtAdminTokenInterceptor)
                 .addPathPatterns("/admin/**");
@@ -40,10 +43,14 @@ public class InterceptorConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**") // 允许所有路径
-                .allowedOrigins(location) // 允许的前端地址
+        // 允许所有路径
+        registry.addMapping("/**")
+                // 允许的前端地址
+                .allowedOrigins(location)
                 .allowedMethods("*")
-                .allowCredentials(true) // 允许携带 Cookie
-                .maxAge(3600); // 预检请求缓存时间
+                // 允许携带 Cookie
+                .allowCredentials(true)
+                // 预检请求缓存时间
+                .maxAge(3600);
     }
 }
