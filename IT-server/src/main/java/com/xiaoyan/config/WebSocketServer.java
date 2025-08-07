@@ -1,5 +1,6 @@
 package com.xiaoyan.config;
 
+import cn.hutool.json.JSONUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xiaoyan.dto.ChatDialogDTO;
 import com.xiaoyan.pojo.ChatDialog;
@@ -84,7 +85,7 @@ public class WebSocketServer{
 
         // 4. 如果接收者在线，发送完整的 ChatDialog 对象（JSON 格式）
         if (receiverSession != null && receiverSession.isOpen()) {
-            String jsonMessage = objectMapper.writeValueAsString(chatDialog);
+            String jsonMessage = JSONUtil.toJsonStr(chatDialog);
             receiverSession.getBasicRemote().sendText(jsonMessage);
 
         }
@@ -92,7 +93,7 @@ public class WebSocketServer{
     private void loadChatRecordHistory(@NotNull Integer studentId, List<ChatDialog> list) throws IOException {
         Session session = SESSION_MAP.get(studentId);
         if (session != null && session.isOpen()) {
-            String jsonList = objectMapper.writeValueAsString(list);
+            String jsonList = JSONUtil.toJsonStr(list);
             session.getBasicRemote().sendText(jsonList);
         }
     }
