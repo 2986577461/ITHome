@@ -47,7 +47,8 @@ public class InterceptorConfig implements WebMvcConfigurer {
         registry.addMapping("/**")
                 // 允许的前端地址
                 .allowedOrigins(location)
-                .allowedMethods("*")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
                 // 允许携带 Cookie
                 .allowCredentials(true)
                 // 预检请求缓存时间

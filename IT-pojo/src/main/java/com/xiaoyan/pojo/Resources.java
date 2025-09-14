@@ -2,6 +2,7 @@ package com.xiaoyan.pojo;
 
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.xiaoyan.baseinterface.HashCacheId;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,7 +17,7 @@ import java.time.LocalDateTime;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class Resources implements Serializable {
+public class Resources implements Serializable, HashCacheId {
 
     @TableId("id")
     private Long id;
@@ -35,4 +36,9 @@ public class Resources implements Serializable {
 
     @TableLogic
     private Boolean deleted;
+
+    @Override
+    public String getCacheId() {
+        return String.valueOf(this.id);
+    }
 }

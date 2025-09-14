@@ -4,7 +4,7 @@ package com.xiaoyan.interceptor;
 import com.xiaoyan.context.BaseContext;
 import lombok.AllArgsConstructor;
 import org.springframework.data.redis.core.HashOperations;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 
@@ -15,10 +15,10 @@ import org.springframework.stereotype.Component;
 @AllArgsConstructor
 public class JwtWhiteList {
 
-    private RedisTemplate<String, Object> redisTemplate;
+    private StringRedisTemplate stringRedisTemplate;
 
     public boolean validation(Integer studentId, String token) {
-        HashOperations<String, Object, Object> hash = redisTemplate.opsForHash();
+        HashOperations<String, String, Object> hash = stringRedisTemplate.opsForHash();
         String hashKey = "jwt:active_sessions";
         String storedtToken = (String) hash.get(hashKey, String.valueOf(studentId));
         return storedtToken != null && storedtToken.equals(token);
@@ -26,7 +26,7 @@ public class JwtWhiteList {
 
     public void addOrUpdateTokenHash(String token) {
         Integer studentId = BaseContext.getCurrentStudentId();
-        HashOperations<String, String, Object> opsForHash = redisTemplate.opsForHash();
+        HashOperations<String, String, Object> opsForHash = stringRedisTemplate.opsForHash();
         String hashKey = "jwt:active_sessions";
         opsForHash.put(hashKey, String.valueOf(studentId), token);
     }

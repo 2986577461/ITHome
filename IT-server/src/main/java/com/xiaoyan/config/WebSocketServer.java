@@ -87,7 +87,6 @@ public class WebSocketServer{
         if (receiverSession != null && receiverSession.isOpen()) {
             String jsonMessage = JSONUtil.toJsonStr(chatDialog);
             receiverSession.getBasicRemote().sendText(jsonMessage);
-
         }
     }
     private void loadChatRecordHistory(@NotNull Integer studentId, List<ChatDialog> list) throws IOException {

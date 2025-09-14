@@ -35,8 +35,7 @@ public class UsersController {
     @Operation(summary = "返回所有学生信息")
     public Result<List<StudentVO>> getAll() {
         log.info("返回所有学生信息");
-        List<StudentVO> list = userService.getAll();
-        return Result.success(list);
+        return Result.success(userService.getAll());
     }
 
     @GetMapping("excel")
@@ -46,12 +45,11 @@ public class UsersController {
         return commonService.downloadExcel();
     }
 
-
     @DeleteMapping
     @Operation(summary = "删除学生,记得清理localStorage")
-    public Result<String> removeStudents(@RequestBody List<Long> ids) {
-        log.info("删除学生{}",ids);
-        userService.removeStudents(ids);
+    public Result<String> removeStudents(@RequestBody List<Long> studentIds) {
+        log.info("删除学生{}", studentIds);
+        userService.removeStudents(studentIds);
         return Result.success();
     }
     @PutMapping

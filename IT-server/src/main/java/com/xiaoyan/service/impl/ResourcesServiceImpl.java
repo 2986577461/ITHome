@@ -1,7 +1,7 @@
 package com.xiaoyan.service.impl;
 
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.xiaoyan.annotation.AutoFillFields;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.dto.ResourcesDTO;
 import com.xiaoyan.exception.ParameterException;
@@ -12,14 +12,19 @@ import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.CommonService;
 import com.xiaoyan.service.ResourcesService;
+import com.xiaoyan.utils.RedisUtil;
 import com.xiaoyan.vo.ResourcesVO;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
+
+import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES;
+import static com.xiaoyan.constant.RedisConstant.CACHE_COUNT_RESOURCES;
+import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
 
 
 /**
@@ -31,60 +36,62 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         implements ResourcesService {
 
     private ResourcesMapper resourcesMapper;
-
+    private StringRedisTemplate stringRedisTemplate;
     private UserMapper userMapper;
-
+    private RedisUtil redisUtil;
     private CommonService commonService;
 
     private StudentFileMapper studentFileMapper;
 
     @Override
     public Long getCount() {
-        return this.count();
+        return redisUtil.queryCountWithLogicalExpire(CACHE_COUNT_RESOURCES, this::count);
     }
 
     @Override
     public List<ResourcesVO> getList() {
-        List<Resources> resources = resourcesMapper.selectList(null);
-        List<ResourcesVO> list = new ArrayList<>();
-        for (Resources resource : resources) {
-            Long studentFileCoverId = resource.getStudentFileCoverId();
-            Long studentFileFileId = resource.getStudentFileFileId();
-            Integer studentId = resource.getStudentId();
+        List<Resources> list = redisUtil.getAllWithHashCache(CACHE_RESOURCES, this::count, query()::list,
+                Resources.class, Resources.class);
+
+        return list.stream().map(r -> {
+            Long studentFileCoverId = r.getStudentFileCoverId();
+            Long studentFileFileId = r.getStudentFileFileId();
+            Integer studentId = r.getStudentId();
 
             ResourcesVO resourcesVO = new ResourcesVO();
             resourcesVO.setCoverUrl(studentFileMapper.selectById(studentFileCoverId).getFileUrl());
             StudentFile file = studentFileMapper.selectById(studentFileFileId);
             resourcesVO.setFileUrl(file.getFileUrl());
             resourcesVO.setFileName(file.getOriginalName());
-            resourcesVO.setStudentName(userMapper.selectByStudentId(studentId).getName());
+            resourcesVO.setStudentName(userMapper.selectNameByStudentId(studentId));
             resourcesVO.setObjectName(file.getObjectName());
 
-            BeanUtils.copyProperties(resource, resourcesVO);
-            list.add(resourcesVO);
-        }
-
-        list.sort((o1, o2) -> o2.getReleaseDateTime().compareTo(o1.getReleaseDateTime()));
-
-        return list;
+            BeanUtils.copyProperties(r, resourcesVO);
+            return resourcesVO;
+        }).toList();
     }
 
     @Override
-    @AutoFillFields(AutoFillFields.OpType.INSERT)
     public void saveResource(ResourcesDTO resourcesDTO, Integer studentId) {
         try {
             Long coverId = commonService.upload(resourcesDTO.getCover());
             Long fileId = commonService.upload(resourcesDTO.getFile());
 
-            resourcesMapper.insert(Resources.builder().
+            Resources resources = Resources.builder().
                     head(resourcesDTO.getHead()).
                     introduce(resourcesDTO.getIntroduce()).
                     studentId(studentId).
                     studentFileCoverId(coverId).
                     studentFileFileId(fileId).
-                    releaseDateTime(LocalDateTime.now()).build());
+                    releaseDateTime(LocalDateTime.now()).build();
+
+            resourcesMapper.insert(resources);
+            stringRedisTemplate.opsForHash().put(CACHE_RESOURCES,
+                    String.valueOf(resources.getId()), JSONUtil.toJsonStr(resources));
 
             userMapper.addReourceCountByID(studentId);
+            stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, String.valueOf(studentId));
+            stringRedisTemplate.delete(CACHE_COUNT_RESOURCES);
         } catch (Exception e) {
             // 详细打印异常栈
             log.error("保存资源失败：", e);
@@ -95,15 +102,14 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
     @Override
     public void deleteById(Long id, Integer studentId) {
-        Resources resources = resourcesMapper.selectById(id);
-        if (resources == null) {
+        Object o = stringRedisTemplate.opsForHash().get(CACHE_RESOURCES, String.valueOf(id));
+        if (o == null) {
             throw new ParameterException(MessageConstant.RRSOURCES_NO_EXISITS);
         }
-
+        Resources resources = JSONUtil.toBean((String) o, Resources.class);
         if (!resources.getStudentId().equals(studentId)) {
             throw new ParameterException(MessageConstant.ILLEGAL_OPERATION);
         }
-
 
         StudentFile cover = studentFileMapper.selectById(resources.getStudentFileCoverId());
         commonService.delete(cover.getObjectName());
@@ -111,8 +117,10 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         commonService.delete(file.getObjectName());
 
         resourcesMapper.deleteById(id);
+        stringRedisTemplate.opsForHash().delete(CACHE_RESOURCES, String.valueOf(id));
 
         userMapper.decreaceResourceCount(studentId);
+        stringRedisTemplate.delete(CACHE_COUNT_RESOURCES);
     }
 
 

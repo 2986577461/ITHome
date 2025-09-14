@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: dev
+    active: prod
   servlet:
     multipart:
       max-file-size: 500MB      # 单个文件最大大小
@@ -19,6 +19,10 @@ spring:
       password: ${SPRING_REDIS_PASSWORD}
       database: ${SPRING_REDIS_DATABASE:0}
       timeout: 5000ms
+#      开启数字转成字符串，避免前端js的long类型精度异常
+  jackson:
+    generator:
+      write-numbers-as-strings: true
 
 management:
   endpoints:
@@ -33,6 +37,8 @@ management:
           enabled: true
 
 mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
   global-config:
     db-config:
       logic-delete-field: deleted # 逻辑删除的数据库字段名，与表中保持一致

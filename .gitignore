@@ -9,3 +9,6 @@
 
 /IT-server/src/main/resources/application-prod.yml
 /my.cnf
+/nginx.conf
+/my.conf
+/Dockfile
