@@ -7,27 +7,27 @@
         <h2>选择文章类型</h2>
         <div class="radio-group">
           <label class="radio-item">
-            <input type="radio" v-model="article.type" value=1 />
+            <input type="radio" v-model="article.type" value="1" />
             <span>C语言</span>
           </label>
           <label class="radio-item">
-            <input type="radio" v-model="article.type" value=2 />
+            <input type="radio" v-model="article.type" value="2" />
             <span>HTML</span>
           </label>
           <label class="radio-item">
-            <input type="radio" v-model="article.type" value=3 />
+            <input type="radio" v-model="article.type" value="3" />
             <span>CSS</span>
           </label>
           <label class="radio-item">
-            <input type="radio" v-model="article.type" value=4 />
+            <input type="radio" v-model="article.type" value="4" />
             <span>JavaScript</span>
           </label>
           <label class="radio-item">
-            <input type="radio" v-model="article.type" value=5 />
+            <input type="radio" v-model="article.type" value="5" />
             <span>Java</span>
           </label>
           <label class="radio-item">
-            <input type="radio" v-model="article.type" value=6 />
+            <input type="radio" v-model="article.type" value="6" />
             <span>MySql</span>
           </label>
         </div>
@@ -81,7 +81,7 @@ import { useRouter } from "vue-router";
 import { ElLoading } from "element-plus";
 import { article_store } from "@/store/updateArticle";
 import { user_store } from "@/store/user";
-import {update, upload} from "@/request/axiosForArticles.js";
+import { update, upload } from "@/request/axiosForArticles.js";
 const articleStore = article_store();
 const userStore = user_store();
 // 编辑器实例，必须用 shallowRef
@@ -89,14 +89,13 @@ const editorRef = shallowRef();
 const router = useRouter();
 
 const article = reactive({
-  id: null,
-  type: 1,
+  id: "",
+  type: "1",
   head: "",
   content: "",
 });
 
 const uploadArticle = async () => {
-  
   if (article.content.length < 30) {
     ElMessage.error("文章内容太少！");
     return;
@@ -106,14 +105,12 @@ const uploadArticle = async () => {
     return;
   }
   let resp;
-  if (article.id !== null) {
-    
+  if (article.id !== "") {
     resp = await update(article);
   } else {
-    
     resp = await upload(article);
   }
-  if (resp.code === 200) {
+  if (resp.code === "200") {
     ElMessage.success("文章上传成功!");
     setTimeout(() => {
       const load = ElLoading.service({

@@ -5,8 +5,8 @@ import { user_store } from "@/store/user";
 import { useRouter } from "vue-router";
 import { ElLoading, ElMessage, ElDialog } from "element-plus";
 import { article_store } from "@/store/updateArticle";
-import { deleteById,getAll } from "@/request/axiosForArticles";
-import {Delete, Edit, MoreFilled} from "@element-plus/icons-vue";
+import { deleteById, getAll } from "@/request/axiosForArticles";
+import { Delete, Edit, MoreFilled } from "@element-plus/icons-vue";
 const articleStore = article_store();
 const userStore = user_store();
 const router = useRouter();
@@ -21,20 +21,14 @@ const handleClick = (e) => {
   e.preventDefault();
 };
 
-const getType=(type)=>{
-  if(type==1)
-    return "C语言";
-  else if(type==2)
-    return "HTML";
-  else if(type==3)
-    return "CSS"
-  else if(type==4)
-    return "JavaScript"
-  else if(type==5)
-    return "Java"
-  else if(type==6)
-    return "MySQL"
-}
+const getType = (type) => {
+  if (type == 1) return "C语言";
+  else if (type == "2") return "HTML";
+  else if (type == "3") return "CSS";
+  else if (type == "4") return "JavaScript";
+  else if (type == "5") return "Java";
+  else if (type == "6") return "MySQL";
+};
 
 const handleEdit = (item) => {
   articleStore.setArticle(item.id, item.head, item.content, item.type);
@@ -222,7 +216,9 @@ onMounted(async () => {
               <span class="article-type">{{ getType(item.type) }}</span>
             </span>
             <span class="meta-item">{{ `作者：${item.name}` }}</span>
-            <span class="meta-item"> 最后修改时间: {{ item.updatedDateTime }} </span>
+            <span class="meta-item">
+              最后修改时间: {{ item.updatedDateTime }}
+            </span>
           </div>
 
           <!-- 文章内容 -->

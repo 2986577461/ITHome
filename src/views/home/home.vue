@@ -1,21 +1,23 @@
 <script setup>
 import Header from "@/components/Header.vue";
 import Footer from "@/components/Foot.vue";
-import {user_store} from "@/store/user.js";
-import {onMounted, reactive, computed} from "vue";
-import {ref} from "vue";
-import {useRouter} from "vue-router";
-import {visible_store} from "@/store/visible.js";
+import { user_store } from "@/store/user.js";
+import { onMounted, reactive, computed } from "vue";
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { visible_store } from "@/store/visible.js";
 import ResetPassword from "@/components/resetPassword.vue";
-import {getAll} from "@/request/axiosForResources.js";
+import { getAll } from "@/request/axiosForResources.js";
 
 const visibleStore = visible_store();
 const router = useRouter();
 
-const imgArr = ["https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/3.jpg",
+const imgArr = [
+  "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/3.jpg",
   "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/2.jpg",
   "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/1.jpg",
-  "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/4.jpg"];
+  "https://liuxingjielihaichuanlai.oss-cn-chengdu.aliyuncs.com/4.jpg",
+];
 
 const userStore = user_store();
 
@@ -28,7 +30,6 @@ function getimg(item) {
 const gotoPage = (page) => {
   router.push(page);
 };
-
 
 let news = reactive([]);
 
@@ -62,7 +63,7 @@ const handlePageChange = (page) => {
   // 可以在这里添加滚动到新闻区域顶部的效果
   const newsBar = document.querySelector(".newsBar");
   if (newsBar) {
-    newsBar.scrollIntoView({behavior: "smooth"});
+    newsBar.scrollIntoView({ behavior: "smooth" });
   }
 };
 
@@ -80,7 +81,7 @@ onMounted(async () => {
         <el-carousel height="500px" arrow="always" direction="vertical">
           <el-carousel-item v-for="(item, index) in 4" :key="index">
             <a :href="imgLink" target="_blank" @click="intoUrl(index)"
-            ><img :src="getimg(item)" alt="ngm" class="img"
+              ><img :src="getimg(item)" alt="ngm" class="img"
             /></a>
           </el-carousel-item>
         </el-carousel>
@@ -106,16 +107,16 @@ onMounted(async () => {
           </div>
 
           <div
-              @click="visibleStore.resetPasswordVisible = true"
-              class="change-password-btn"
-              v-if="userStore.condition"
+            @click="visibleStore.resetPasswordVisible = true"
+            class="change-password-btn"
+            v-if="userStore.condition"
           >
             修改密码
           </div>
           <div
-              class="logout-btn"
-              @click="visibleStore.loginOrLogoutButton()"
-              :class="{ 'full-width': !userStore.condition }"
+            class="logout-btn"
+            @click="visibleStore.loginOrLogoutButton()"
+            :class="{ 'full-width': !userStore.condition }"
           >
             {{ visibleStore.getText }}
           </div>
@@ -147,12 +148,12 @@ onMounted(async () => {
 
     <div class="newsBar">
       <div
-          class="newsStyle"
-          v-for="item in currentPageNews"
-          :key="item.id"
-          @click="gotoPage('/leraningResource')"
+        class="newsStyle"
+        v-for="item in currentPageNews"
+        :key="item.id"
+        @click="gotoPage('/leraningResource')"
       >
-        <img :src="item.coverUrl" class="news-image">
+        <img :src="item.coverUrl" class="news-image" />
         <div class="text">
           <div class="head">
             {{ item.head }}
@@ -166,18 +167,20 @@ onMounted(async () => {
     <!-- 分页器容器 -->
     <div class="pagination-container">
       <el-pagination
-          class="pageBar"
-          background
-          size="large"
-          layout="prev, pager, next"
-          :total="news.length"
-          :page-size="pageSize"
-          :current-page="currentPage"
-          @current-change="handlePageChange"
+        class="pageBar"
+        background
+        size="large"
+        layout="prev, pager, next"
+        :total="news.length"
+        :page-size="pageSize"
+        :current-page="currentPage"
+        @current-change="handlePageChange"
       />
     </div>
 
     <ResetPassword></ResetPassword>
+    <div>如果您有任何问题或者需要的功能，欢迎向我们提出，我们会尽力优化！</div>
+    <el-button type="primary">提交反馈：</el-button>
     <Footer></Footer>
   </div>
 </template>
@@ -390,7 +393,6 @@ onMounted(async () => {
 
 /* 自定义分页器样式 */
 
-
 .pagination-container {
   display: flex;
   justify-content: center;
@@ -491,11 +493,11 @@ onMounted(async () => {
   width: auto;
 }
 .news-image {
-  width: 150px;          /* 固定宽度 */
-  height: 150px;         /* 固定高度，与 .text 区域对齐 */
-  object-fit: cover;     /* 保持图片比例并填充容器 */
-  border-radius: 8px;    /* 圆角效果 */
-  margin-right: 15px;    /* 与右侧文字间隔 */
+  width: 150px; /* 固定宽度 */
+  height: 150px; /* 固定高度，与 .text 区域对齐 */
+  object-fit: cover; /* 保持图片比例并填充容器 */
+  border-radius: 8px; /* 圆角效果 */
+  margin-right: 15px; /* 与右侧文字间隔 */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* 轻微阴影提升层次感 */
   transition: transform 0.3s ease; /* 悬停动画 */
 }

@@ -44,6 +44,7 @@
 <script setup>
 import Foot from "@/components/Foot.vue";
 import Header from "@/components/Header.vue";
+import Introduce from "@/components/Introduce.vue";
 
 // 证书相关数据
 const certificateImages = [

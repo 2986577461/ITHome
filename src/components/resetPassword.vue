@@ -53,10 +53,10 @@ const handleSubmit = async () => {
   }
 
   ElMessage.success("密码修改成功。");
-  setTimeout(async () => {
-    localStorage.removeItem("token");
-    location.reload();
-  }, 1000);
+  // setTimeout(async () => {
+  //   localStorage.removeItem("token");
+  //   location.reload();
+  // }, 1000);
   visibleStore.resetPasswordVisible = false;
 };
 </script>

@@ -1,17 +1,17 @@
 <script lang="ts" setup>
-import {onMounted, ref} from "vue";
+import { onMounted, ref } from "vue";
 import Foot from "@/components/Foot.vue";
 import UpdateStudent from "./colonyMessage/updateStudent.vue";
-import {govern_store} from "@/store/govern.js";
+import { govern_store } from "@/store/govern.js";
 import AddStudent from "./colonyMessage/addStudent.vue";
-import {ElMessage} from "element-plus";
-import {downloadExcel} from "@/request/axiosForUser";
-import {getArticleCount} from '@/request/axiosForArticles';
-import {getResourcesCount} from '@/request/axiosForResources';
-import {getAllNewcomers} from '@/request/axiosForNewcomers';
-import {removeBatch, getAll} from '@/request/axiosForUser';
+import { ElMessage } from "element-plus";
+import { downloadExcel } from "@/request/axiosForUser";
+import { getArticleCount } from "@/request/axiosForArticles";
+import { getResourcesCount } from "@/request/axiosForResources";
+import { getAllNewcomers } from "@/request/axiosForNewcomers";
+import { removeBatch, getAll } from "@/request/axiosForUser";
 import Header from "@/components/Header.vue";
-import {CirclePlusFilled, DeleteFilled} from "@element-plus/icons-vue";
+import { CirclePlusFilled, DeleteFilled } from "@element-plus/icons-vue";
 
 const governStore = govern_store();
 
@@ -28,8 +28,8 @@ const studentForRemove = ref([]);
 const updateDialog = () => {
   //从学生集合过滤出被单选框选中的学生
   const student = governStore.member.filter(
-      //如果索引所对应的单选框中的元素为true，则返回该学生
-      (_student, index) => checked.value[index]
+    //如果索引所对应的单选框中的元素为true，则返回该学生
+    (_student, index) => checked.value[index]
   );
   if (student.length === 0) {
     ElMessage.error("请选择要修改的学生");
@@ -47,8 +47,8 @@ const updateDialog = () => {
 
 const removeDialog = () => {
   studentForRemove.value = governStore.member.filter(
-      // 计算被选中的学生数量
-      (_student, index) => checked.value[index]
+    // 计算被选中的学生数量
+    (_student, index) => checked.value[index]
   );
 
   if (studentForRemove.value.length === 0) {
@@ -60,9 +60,8 @@ const removeDialog = () => {
 const download = async () => {
   // 下载学生信息
   const resp = await downloadExcel();
-  console.log(resp)
   // 创建一个 Blob 对象
-  const blob = new Blob([resp], {type: "application/vnd.ms-excel"});
+  const blob = new Blob([resp], { type: "application/vnd.ms-excel" });
   // 创建一个 URL 对象
   const url = window.URL.createObjectURL(blob);
   // 创建一个链接元素
@@ -84,7 +83,7 @@ const remove = async () => {
   const students = ref([]);
 
   for (const student of studentForRemove.value)
-    students.value.push(student.id);
+    students.value.push(student.studentId);
   // 发送请求
   const condition = await removeBatch(students.value);
 
@@ -97,9 +96,9 @@ const remove = async () => {
 
   // 删除学生：更新 member 数组
   governStore.member.splice(
-      0,
-      governStore.member.length,
-      ...governStore.member.filter((_student, index) => !checked.value[index])
+    0,
+    governStore.member.length,
+    ...governStore.member.filter((_student, index) => !checked.value[index])
   );
 
   // 清空选中状态
@@ -128,39 +127,39 @@ onMounted(async () => {
     <div class="content-wrapper">
       <div class="control-panel">
         <el-badge
-            :value="governStore.newcomers.length"
-            :max="50"
-            type="danger"
-            :offset="[-20, 5]"
-            :hidden="!governStore.displayStudentCount()"
+          :value="governStore.newcomers.length"
+          :max="50"
+          type="danger"
+          :offset="[-20, 5]"
+          :hidden="!governStore.displayStudentCount()"
         >
           <el-button
-              type="success"
-              class="controllerBt"
-              @click="governStore.turnaddStudentSwitch()"
+            type="success"
+            class="controllerBt"
+            @click="governStore.turnaddStudentSwitch()"
           >
             <span>新增</span>
             <el-icon>
-              <CirclePlusFilled/>
+              <CirclePlusFilled />
             </el-icon>
           </el-button>
         </el-badge>
         <el-button type="warning" class="controllerBt" @click="updateDialog"
-        ><span>修改</span>
+          ><span>修改</span>
           <el-icon>
-            <Edit/>
+            <Edit />
           </el-icon>
         </el-button>
         <el-button type="danger" class="controllerBt" @click="removeDialog"
-        ><span>删除</span>
+          ><span>删除</span>
           <el-icon>
-            <DeleteFilled/>
+            <DeleteFilled />
           </el-icon>
         </el-button>
         <el-button type="success" class="controllerBt" @click="download()">
           <span>下载名单</span>
           <el-icon>
-            <CirclePlusFilled/>
+            <CirclePlusFilled />
           </el-icon>
         </el-button>
       </div>
@@ -197,12 +196,12 @@ onMounted(async () => {
         </div>
 
         <div
-            class="table-row"
-            v-for="(student, index) in governStore.member"
-            :key="student.claxx"
+          class="table-row"
+          v-for="(student, index) in governStore.member"
+          :key="student.claxx"
         >
           <div class="table-cell checkbox-cell">
-            <el-checkbox v-model="checked[index]" size="large"/>
+            <el-checkbox v-model="checked[index]" size="large" />
           </div>
           <div class="table-cell">{{ student.studentId }}</div>
           <div class="table-cell">{{ student.name }}</div>
@@ -219,19 +218,19 @@ onMounted(async () => {
     <UpdateStudent></UpdateStudent>
     <AddStudent></AddStudent>
     <el-dialog
-        v-model="removeDialogVisible"
-        title="警告"
-        width="450"
-        top="30vh"
-        style="font-family: '微软雅黑'; letter-spacing: 2px"
+      v-model="removeDialogVisible"
+      title="警告"
+      width="450"
+      top="30vh"
+      style="font-family: '微软雅黑'; letter-spacing: 2px"
     >
       <h3 style="font-size: 16px; font-weight: 400">
         <!-- 通过监测删除学生的数量决定模版字符串所展示的内容 -->
         {{
           `确定删除${
-              studentForRemove.length === 1
-                  ? studentForRemove[0].name + "同学"
-                  : "这" + studentForRemove.length + "个学生"
+            studentForRemove.length === 1
+              ? studentForRemove[0].name + "同学"
+              : "这" + studentForRemove.length + "个学生"
           }吗`
         }}
       </h3>
