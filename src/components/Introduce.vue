@@ -1,6 +1,5 @@
 <template>
   //这个页面还没有展示，可以放到harvest组件下
-  <Header></Header>
   <div class="introduce">
     <h1 class="head">IT之家协会简介</h1>
     <p>
@@ -39,7 +38,6 @@
 </template>
 
 <script setup>
-import Header from "../Header.vue";
 </script>
 
 <style scoped>

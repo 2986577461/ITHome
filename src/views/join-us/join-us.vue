@@ -45,7 +45,12 @@
       <form @submit.prevent="submitForm">
         <div class="form-item">
           <label for="studentID">学号：</label>
-          <input type="text" id="studentID" v-model="form.studentId" required />
+          <input
+            type="number"
+            id="studentID"
+            v-model="form.studentId"
+            required
+          />
         </div>
 
         <div class="form-item">
@@ -74,7 +79,7 @@
         <div class="form-item">
           <label for="className">班级：</label>
           <input
-            type="text"
+            type="number"
             id="claxx"
             v-model="form.className"
             required
@@ -132,7 +137,7 @@ const academys = [
 ];
 
 const form = ref({
-  studentId: null,
+  studentId: "",
   name: "",
   sex: "",
   major: "",

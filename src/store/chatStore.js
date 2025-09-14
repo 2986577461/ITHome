@@ -9,31 +9,20 @@ export const chat_store = defineStore("chat", {
         unreadCounts: {}
     }),
     actions: {
-        // 更新在线用户列表（确保响应式）
-        updateOnlineUsers(users) {
-            // 使用数组替换确保响应式更新
-            this.onlineUsers = [...users];
-        },
 
-        // 添加新消息
-        addMessage(senderId, message) {
-            if (!this.messages[senderId]) {
-                this.messages[senderId] = [];
+        addMessage(conversationPartnerId, message) { 
+            if (!this.messages[conversationPartnerId]) { 
+                this.messages[conversationPartnerId] = []; 
             }
-
-            const newMessage = {
-                ...message,
-                read: false
-            };
-
-            // 使用数组操作确保响应式
-            this.messages[senderId] = [...this.messages[senderId], newMessage];
+            // 确保 read 属性设置正确
+            const messageToAdd = { ...message, read: false }; 
+            this.messages[conversationPartnerId] = [...this.messages[conversationPartnerId], messageToAdd]; 
 
             // 更新未读计数
-            if (!this.unreadCounts[senderId]) {
-                this.unreadCounts[senderId] = 0;
+            if (!this.unreadCounts[conversationPartnerId]) {
+                this.unreadCounts[conversationPartnerId] = 0;
             }
-            this.unreadCounts[senderId] += 1;
+            this.unreadCounts[conversationPartnerId] += 1;
         },
 
         // 标记消息为已读
@@ -54,19 +43,13 @@ export const chat_store = defineStore("chat", {
             this.unreadCounts[userId] = 0;
         },
 
-        // 添加发送的消息
-        addSentMessage(receiverId, message) {
-            if (!this.messages[receiverId]) {
-                this.messages[receiverId] = [];
+        addSentMessage(conversationPartnerId, message) { 
+            if (!this.messages[conversationPartnerId]) { 
+                this.messages[conversationPartnerId] = []; 
             }
-
-            const newMessage = {
-                ...message,
-                read: true
-            };
-
-            // 使用数组操作确保响应式
-            this.messages[receiverId] = [...this.messages[receiverId], newMessage];
+            // 确保 read 属性设置正确
+            const messageToAdd = { ...message, read: true }; 
+            this.messages[conversationPartnerId] = [...this.messages[conversationPartnerId], messageToAdd]; 
         }
     }
 });

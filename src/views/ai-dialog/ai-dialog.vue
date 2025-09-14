@@ -110,7 +110,7 @@ import {ref, onMounted, nextTick} from 'vue';
 import VueMarkdown from 'vue-markdown-render';
 import Header from "@/components/Header.vue";
 import {baseURL} from "@/request/axiosInit.js";
-import { saveAnswer} from "@/request/axiosForAI.js"; // 确保此路径正确
+import {ElMessage} from "element-plus";
 
 const userInput = ref('');
 const messages = ref([]);
@@ -265,6 +265,11 @@ const initParticles = () => {
 
 
 const sendMessage = async () => {
+  if(localStorage.getItem("token")==null)
+  {
+    ElMessage.error("请登录后再尝试!")
+    return;
+  }
   if (!userInput.value.trim() || loading.value) return;
 
   const userMessage = {
@@ -288,7 +293,7 @@ const sendMessage = async () => {
 
   try {
     const eventSource = new EventSource(
-        `http://${baseURL}/user/ai-dialog?&sessionId=1&message=${encodeURIComponent(userMessage.content)}&token=${encodeURIComponent(localStorage.getItem("token"))}`
+        `http://${baseURL}/user/ai-dialog?sessionId=1&message=${encodeURIComponent(userMessage.content)}&token=${encodeURIComponent(localStorage.getItem("token"))}`
     );
 
     eventSource.onmessage = async (event) => {
@@ -298,26 +303,18 @@ const sendMessage = async () => {
       if (rawData.startsWith('data:')) {
         rawData = rawData.substring(5).trim();
       }
-
-      // **宝宝，看这里，我帮你加了对 '[DONE]' 的判断！**
       if (rawData === '[DONE]') {
         eventSource.close(); // 关闭 EventSource
-        //保存回答
-        const answer = {
-          message: messages.value[currentAIMessageIndex.value].content,
-          sessionId:1
-        }
-        await saveAnswer(answer);
         loading.value = false; // 停止加载状态
         return; // 不再尝试解析 JSON
       }
-
       try {
         const eventData = JSON.parse(rawData);
         const contentChunk = eventData.choices?.[0]?.delta?.content || '';
         if (contentChunk) {
+          //拼接流式回答
           messages.value[currentAIMessageIndex.value].content += contentChunk;
-          scrollToBottom();
+          await scrollToBottom();
         }
       } catch (e) {
         console.error('解析 JSON 失败:', e, event.data);
@@ -875,7 +872,7 @@ button:hover::after {
 
 /* Markdown 增强样式 */
 :deep(.markdown-content) {
-  line-height: 1.7;
+  line-height: 2;
   color: var(--text-light);
 }
 

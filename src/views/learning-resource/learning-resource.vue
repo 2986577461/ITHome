@@ -176,13 +176,14 @@ const handleDelete = async () => {
 
 
 const download = async (objectName) => {
-  const resp = await getDownloadUrl(objectName);
-  const link = document.createElement("a");
-  link.href = resp.data;
-  // link.download = friendlyName; // 设置下载文件名
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  try {
+    const resp = await getDownloadUrl(objectName);
+    const link = document.createElement("a");
+    link.href = resp.data;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }catch (e){}
 };
 
 onMounted(async () => {

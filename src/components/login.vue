@@ -1,10 +1,10 @@
 <script setup>
-import {visible_store} from "@/store/visible.js";
-import {user_store} from "@/store/user.js";
-import {ref} from "vue";
-import {ElLoading} from "element-plus";
-import {ElMessage} from "element-plus";
-import {login} from "@/request/axiosForUser.js";
+import { visible_store } from "@/store/visible.js";
+import { user_store } from "@/store/user.js";
+import { ref } from "vue";
+import { ElLoading } from "element-plus";
+import { ElMessage } from "element-plus";
+import { login } from "@/request/axiosForUser.js";
 import router from "@/router/router.js";
 
 const visibleStore = visible_store();
@@ -28,7 +28,7 @@ const handleSubmit = async (e) => {
       password: password.value,
     };
     const resp = await login(loginMessage);
-    if (resp.code === 200) {
+    if (resp.code === "200") {
       ElMessage.success("登陆成功。");
 
       // 1. 存储Token到本地存储
@@ -37,12 +37,12 @@ const handleSubmit = async (e) => {
       setTimeout(() => {
         visibleStore.offvisible();
         userStore.loginsuccess(
-            resp.data.id,
-            resp.data.name,
-            resp.data.position,
-            resp.data.academy
+          resp.data.id,
+          resp.data.name,
+          resp.data.position,
+          resp.data.academy
         );
-        router.push("/")
+        //  location.reload();
       }, 600);
     } else {
       ElMessage.error("账号或密码错误，请重试。");
@@ -53,32 +53,32 @@ const handleSubmit = async (e) => {
 
 <template>
   <el-dialog
-      width="550px"
-      :show-close="false"
-      style="
+    width="550px"
+    :show-close="false"
+    style="
       padding: 0;
       background: linear-gradient(135deg, #90caf9 0%, #1976d2 100%);
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
       height: 440px;
       border-radius: 18px;
     "
-      v-model="visibleStore.visible"
+    v-model="visibleStore.visible"
   >
     <form @submit="handleSubmit">
       <div class="headLine">IT之家协会</div>
 
       <div class="input-group">
         <div>请输入账号：</div>
-        <input v-model="studentId" required/>
+        <input v-model="studentId" required />
       </div>
       <div class="input-group">
         <div>请输入密码：</div>
-        <input v-model="password" type="password" required/>
+        <input v-model="password" type="password" required />
       </div>
 
       <div class="submit-div">
         <el-button type="success" native-type="submit" class="glass-btn"
-        >登录
+          >登录
         </el-button>
       </div>
     </form>

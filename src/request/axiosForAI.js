@@ -1,6 +1,5 @@
 import axiosInstance from "@/request/axiosInit.js";
 
-export const saveAnswer = async (message) => {
-    return  await axiosInstance.post("/user/ai-dialog/assistant-answer",message)
-};
-
+export const getUserList=async ()=>{
+    return  await axiosInstance.get("user/chat/all");
+}
