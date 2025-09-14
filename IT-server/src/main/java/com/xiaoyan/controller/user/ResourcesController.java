@@ -11,10 +11,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.IOException;
 import java.util.List;
 
 @Slf4j
@@ -22,9 +20,7 @@ import java.util.List;
 @RequestMapping("user/resources")
 @AllArgsConstructor
 @Tag(name = "资料管理")
-@Validated
 public class ResourcesController {
-
 
     private ResourcesService resourcesService;
 

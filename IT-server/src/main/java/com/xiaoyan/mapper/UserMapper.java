@@ -9,9 +9,6 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface UserMapper extends BaseMapper<Student> {
 
-    @Update("update it_student set password=#{password} where student_id=#{studentId}")
-    void updatePasswordByStudentId(Integer studentId, String password);
-
     @Select("select * from it_student where student_id=#{studentId} and deleted=0")
     Student selectByStudentId(Integer studentId);
 
@@ -26,4 +23,7 @@ public interface UserMapper extends BaseMapper<Student> {
 
     @Update("update it_student set resource_count=resource_count-1 where student_id=#{studentId}")
     void decreaceResourceCount(Integer studentId);
+
+    @Select("select name from it_student where student_id=#{studentId};")
+    String selectNameByStudentId(Integer studentId);
 }

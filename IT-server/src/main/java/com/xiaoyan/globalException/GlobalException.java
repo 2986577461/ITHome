@@ -50,6 +50,7 @@ public class GlobalException {
 
     @ExceptionHandler
     public Result<String> exceptionHandler(Exception ex) {
+        ex.printStackTrace();
         return Result.error(ex.getMessage());
     }
 }

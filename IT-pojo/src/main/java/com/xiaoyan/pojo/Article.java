@@ -3,6 +3,7 @@ package com.xiaoyan.pojo;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.xiaoyan.baseinterface.HashCacheId;
 import lombok.Data;
 import lombok.ToString;
 
@@ -11,7 +12,7 @@ import java.time.LocalDateTime;
 
 @Data
 @ToString
-public class Article implements Serializable {
+public class Article implements Serializable, HashCacheId {
 
     @TableId("id")
     private Long id;
@@ -32,4 +33,9 @@ public class Article implements Serializable {
     private LocalDateTime releaseDateTime;
 
     private LocalDateTime updatedDateTime;
+
+    @Override
+    public String getCacheId() {
+        return String.valueOf(this.id);
+    }
 }

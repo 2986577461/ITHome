@@ -22,13 +22,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class ArticlesController {
 
     @Resource
-    private ArticlesService messageService;
+    private ArticlesService articlesService;
 
     @GetMapping
     @Operation(summary = "获取文章总数")
     public Result<Long> getCount() {
         log.info("获取文章总数");
-        return Result.success(messageService.getCount());
+        return Result.success(articlesService.getCount());
     }
 
 }
