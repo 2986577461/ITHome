@@ -5,7 +5,6 @@ import { ref } from "vue";
 import { ElLoading } from "element-plus";
 import { ElMessage } from "element-plus";
 import { login } from "@/request/axiosForUser.js";
-import router from "@/router/router.js";
 
 const visibleStore = visible_store();
 const userStore = user_store();

@@ -1,8 +1,8 @@
 import axios from "axios";
 import { ElMessage } from "element-plus";
 
-export const baseHost = "www.myzyitzj.cn/";
-export const baseURL = "www.myzyitzj.cn/ithome";
+export const baseHost = "localhost:8080/";
+export const baseURL = "localhost:8080/";
 const axiosInstance = axios.create({
   baseURL: "http://" + baseURL,
   // 设置请求超时时间60秒
