@@ -11,3 +11,7 @@ ai-backend/.claude
 /frontend/CLAUDE.md
 /ai-backend/CLAUDE.md
 /backend/IT-server/src/main/resources/application-dev.yml
+
+/backend/.idea/
+/ai-backend/.idea/
+/frontend/.vscode/
