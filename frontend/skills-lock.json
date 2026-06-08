@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "spark": {
+      "source": "wishworldbetter/seedex-skills",
+      "sourceType": "github",
+      "skillPath": "skills/spark/SKILL.md",
+      "computedHash": "bfbfddd1df1335481f73e7a6852d29041a225855867029f90b165ebd0a6c5c01"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+
+<mapper namespace="com.xiaoyan.mapper.ArticleMapper">
+
+    <select id="selectPage" resultType="com.xiaoyan.pojo.Article">
+        SELECT * FROM article
+        <if test="type!=null">
+            WHERE article.type=#{type}
+        </if>
+        ORDER BY article.updated_date_time DESC
+        LIMIT #{offset},#{size}
+    </select>
+
+    <select id="selectPageByStudentId" resultType="com.xiaoyan.pojo.Article">
+        SELECT * FROM article
+        WHERE article.student_id = #{studentId}
+        ORDER BY article.updated_date_time DESC
+        LIMIT #{offset},#{size}
+    </select>
+
+    <select id="countBefore" resultType="long">
+        SELECT COUNT(*) FROM article
+        WHERE updated_date_time > #{updatedDateTime}
+           OR (updated_date_time = #{updatedDateTime} AND id > #{id})
+    </select>
+</mapper>

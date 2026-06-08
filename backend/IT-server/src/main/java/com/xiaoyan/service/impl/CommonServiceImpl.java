@@ -1,0 +1,85 @@
+package com.xiaoyan.service.impl;
+
+import com.xiaoyan.constant.MessageConstant;
+import com.xiaoyan.context.BaseContext;
+import com.xiaoyan.exception.ParameterException;
+import com.xiaoyan.mapper.StudentFileMapper;
+import com.xiaoyan.pojo.StudentFile;
+import com.xiaoyan.service.CommonService;
+import com.xiaoyan.utils.AliOssUtil;
+import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+
+
+@Slf4j
+@Service
+@AllArgsConstructor
+public class CommonServiceImpl implements CommonService {
+
+    private AliOssUtil aliOssUtil;
+
+    private StudentFileMapper studentFileMapper;
+
+    @Override
+    public Long upload(MultipartFile file) throws IOException {
+        String originalName = file.getOriginalFilename();
+        if (originalName == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
+
+        String suffix = originalName.substring(originalName.lastIndexOf("."));
+
+        String objectName = UUID.randomUUID() + suffix;
+        String fileUrl = aliOssUtil.upload(file.getBytes(), objectName);
+
+        long size = file.getSize();
+        String contentType = file.getContentType();
+
+        StudentFile record = StudentFile.builder().
+                studentId(BaseContext.getCurrentStudentId()).
+                fileSize(size).
+                originalName(originalName).
+                objectName(objectName).
+                fileType(contentType).
+                createDateTime(LocalDateTime.now()).
+                fileUrl(fileUrl).build();
+
+        studentFileMapper.insert(record);
+
+        //回显id
+        return record.getId();
+    }
+
+    @Override
+    public void delete(String... objectNames) {
+        if (objectNames == null || objectNames.length == 0) {
+            return;
+        }
+        List<String> list = Arrays.asList(objectNames);
+        aliOssUtil.deleteObjects(list);
+        studentFileMapper.deleteByObjectNames(list);
+    }
+
+    /**
+     * 生成带签名的下载URL
+     *
+     * @param objectName       OSS上的文件路径/名称
+     * @param expirationMillis URL的过期时间（毫秒），例如 3600 * 1000 = 1小时
+     * @return 带签名的下载URL
+     */
+    @Override
+    public String generatePresignedDownloadUrl(String objectName, long expirationMillis) {
+        StudentFile studentFile = studentFileMapper.selectbyObjectName(objectName);
+        log.info("下载文件:{}",studentFile.getOriginalName());
+        return aliOssUtil.getDownloadUrl(objectName,
+                studentFile.getOriginalName(), expirationMillis);
+    }
+}

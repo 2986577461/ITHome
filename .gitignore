@@ -1,0 +1,13 @@
+ai-backend/.claude
+/.idea/
+/ai-backend/.claude/
+/ai-backend/db/
+/ai-backend/.env
+/backend/IT-common/target/
+/backend/IT-pojo/target/
+/backend/IT-server/target/
+/frontend/.claude/
+/frontend/node_modules/
+/frontend/CLAUDE.md
+/ai-backend/CLAUDE.md
+/backend/IT-server/src/main/resources/application-dev.yml
