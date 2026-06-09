@@ -71,6 +71,8 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
             BeanUtils.copyProperties(newcomer, student, "id");
             student.setPassword(ENCODER.encode(PasswordConstant.STUDENT_PASSWORD));
             student.setPosition(PositionConstant.STUDENT);
+            student.setArticleCount(0);
+            student.setResourceCount(0);
             student.setAvatarId(1L);
 
             userMapper.insert(student);

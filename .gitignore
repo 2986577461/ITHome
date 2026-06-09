@@ -15,3 +15,4 @@ ai-backend/.claude
 /backend/.idea/
 /ai-backend/.idea/
 /frontend/.vscode/
+.DS_Store
