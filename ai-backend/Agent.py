@@ -7,7 +7,7 @@
   3. 对话记忆存储在 SQLite 数据库中
   4. 支持多会话隔离（通过 thread_id）
 
-启动方式：python3 ai4.py
+启动方式：python3 Agent.py
 API 文档：启动后访问 http://localhost:8000/docs
 """
 
@@ -43,12 +43,12 @@ JWT_ALGORITHM = "HS256"
 
 
 def _verify_jwt(token: str) -> str:
-    """验证 JWT 并返回 user_id。token 为空时返回空字符串（兼容未登录）。"""
+    """验证 JWT 并返回 user_id。未登录直接拒绝。"""
     if not token:
-        return ""
+        raise HTTPException(401, "请先登录")
     try:
         payload = pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return str(payload.get("sub") or payload.get("userId") or payload.get("id") or "")
+        return str(payload.get("user") or payload.get("admin") or payload.get("sub") or payload.get("userId") or payload.get("id") or "")
     except pyjwt.ExpiredSignatureError:
         raise HTTPException(401, "登录已过期，请重新登录")
     except pyjwt.InvalidTokenError:
@@ -265,75 +265,83 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
-# ---- 知识库检索工具（供 Agent 调用） ----
+# ---- 知识库检索工具工厂（每次请求动态生成，确保用户隔离） ----
 from langchain_core.tools import tool
 
 
-@tool
-def search_knowledge_base(query: str) -> str:
-    """检索本地知识库中用户上传的文档内容。用户可能通过文档告诉你个人信息（名字、背景、偏好等），回答问题前必须先调用此工具查文档。参数 query 请使用文档中可能出现的关键词（2-5个词），不要用完整问句。"""
-    if not query.strip():
-        return "查询内容为空"
+def _make_search_knowledge_base(user_id: str):
+    """为指定用户创建知识库检索工具，仅检索该用户上传的文档。"""
+    @tool
+    def search_knowledge_base(query: str) -> str:
+        """检索本地知识库中用户上传的文档内容。用户可能通过文档告诉你个人信息（名字、背景、偏好等），回答问题前必须先调用此工具查文档。参数 query 请使用文档中可能出现的关键词（2-5个词），不要用完整问句。"""
+        if not query.strip():
+            return "查询内容为空"
 
-    # 1) 向量化查询
-    try:
-        q_vec = _embed([query])[0]
-    except Exception as e:
-        return f"查询向量化失败：{e}"
-
-    # 2) 从数据库加载所有 chunks 并计算相似度
-    conn = get_kb_db()
-    try:
-        rows = conn.execute("SELECT doc_id, chunk_idx, content, embedding FROM chunks_vec").fetchall()
-    finally:
-        conn.close()
-
-    if not rows:
-        return "知识库中暂无文档，请先上传文档。"
-
-    import json as _json
-
-    scored = []
-    for r in rows:
+        # 1) 向量化查询
         try:
-            vec = _json.loads(r["embedding"])
-        except Exception:
-            continue
-        sim = _cosine_similarity(q_vec, vec)
-        scored.append((sim, r["doc_id"], r["content"]))
+            q_vec = _embed([query])[0]
+        except Exception as e:
+            return f"查询向量化失败：{e}"
 
-    # 3) 取 Top-5 向量相似片段，同时准备全量兜底
-    scored.sort(key=lambda x: x[0], reverse=True)
-    top = scored[:5]
+        # 2) 仅加载当前用户的文档 chunks，JOIN documents 表做 user_id 过滤
+        conn = get_kb_db()
+        try:
+            rows = conn.execute(
+                "SELECT c.doc_id, c.chunk_idx, c.content, c.embedding "
+                "FROM chunks_vec c JOIN documents d ON c.doc_id = d.id "
+                "WHERE d.user_id = ?", (user_id,)
+            ).fetchall()
+        finally:
+            conn.close()
 
-    cards = []
-    context_parts = []
-    for sim, doc_id, content in top:
-        if sim >= 0.1:
-            cards.append({
-                "title": f"文档#{doc_id} 片段（相似度 {sim:.0%}）",
+        if not rows:
+            return "知识库中暂无文档，请先上传文档。"
+
+        import json as _json
+
+        scored = []
+        for r in rows:
+            try:
+                vec = _json.loads(r["embedding"])
+            except Exception:
+                continue
+            sim = _cosine_similarity(q_vec, vec)
+            scored.append((sim, r["doc_id"], r["content"]))
+
+        # 3) 取 Top-5 向量相似片段，同时准备全量兜底
+        scored.sort(key=lambda x: x[0], reverse=True)
+        top = scored[:5]
+
+        cards = []
+        context_parts = []
+        for sim, doc_id, content in top:
+            if sim >= 0.1:
+                cards.append({
+                    "title": f"文档#{doc_id} 片段（相似度 {sim:.0%}）",
+                    "url": "",
+                    "snippet": content.strip()[:150],
+                })
+                context_parts.append(f"[文档#{doc_id}]\n{content.strip()}")
+
+        # 4) 向量没命中时，把该用户所有文档内容都给 Agent，让 LLM 自己判断语义相关性
+        if not context_parts:
+            seen = set()
+            for _, doc_id, content in scored:  # scored 已排序，取全部
+                c = content.strip()
+                if c not in seen:
+                    seen.add(c)
+                    context_parts.append(f"[文档#{doc_id}]\n{c}")
+            # 前端卡片显示"全文检索"
+            cards = [{
+                "title": f"全文检索（共 {len(context_parts)} 个片段）",
                 "url": "",
-                "snippet": content.strip()[:150],
-            })
-            context_parts.append(f"[文档#{doc_id}]\n{content.strip()}")
+                "snippet": "向量未匹配，已将全部文档提供给 AI 分析",
+            }]
 
-    # 4) 向量没命中时，把所有文档内容都给 Agent，让 LLM 自己判断语义相关性
-    if not context_parts:
-        seen = set()
-        for _, doc_id, content in scored:  # scored 已排序，取全部
-            c = content.strip()
-            if c not in seen:
-                seen.add(c)
-                context_parts.append(f"[文档#{doc_id}]\n{c}")
-        # 前端卡片显示"全文检索"
-        cards = [{
-            "title": f"全文检索（共 {len(context_parts)} 个片段）",
-            "url": "",
-            "snippet": "向量未匹配，已将全部文档提供给 AI 分析",
-        }]
+        ctx = "\n\n".join(context_parts)
+        return f"[KB]{_json.dumps({'results': cards}, ensure_ascii=False)}\n---\n{ctx}"
 
-    ctx = "\n\n".join(context_parts)
-    return f"[KB]{_json.dumps({'results': cards}, ensure_ascii=False)}\n---\n{ctx}"
+    return search_knowledge_base
 
 
 # ============================================================
@@ -589,16 +597,25 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = ""):
     conn = get_app_db()
     try:
         existing = conn.execute(
-            "SELECT thread_id FROM conversations WHERE thread_id = ?", (thread_id,)
+            "SELECT thread_id, user_id FROM conversations WHERE thread_id = ?", (thread_id,)
         ).fetchone()
         if not existing:
-            # 先用占位标题，流结束后由 AI 生成真正的标题
+            # 新会话：先用占位标题，流结束后由 AI 生成真正的标题
+            conn.execute(
+                "INSERT INTO conversations (thread_id, title, created_at, updated_at, user_id) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (thread_id, "新的对话", now, now, user_id),
+            )
+        elif existing["user_id"] != user_id:
+            # thread_id 被其他用户占用，自动分配新 thread_id 避免数据泄露
+            thread_id = str(uuid.uuid4())[:8]
             conn.execute(
                 "INSERT INTO conversations (thread_id, title, created_at, updated_at, user_id) "
                 "VALUES (?, ?, ?, ?, ?)",
                 (thread_id, "新的对话", now, now, user_id),
             )
         else:
+            # 自己的会话：只更新最后活跃时间
             conn.execute(
                 "UPDATE conversations SET updated_at = ? WHERE thread_id = ?",
                 (now, thread_id),
@@ -630,11 +647,12 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = ""):
         try:
             agent = create_agent(
                 model=model,
-                tools=[search_knowledge_base, web_search],
+                tools=[_make_search_knowledge_base(user_id), web_search],
                 checkpointer=checkpointer,
                 system_prompt=load_system_prompt(),
             )
-            config = {"configurable": {"thread_id": thread_id}}
+            # 用 user_id 前缀隔离不同用户的 LangGraph checkpoint，防止 agent 记忆串号
+            config = {"configurable": {"thread_id": f"{user_id}:{thread_id}"}}
             searching_sent = False  # 避免重复发送 [SEARCHING]
             for chunk, metadata in agent.stream(
                     {"messages": [{"role": "user", "content": question}]},
@@ -865,7 +883,7 @@ if __name__ == "__main__":
     # host="0.0.0.0" 允许局域网其他设备访问
     # reload=True 文件改动时自动重启（开发用）
     uvicorn.run(
-        "ai4:app",
+        "Agent:app",
         host="0.0.0.0",
         port=8000,
         reload=True,
