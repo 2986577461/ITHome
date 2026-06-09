@@ -179,13 +179,18 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             throw new PasswordErrorException(MessageConstant.PASSWORD_ERROR);
         }
         StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
+
+        StudentFile avatar = studentFileMapper.selectById(student.getAvatarId());
+        if(avatar!=null){
+            vo.setAvatar(avatar.getFileUrl());
+        }
+
         BaseContext.setCurrentStudentId(vo.getStudentId());
-        String position = vo.getPosition();
         String tokenName;
-        if (position.equals(PositionConstant.STUDENT)) {
-            tokenName = JwtClaimsConstant.USER_ID;
-        } else {
+        if (vo.getPosition().equals(PositionConstant.MASTER)) {
             tokenName = JwtClaimsConstant.ADMIN_ID;
+        } else {
+            tokenName = JwtClaimsConstant.USER_ID;
         }
         //登录成功后，生成jwt令牌
         Map<String, Object> claims = new HashMap<>();

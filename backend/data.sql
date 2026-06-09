@@ -86,4 +86,5 @@ create table student_file
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
 
-;
+insert into student_file(id, student_id, original_name, object_name, file_url, file_size, file_type, create_date_time) value
+    (1,1,'1','a','https://api.dicebear.com/10.x/thumbs/svg?seed=fadsvfewtzxcv',1,'image/png','2026-06-09 14:32:41');
