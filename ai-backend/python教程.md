@@ -351,7 +351,7 @@ def count_up_to(n: int):
 for num in count_up_to(5):
     print(num)           # 1 2 3 4 5
 
-# 在 ai4.py 中，SSE 流式响应就是靠 yield：
+# 在 Agent.py 中，SSE 流式响应就是靠 yield：
 async def _stream_chat(question, thread_id):
     while True:
         data = await queue.get()

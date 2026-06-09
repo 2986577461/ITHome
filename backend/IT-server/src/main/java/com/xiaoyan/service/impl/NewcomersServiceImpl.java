@@ -38,9 +38,9 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
         implements NewcomersService {
 
     private static final BCryptPasswordEncoder ENCODER = new BCryptPasswordEncoder();
+    private final UsersServiceImpl usersServiceImpl;
 
     private StringRedisTemplate stringRedisTemplate;
-    private NewcomerMapper newcomerMapper;
     private TransactionTemplate transactionTemplate;
     private RedisUtil redisUtil;
     private UserMapper userMapper;
@@ -73,7 +73,10 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
             student.setPosition(PositionConstant.STUDENT);
             student.setArticleCount(0);
             student.setResourceCount(0);
+            student.setAvatarId(1L);
+
             userMapper.insert(student);
+
             stringRedisTemplate.opsForHash().put(CACHE_STUDENTS,
                     String.valueOf(studentId), JSONUtil.toJsonStr(student));
             return null;
