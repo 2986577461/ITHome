@@ -269,6 +269,12 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
 from langchain_core.tools import tool
 
 
+@tool
+def get_current_time() -> str:
+    """获取当前系统时间，返回 ISO 格式的日期时间字符串。当用户询问当用户提到"昨天、今年，上个月"等关键词时调用"""
+    return datetime.now().isoformat()
+
+
 def _make_search_knowledge_base(user_id: str):
     """为指定用户创建知识库检索工具，仅检索该用户上传的文档。"""
     @tool
@@ -647,7 +653,7 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = ""):
         try:
             agent = create_agent(
                 model=model,
-                tools=[_make_search_knowledge_base(user_id), web_search],
+                tools=[get_current_time, _make_search_knowledge_base(user_id), web_search],
                 checkpointer=checkpointer,
                 system_prompt=load_system_prompt(),
             )
