@@ -73,6 +73,9 @@ const handleSubmit = async () => {
       localStorage.setItem("authorization", resp.data.token);
       visibleStore.offVisible();
       userStore.setUser(resp.data);
+      setTimeout(function () {
+        window.location.reload();
+      }, 800);
     } else {
       ElMessage.error("账号或密码错误");
     }
