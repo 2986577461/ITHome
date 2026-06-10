@@ -1,5 +1,6 @@
 package com.xiaoyan.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.MessageConstant;
@@ -38,7 +39,6 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
         implements NewcomersService {
 
     private static final BCryptPasswordEncoder ENCODER = new BCryptPasswordEncoder();
-    private final UsersServiceImpl usersServiceImpl;
 
     private StringRedisTemplate stringRedisTemplate;
     private TransactionTemplate transactionTemplate;
@@ -67,8 +67,7 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
             this.removeById(id);
             stringRedisTemplate.opsForHash().delete(CACHE_NEWCOMERS, String.valueOf(id));
 
-            Student student = new Student();
-            BeanUtils.copyProperties(newcomer, student, "id");
+            Student student = BeanUtil.toBean(newcomer, Student.class);
             student.setPassword(ENCODER.encode(PasswordConstant.STUDENT_PASSWORD));
             student.setPosition(PositionConstant.STUDENT);
             student.setArticleCount(0);

@@ -17,3 +17,5 @@ ai-backend/.claude
 /frontend/.vscode/
 .DS_Store
 **/.DS_Store
+frontend/dist/
+ai-backend/__pycache__/

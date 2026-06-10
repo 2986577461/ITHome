@@ -60,7 +60,6 @@ public class UsersController {
     @Operation(summary = "账号密码登录")
     public Result<StudentVO> login(@RequestBody @Valid LoginDTO message) {
         log.info("用户登录{}", message);
-        StudentVO studentVO = userService.login(message);
-        return Result.success(studentVO);
+        return userService.login(message);
     }
 }
