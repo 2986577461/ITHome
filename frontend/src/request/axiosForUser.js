@@ -16,8 +16,6 @@ export const update = async (studentMessage) =>
 export const updatePassword = async (resetPassword) =>
   axiosInstance.put("user/users", { password: resetPassword });
 
-export const getUserList = async () => axiosInstance.get("user/chat");
-
 // 上传头像
 export function uploadAvatar(formData) {
   return axiosInstance.post("user/users/avatar", formData, {

@@ -1,6 +1,5 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import { useUserStore } from "@/stores/user.js";
-import { ElMessage } from "element-plus";
 
 const router = createRouter({
   history: createWebHashHistory(),

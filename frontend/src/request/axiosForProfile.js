@@ -1,9 +1,6 @@
 import request from "./axiosInit.js";
 
-// 获取用户详情
-export function getUserDetail() {
-  return request.get("/user/users/profile");
-}
+
 
 // 更新用户信息
 export function updateProfile(data) {

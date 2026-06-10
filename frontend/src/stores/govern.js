@@ -16,8 +16,5 @@ export const useGovernStore = defineStore("govern", {
     toggleAdd() {
       this.addStudentVisible = !this.addStudentVisible;
     },
-    hasNewcomers() {
-      return this.newcomers.length > 0;
-    },
   },
 });
