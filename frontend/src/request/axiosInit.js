@@ -18,7 +18,6 @@ axiosInstance.interceptors.response.use(
     if (error.response?.status === 401) {
       const token = localStorage.getItem("authorization");
       ElMessage.error(token ? "身份验证失败，请重新登录!" : "请登录后再尝试!");
-      localStorage.removeItem("authorization");
     }
     return Promise.reject(error);
   },

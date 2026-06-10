@@ -1,7 +1,5 @@
 import axiosInstance from "./axiosInit.js";
 
-export const healthCheck = () => axiosInstance.get("/health");
-
 export const getConversations = () => axiosInstance.get("/api/conversations");
 
 export const getMessages = (threadId) =>

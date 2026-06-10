@@ -61,11 +61,4 @@ onMounted(async () => {
 </style>
 
 <style>
-.page-enter-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-.page-enter-from {
-  opacity: 0;
-  transform: translateY(6px);
-}
 </style>
