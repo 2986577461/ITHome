@@ -186,13 +186,6 @@
                 <option value="6">H6</option>
                 <option value="7">H7</option>
               </select>
-              <input
-                type="color"
-                class="color-picker"
-                @change="setColor"
-                title="文字颜色"
-                value="#1d1d1f"
-              />
             </div>
 
             <span class="toolbar-divider"></span>
@@ -354,9 +347,6 @@ function setFontSize(level) {
     return;
   }
   e.chain().focus().toggleHeading({ level: lv }).run();
-}
-function setColor(e) {
-  applyInline("span", 'style="color:' + e.target.value + '"');
 }
 
 const types = [
@@ -726,22 +716,6 @@ form {
 }
 .font-size-select:focus {
   border-color: var(--color-accent);
-}
-.color-picker {
-  width: 28px;
-  height: 28px;
-  border: 1.5px solid var(--color-border);
-  border-radius: 6px;
-  cursor: pointer;
-  padding: 2px;
-  background: var(--color-surface);
-}
-.color-picker::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-.color-picker::-webkit-color-swatch {
-  border-radius: 3px;
-  border: none;
 }
 
 /* ── Editor ── */

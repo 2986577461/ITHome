@@ -77,7 +77,8 @@
               <h2 class="ac-title">{{ a.head }}</h2>
               <div class="ac-meta">
                 <span class="ac-author">
-                  <span class="ac-avatar">{{ (a.name || "?")[0] }}</span>
+                  <img v-if="a.avatar" :src="a.avatar" class="ac-avatar" />
+                  <span v-else class="ac-avatar">{{ (a.name || "?")[0] }}</span>
                   {{ a.name }}
                 </span>
                 <span>{{ fmtDate(a.updatedDateTime) }}</span>
@@ -654,7 +655,7 @@ onMounted(async () => {
 }
 .ac-title {
   font-family: var(--font-heading);
-  font-size: 26px;
+  font-size: 38px;
   font-weight: 700;
   margin-bottom: 12px;
 }
@@ -662,7 +663,7 @@ onMounted(async () => {
   display: flex;
   gap: 16px;
   align-items: center;
-  font-size: 15px;
+  font-size: 18px;
   color: var(--color-text-secondary);
   margin-bottom: 18px;
 }
@@ -672,9 +673,10 @@ onMounted(async () => {
   gap: 6px;
 }
 .ac-avatar {
-  width: 22px;
-  height: 22px;
+  width: 33px;
+  height: 33px;
   border-radius: 50%;
+  object-fit: cover;
   background: var(--color-accent);
   color: #fff;
   display: flex;
@@ -685,7 +687,7 @@ onMounted(async () => {
 }
 .ac-body {
   line-height: 1.9;
-  font-size: 17px;
+  font-size: 24px;
   word-wrap: break-word;
   color: var(--color-text-secondary);
 }

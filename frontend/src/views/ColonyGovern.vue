@@ -166,7 +166,8 @@
             @click="toggleSelect(i)"
           >
             <span class="gr-name">
-              <span class="gr-avatar">{{ (s.name || "?")[0] }}</span>
+              <img v-if="s.avatar" :src="s.avatar" class="gr-avatar" />
+              <span v-else class="gr-avatar">{{ (s.name || "?")[0] }}</span>
               {{ s.name }}
             </span>
             <span class="gr-id">{{ s.studentId }}</span>
@@ -504,6 +505,7 @@ onMounted(async function () {
   width: 32px;
   height: 32px;
   border-radius: 50%;
+  object-fit: cover;
   background: linear-gradient(
     135deg,
     var(--color-accent),

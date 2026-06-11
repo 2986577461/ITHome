@@ -42,6 +42,7 @@
               </div>
               <p class="res-desc">{{ r.introduce }}</p>
               <div class="res-meta">
+                <img v-if="r.avatar" :src="r.avatar" class="res-avatar" />
                 <span class="res-author">{{ r.studentName }}</span>
                 <span class="res-time">{{ fmtDate(r.releaseDateTime) }}</span>
               </div>
@@ -226,6 +227,7 @@ onMounted(async function(){
   display: flex; gap: 16px; align-items: center; font-size: 13px;
   color: var(--color-text-tertiary); padding-top: 12px; border-top: 1px solid var(--color-border);
 }
+.res-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .res-author { font-weight: 500; color: var(--color-text-secondary); }
 .res-dl {
   display: inline-flex; align-items: center; gap: 8px;
