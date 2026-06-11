@@ -14,6 +14,6 @@ public interface NewcomersService {
 
     void applyJoin(Newcomer newComer);
 
-    List<NewcomerVO> getAll();
+    List<Newcomer> getAll();
 
 }

@@ -40,6 +40,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
 
@@ -62,24 +65,24 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public StudentVO getUser(Integer studentId) {
-        try {
-            Student student = redisUtil.queryHashWithMutex(CACHE_STUDENTS, String.valueOf(studentId),
-                    Student.class, id -> this.lambdaQuery().eq(Student::getStudentId, id).one());
-            if (student == null) {
-                return null;
-            }
-            StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
-            Long avatarId = student.getAvatarId();
-            if (avatarId != null) {
-                StudentFile avatar = studentFileMapper.selectById(avatarId);
-                if (avatar != null) {
-                    vo.setAvatar(avatar.getFileUrl());
-                }
-            }
-            return vo;
-        } catch (RuntimeException e) {
-            throw new RuntimeException(e);
+        return redisUtil.queryHashWithMutex(CACHE_STUDENTS, String.valueOf(studentId),
+                StudentVO.class, id -> this.queryStudentFromDB(studentId));
+    }
+
+    public StudentVO queryStudentFromDB(Integer studentId) {
+        Student student = userMapper.selectByStudentId(studentId);
+        if (student == null) {
+            return null;
         }
+        StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
+        Long avatarId = student.getAvatarId();
+        if (avatarId != null) {
+            StudentFile avatar = studentFileMapper.selectById(avatarId);
+            if (avatar != null) {
+                vo.setAvatar(avatar.getFileUrl());
+            }
+        }
+        return vo;
     }
 
     public void uploadAvatar(MultipartFile avatar) throws IOException {
@@ -167,14 +170,13 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     public Result<StudentVO> login(LoginDTO message) {
         Integer studentId = message.getStudentId();
         String password = message.getPassword();
-        Student student = redisUtil.queryHashWithMutex(CACHE_STUDENTS,
-                String.valueOf(studentId), Student.class, id -> this.lambdaQuery().
-                        eq(Student::getStudentId, Integer.valueOf(id)).one());
+        Student student = userMapper.selectByStudentId(studentId);
+
         if (student == null) {
-           return Result.error(MessageConstant.ACCOUNT_NOT_FOUND);
+            return Result.error(MessageConstant.ACCOUNT_NOT_FOUND);
         }
         if (!ENCODER.matches(password, student.getPassword())) {
-           return Result.error(MessageConstant.PASSWORD_ERROR);
+            return Result.error(MessageConstant.PASSWORD_ERROR);
         }
         StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
 
@@ -206,8 +208,34 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public List<StudentVO> getAll() {
-        return redisUtil.getAllWithHashCache(CACHE_STUDENTS,
-                this::count, this.query()::list, Student.class, StudentVO.class);
+        return redisUtil.getAllWithHashCache(CACHE_STUDENTS, this::count, this::queryStudentsFromDB, StudentVO.class);
+    }
+
+    public List<StudentVO> queryStudentsFromDB() {
+        List<Student> list = this.list();
+
+        // 收集所有非空 avatarId
+        Set<Long> avatarIds = list.stream()
+                .map(Student::getAvatarId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // 批量查头像，构建 id -> url 映射
+        Map<Long, String> avatarUrlMap = new HashMap<>();
+        if (!avatarIds.isEmpty()) {
+            studentFileMapper.selectBatchIds(avatarIds)
+                    .forEach(file -> avatarUrlMap.put(file.getId(), file.getFileUrl()));
+        }
+
+        // Student → StudentVO，填入头像 URL
+        return list.stream().map(student -> {
+            StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
+            Long avatarId = student.getAvatarId();
+            if (avatarId != null) {
+                vo.setAvatar(avatarUrlMap.get(avatarId));
+            }
+            return vo;
+        }).toList();
     }
 
     @Override

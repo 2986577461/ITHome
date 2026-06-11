@@ -17,8 +17,11 @@ import com.xiaoyan.pojo.Student;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.ArticlesService;
 import com.xiaoyan.service.CommonService;
+import com.xiaoyan.service.UsersService;
+import com.xiaoyan.utils.RedisUtil;
 import com.xiaoyan.vo.ArticleImageVO;
 import com.xiaoyan.vo.ArticleVO;
+import com.xiaoyan.vo.StudentVO;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import org.springframework.data.redis.core.DefaultTypedTuple;
@@ -52,6 +55,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
      * ZSET缓存最多保留的文章数
      */
     public static final int MAX_CACHE_SIZE = 50;
+    private final UsersService usersService;
     private ArticleMapper articleMapper;
     private UserMapper userMapper;
     private StringRedisTemplate stringRedisTemplate;
@@ -83,7 +87,10 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
         // 增量更新ZSET：加入新文章，裁剪到50条（末位淘汰）
         ArticleVO vo = BeanUtil.toBean(article, ArticleVO.class);
-        vo.setName(userMapper.selectNameByStudentId(studentId));
+        StudentVO user = usersService.getUser(studentId);
+        vo.setName(user.getName());
+        vo.setAvatar(user.getAvatar());
+
         stringRedisTemplate.opsForZSet().add(CACHE_ARTICLES,
                 JSONUtil.toJsonStr(vo), vo.getScore());
         stringRedisTemplate.opsForZSet().removeRange(CACHE_ARTICLES, 0, -(MAX_CACHE_SIZE + 1));
@@ -120,7 +127,6 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         if (end < MAX_CACHE_SIZE) {
             result = getPageFromCache(start, end, type, size);
             if (result != null && result.size() == size) {
-//                fillImageUrls(result);  // 缓存不存imageUrls，这里补填
                 return result;
             }
 
@@ -128,14 +134,12 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
                 buildLatestCache(null);
                 result = getPageFromCache(start, end, null, size);
                 if (result != null && result.size() == size) {
-//                    fillImageUrls(result);
                     return result;
                 }
             }
         }
         // 不在缓存范围内 / 缓存不够 → 数据库兜底
         result = queryPageFromDB(start, type, size);
-//        fillImageUrls(result);
         return result;
     }
 
@@ -218,24 +222,12 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         stringRedisTemplate.expire(CACHE_ARTICLES, 2, TimeUnit.HOURS);
     }
 
-    /**
-     * 直接查数据库分页，<b>不写 Redis</b>。
-     *
-     * <p>跟 {@link #buildLatestCache} 的区别：不构建 ZSET，直接返回。
-     *
-     * @param start 分页偏移（同 LIMIT offset）
-     * @param type  null=全部
-     * @param size  取多少条
-     */
+
     private List<ArticleVO> queryPageFromDB(int start, Integer type, int size) {
         List<Article> list = articleMapper.selectPage(start, type, size);
         return toArticleVOList(list);
     }
 
-    /**
-     * Article 列表 → ArticleVO 列表，并批量填入学生姓名（1次SQL）。
-     * <p>不填 imageUrls，由调用方按需批量填充。</p>
-     */
     private List<ArticleVO> toArticleVOList(List<Article> articles) {
         if (articles == null || articles.isEmpty()) {
             return List.of();
@@ -250,9 +242,19 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         // 批量查姓名
         if (!studentIds.isEmpty()) {
             Map<Integer, String> nameMap = new HashMap<>();
-            List<Student> students = userMapper.selectByStudentIds(studentIds);
-            students.forEach(s -> nameMap.put(s.getStudentId(), s.getName()));
-            vos.forEach(vo -> vo.setName(nameMap.get(vo.getStudentId())));
+            Map<Integer, String> avatarMap = new HashMap<>();
+
+            List<StudentVO> students = usersService.getAll().stream()
+                    .filter(vo -> studentIds.contains(vo.getStudentId())).toList();
+
+            students.forEach(vo -> {
+                nameMap.put(vo.getStudentId(), vo.getName());
+                avatarMap.put(vo.getStudentId(), vo.getAvatar());
+            });
+            vos.forEach(vo -> {
+                vo.setName(nameMap.get(vo.getStudentId()));
+                vo.setAvatar(avatarMap.get(vo.getStudentId()));
+            });
         }
 
         return vos;

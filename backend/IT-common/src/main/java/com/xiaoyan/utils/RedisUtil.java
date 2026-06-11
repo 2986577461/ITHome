@@ -267,11 +267,10 @@ public class RedisUtil {
         stringRedisTemplate.delete(key);
     }
 
-    public <P extends HashCacheId, T> List<T> getAllWithHashCache(String cacheKey,
+    public <P extends HashCacheId> List<P> getAllWithHashCache(String cacheKey,
                                                                                          Supplier<Long> countSupplier,
                                                                                          Supplier<List<P>> dbFallback,
-                                                                                         Class<P> pojoType,
-                                                                                         Class<T> targetType) {
+                                                                                         Class<P> pojoType) {
         // 1. 获取缓存总数
         long count = countSupplier.get();
 
@@ -281,11 +280,7 @@ public class RedisUtil {
         // 3. 校验缓存，如果数量匹配，则返回缓存数据
         if (caches.size() == count) {
             return caches.stream()
-                    .map(o -> {
-                        P p= JSONUtil.toBean((String) o, pojoType);
-                        System.out.println(p);
-                        return BeanUtil.toBean(p, targetType);
-                    })
+                    .map(o -> JSONUtil.toBean((String) o, pojoType))
                     .toList();
         }
 
@@ -298,9 +293,6 @@ public class RedisUtil {
         list.forEach(p -> map.put(p.getCacheId(), JSONUtil.toJsonStr(p)));
         stringRedisTemplate.opsForHash().putAll(cacheKey, map);
 
-        // 6. 返回数据
-        return list.stream()
-                .map(p -> BeanUtil.toBean(p, targetType))
-                .toList();
+       return list;
     }
 }

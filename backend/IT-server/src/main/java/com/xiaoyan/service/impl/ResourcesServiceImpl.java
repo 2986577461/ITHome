@@ -1,5 +1,6 @@
 package com.xiaoyan.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.MessageConstant;
@@ -9,9 +10,10 @@ import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.mapper.UserMapper;
 import com.xiaoyan.service.CommonService;
 import com.xiaoyan.service.ResourcesService;
+import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.RedisUtil;
+import com.xiaoyan.vo.StudentVO;
 import lombok.AllArgsConstructor;
-import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import com.xiaoyan.dto.ResourcesDTO;
@@ -38,6 +40,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     private ResourcesMapper resourcesMapper;
     private StringRedisTemplate stringRedisTemplate;
     private UserMapper userMapper;
+    private UsersService usersService;
     private RedisUtil redisUtil;
     private CommonService commonService;
 
@@ -45,36 +48,41 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
     @Override
     public Long getCount() {
-        return redisUtil.queryCountWithLogicalExpire(CACHE_COUNT_RESOURCES, this::count);
+        return this.count();
     }
 
     @Override
     public List<ResourcesVO> getList() {
-        List<Resources> list = redisUtil.getAllWithHashCache(CACHE_RESOURCES, this::count, query()::list,
-                Resources.class, Resources.class);
+        List<ResourcesVO> list = redisUtil.getAllWithHashCache(CACHE_RESOURCES, this::count, this::queryResourcesByDB,
+                ResourcesVO.class);
+
+        return list.stream().toList();
+    }
+
+    private List<ResourcesVO> queryResourcesByDB() {
+        List<Resources> list = this.list();
 
         return list.stream().map(r -> {
-            Long studentFileCoverId = r.getStudentFileCoverId();
-            Long studentFileFileId = r.getStudentFileFileId();
-            Integer studentId = r.getStudentId();
+            ResourcesVO rvo = BeanUtil.toBean(r, ResourcesVO.class);
 
-            ResourcesVO resourcesVO = new ResourcesVO();
-
-            StudentFile cover = studentFileMapper.selectById(studentFileCoverId);
+            StudentFile cover = studentFileMapper.selectById(r.getStudentFileCoverId());
             if (cover != null) {
-                resourcesVO.setCoverUrl(cover.getFileUrl());
+                rvo.setCoverUrl(cover.getFileUrl());
             }
-            StudentFile file = studentFileMapper.selectById(studentFileFileId);
+            StudentFile file = studentFileMapper.selectById(r.getStudentFileFileId());
             if (file != null) {
-                resourcesVO.setFileUrl(file.getFileUrl());
-                resourcesVO.setFileName(file.getOriginalName());
-                resourcesVO.setStudentName(userMapper.selectNameByStudentId(studentId));
-                resourcesVO.setObjectName(file.getObjectName());
+                rvo.setFileUrl(file.getFileUrl());
+                rvo.setFileName(file.getOriginalName());
+                rvo.setObjectName(file.getObjectName());
             }
-
-            BeanUtils.copyProperties(r, resourcesVO);
-            return resourcesVO;
+            StudentVO vo = usersService.getUser(r.getStudentId());
+            if (vo != null) {
+                rvo.setAvatar(vo.getAvatar());
+                rvo.setStudentName(vo.getName());
+            }
+            return rvo;
         }).toList();
+
     }
 
     @Override

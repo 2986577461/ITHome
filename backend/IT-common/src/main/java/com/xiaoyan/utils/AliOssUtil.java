@@ -105,20 +105,6 @@ public class AliOssUtil {
         return stringBuilder.toString();
     }
 
-    /**
-     * 批量上传文件到 OSS。
-     *
-     * @param tasks objectName → bytes 的映射（使用 LinkedHashMap 可保序）
-     * @return 对应的 URL 列表（与输入顺序一致）
-     */
-    public List<String> batchUpload(Map<String, byte[]> tasks) {
-        List<String> urls = new ArrayList<>();
-        tasks.forEach((objectName, bytes) -> {
-            urls.add(upload(bytes, objectName));
-        });
-        return urls;
-    }
-
     public String getDownloadUrl(String objectName, String friendlyName, Long expirationMillis) {
         // 创建GeneratePresignedUrlRequest对象
         GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(bucketName, objectName);

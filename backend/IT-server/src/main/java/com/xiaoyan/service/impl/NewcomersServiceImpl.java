@@ -98,9 +98,9 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
     }
 
     @Override
-    public List<NewcomerVO> getAll() {
+    public List<Newcomer> getAll() {
         return redisUtil.getAllWithHashCache(CACHE_NEWCOMERS, this::count,
-                this.query()::list, Newcomer.class, NewcomerVO.class);
+                this.query()::list, Newcomer.class);
     }
 
     @Override

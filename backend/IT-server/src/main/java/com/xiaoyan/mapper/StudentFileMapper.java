@@ -9,12 +9,10 @@ import org.apache.ibatis.annotations.Update;
 import com.xiaoyan.pojo.StudentFile;
 
 import java.util.List;
+import java.util.Set;
 
 @Mapper
 public interface StudentFileMapper extends BaseMapper<StudentFile> {
-
-    @Update("update student_file set deleted=1 where object_name=#{objectName} and deleted=0")
-    void deleteByObjectName(String objectName);
 
     /** 批量软删除 student_file */
     @Update("<script>" +

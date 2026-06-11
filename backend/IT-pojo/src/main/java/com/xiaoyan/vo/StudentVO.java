@@ -1,6 +1,7 @@
 package com.xiaoyan.vo;
 
 
+import com.xiaoyan.baseinterface.HashCacheId;
 import lombok.Data;
 import lombok.ToString;
 
@@ -8,7 +9,7 @@ import java.io.Serializable;
 
 @Data
 @ToString
-public class StudentVO implements Serializable {
+public class StudentVO implements Serializable, HashCacheId {
 
     private Long id;
 
@@ -33,4 +34,9 @@ public class StudentVO implements Serializable {
     private String avatar;
 
     private String token;
+
+    @Override
+    public String getCacheId() {
+        return String.valueOf(this.id);
+    }
 }

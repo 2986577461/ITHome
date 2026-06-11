@@ -1,5 +1,6 @@
 package com.xiaoyan.controller.admin;
 
+import com.xiaoyan.pojo.Newcomer;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.NewcomersService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -44,9 +45,9 @@ public class NewcomersController {
 
     @GetMapping
     @Operation(summary = "获取所有申请")
-    public Result<List<NewcomerVO>> getnewcomers() {
+    public Result<List<Newcomer>> getnewcomers() {
         log.info("获取所有申请");
-        List<NewcomerVO> list = memberService.getAll();
+        List<Newcomer> list = memberService.getAll();
         return Result.success(list);
     }
 }

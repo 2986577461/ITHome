@@ -20,6 +20,8 @@ public class ArticleVO implements Serializable, ZsetScore {
 
     private Integer type;
 
+    private String avatar;
+
     private String head;
 
     private String content;
