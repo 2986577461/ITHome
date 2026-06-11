@@ -40,10 +40,11 @@
 3. ws
 
 **工具说明**：
-- **search_knowledge_base**：检索本地知识库中用户上传的文档。。
+- **search_knowledge_base**：检索本地知识库中用户上传的文档。
 - **get_user_identity**：从协会业务系统获取当前登录用户的身份（姓名、学号、职位等）。
 - **web_search**：上网查询实时/公开信息。
-- **get_current_time**：获取当前系统时间。。
+- **get_current_time**：获取当前系统时间。
+- **publish_article**：在协会网站上发表技术文章。用户说"帮我发一篇文章"、"发表文章"、"写篇文章发出去"时调用。type 分类：1=c/c++, 2=前端, 3=数据结构与算法, 4=mysql数据库, 5=java, 6=python/AI。content 必须用 HTML 标签（<h1>-<h7>, <p>, <strong>, <em>, <ul><li>, <ol><li>, <pre class=\"code-block\"><code>, <a>），代码必须 <pre class=\"code-block\"><code>...</code></pre> 包裹。
 
 **重要**：
 - 调用kb之前，用一句话告知用户你在做什么，例如"让我查一下知识库"、"我去查一下知识库"等。

@@ -97,6 +97,59 @@ def get_user_identity(config: RunnableConfig) -> str:
     return f"获取用户信息失败: {result.get('data', '未知错误')}"
 
 
+# 发表文章工具（调用业务模块 localhost:8080）
+from pydantic import BaseModel as PydanticBaseModel
+
+
+class ArticleInput(PydanticBaseModel):
+    """发表文章的参数结构，供 LLM 填充"""
+    type: int = Field(..., description="文章类型编号：1=c/c++, 2=前端, 3=数据结构与算法, 4=mysql数据库, 5=java, 6=python/AI")
+    head: str = Field(..., description="文章标题，15字以内")
+    content: str = Field(
+        ...,
+        description=(
+            "文章正文 HTML。支持的标签：<h1>~<h7> 标题, <p> 段落, <strong> 加粗, <em> 倾斜, "
+            "<ul><li> 无序列表, <ol><li> 有序列表, <pre class=\"code-block\"><code> 代码块, "
+            "<a target=\"_blank\" href=\"...\"> 链接。"
+            "段落对齐用 style=\"text-align: left/right/center\"。"
+            "代码块必须严格按 <pre class=\"code-block\"><code>代码...</code></pre> 格式，代码内换行用 \\n。"
+            "必须严格使用这些标签，不得自创任何其他标签或属性。"
+        ),
+    )
+
+
+@langchain_tool(args_schema=ArticleInput)
+def publish_article(type: int, head: str, content: str, config: RunnableConfig) -> str:
+    """
+    帮用户在协会网站上发表一篇技术文章。
+    当用户说"帮我发一篇文章"、"发表文章"、"写一篇文章发出去"、"发布"等时调用。
+    type 根据文章主题判断：1=c/c++, 2=前端, 3=数据结构与算法, 4=mysql数据库, 5=java, 6=python/AI
+    content 必须是严格 HTML，只允许 <h1>-<h7>, <p>, <strong>, <em>, <ul><li>, <ol><li>,
+    <pre class=\"code-block\"><code>, <a target=\"_blank\" href=\"...\">, style=\"text-align:left/right/center\"。
+    发布的内容按照"语气与态度"一栏的要求
+    """
+    import asyncio as _asyncio
+    from business_client import business_client
+
+    runtime = config.get("configurable", {})
+    token = runtime.get("token", "")
+    if not token:
+        return "发布失败：未登录，无法获取身份凭据"
+
+    # agent.stream() 是同步调用，但 business_client 是 async，用 asyncio.run 桥接
+    async def _fetch():
+        return await business_client.post(
+            "/user/articles",
+            json_data={"type": type, "head": head, "content": content},
+            token=token,
+        )
+
+    result = _asyncio.run(_fetch())
+    if result.get("ok"):
+        return f"文章《{head}》发布成功！{result['data']}"
+    return f"发布失败: {result.get('data', result)}"
+
+
 # 对话模型（API Key 从环境变量 DEEPSEEK_API_KEY 自动读取）
 model = init_chat_model(model="deepseek-v4-flash")
 
@@ -222,7 +275,7 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
         try:
             agent = create_agent(
                 model=model,
-                tools=[get_current_time, _make_search_knowledge_base(user_id), web_search, get_user_identity],
+                tools=[get_current_time, _make_search_knowledge_base(user_id), web_search, get_user_identity, publish_article],
                 checkpointer=checkpointer,
                 system_prompt=load_system_prompt(),
             )
@@ -312,7 +365,7 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
                 try:
                     fallback_agent = create_agent(
                         model=model,
-                        tools=[get_current_time, _make_search_knowledge_base(user_id), web_search, get_user_identity],
+                        tools=[get_current_time, _make_search_knowledge_base(user_id), web_search, get_user_identity, publish_article],
                         checkpointer=checkpointer,
                         system_prompt=load_system_prompt(),
                     )
