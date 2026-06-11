@@ -305,7 +305,7 @@ const myResources = ref([]);
 
 function typeLabel(t) {
   return (
-    { 1: "C语言", 2: "HTML", 3: "CSS", 4: "JavaScript", 5: "Java", 6: "MySQL" }[
+    { 1: "C/C++", 2: "前端", 3: "数据结构与算法", 4: "MySQL数据库", 5: "Java", 6: "Python/AI" }[
       String(t)
     ] || "其他"
   );

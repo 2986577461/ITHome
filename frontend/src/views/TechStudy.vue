@@ -8,7 +8,7 @@
       <div class="section-inner">
         <div class="pill">技术教学</div>
         <h1>学习资源库</h1>
-        <p>C语言 · HTML · CSS · JavaScript · Java · MySQL</p>
+        <p>C/C++ · 前端 · 数据结构与算法 · MySQL数据库 · Java · Python/AI</p>
       </div>
     </div>
 
@@ -313,12 +313,12 @@ const userStore = useUserStore();
 const articleStore = useArticleStore();
 
 const groups = [
-  { key: "1", label: "C语言" },
-  { key: "2", label: "HTML" },
-  { key: "3", label: "CSS" },
-  { key: "4", label: "JavaScript" },
+  { key: "1", label: "C/C++" },
+  { key: "2", label: "前端" },
+  { key: "3", label: "数据结构与算法" },
+  { key: "4", label: "MySQL数据库" },
   { key: "5", label: "Java" },
-  { key: "6", label: "MySQL" },
+  { key: "6", label: "Python/AI" },
 ];
 const articles = ref([]);
 const activeCat = ref("all");
@@ -378,9 +378,14 @@ function fmtDate(d) {
 }
 function typeLabel(t) {
   return (
-    { 1: "C语言", 2: "HTML", 3: "CSS", 4: "JavaScript", 5: "Java", 6: "MySQL" }[
-      String(t)
-    ] || "其他"
+    {
+      1: "C/C++",
+      2: "前端",
+      3: "数据结构与算法",
+      4: "MySQL数据库",
+      5: "Java",
+      6: "Python/AI",
+    }[String(t)] || "其他"
   );
 }
 
@@ -610,7 +615,7 @@ onMounted(async () => {
 .article-card {
   background: var(--color-surface);
   border-radius: var(--radius-md);
-  padding: 28px;
+  padding: 28px 60px;
   margin-bottom: 20px;
   border: 1px solid var(--color-border);
   transition: box-shadow 0.2s;
@@ -687,7 +692,7 @@ onMounted(async () => {
 }
 .ac-body {
   line-height: 1.9;
-  font-size: 24px;
+  font-size: 26px;
   word-wrap: break-word;
   color: var(--color-text-secondary);
 }
@@ -698,10 +703,26 @@ onMounted(async () => {
 }
 .ac-body :deep(pre) {
   overflow-x: auto;
-  background: #f4f4f6;
-  padding: 14px;
-  border-radius: 8px;
-  font-size: 13px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  padding: 18px 22px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 18px 0;
+  font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+}
+.ac-body :deep(code) {
+  background: rgba(0,0,0,.05);
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: .88em;
+  font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+}
+.ac-body :deep(pre code) {
+  background: none;
+  padding: 0;
+  font-size: 20px;
 }
 
 .ac-interact {

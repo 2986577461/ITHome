@@ -259,7 +259,11 @@
 
           <!-- Editor -->
           <div class="editor-area">
-            <editor-content :editor="editor" class="rich-editor" />
+            <editor-content
+              :editor="editor"
+              class="rich-editor"
+              @keydown.tab.prevent="insertTab"
+            />
           </div>
 
           <input
@@ -350,12 +354,12 @@ function setFontSize(level) {
 }
 
 const types = [
-  { label: "C语言", value: "1" },
-  { label: "HTML", value: "2" },
-  { label: "CSS", value: "3" },
-  { label: "JavaScript", value: "4" },
+  { label: "C/C++", value: "1" },
+  { label: "前端", value: "2" },
+  { label: "数据结构与算法", value: "3" },
+  { label: "MySQL数据库", value: "4" },
   { label: "Java", value: "5" },
-  { label: "MySQL", value: "6" },
+  { label: "Python/AI", value: "6" },
 ];
 
 const article = reactive({ id: "", type: "1", head: "", content: "" });
@@ -418,6 +422,10 @@ function deleteSelectedImage() {
     pendingImages.delete(src);
   }
   editor.value.chain().focus().deleteSelection().run();
+}
+
+function insertTab() {
+  editor.value?.chain().focus().insertContent("        ").run();
 }
 
 function insertImage() {
@@ -608,7 +616,7 @@ onMounted(() => {
   overflow: hidden;
 }
 .editor-wrap {
-  max-width: 960px;
+  max-width: 1080px;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -735,7 +743,7 @@ form {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
-  font-size: 17px;
+  font-size: 20px;
   line-height: 1.9;
   cursor: text;
   font-family: var(--font-body);
@@ -861,7 +869,7 @@ form {
 .rich-editor :deep(pre code) {
   background: none;
   padding: 0;
-  font-size: 14px;
+  font-size: 20px;
 }
 .rich-editor :deep(blockquote) {
   border-left: 3px solid var(--color-accent);

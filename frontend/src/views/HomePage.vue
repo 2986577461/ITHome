@@ -139,7 +139,7 @@ const features = [
   {
     icon: '<svg viewBox="0 0 36 36" fill="none"><rect x="4" y="6" width="28" height="24" rx="4" stroke="currentColor" stroke-width="1.5"/><path d="M14 18l3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     title: "技术教学",
-    desc: "C语言、HTML、CSS、JavaScript、Java、MySQL 系统教学",
+    desc: "C/C++、前端、数据结构与算法、MySQL数据库、Java、Python/AI 系统教学",
     to: "/tech-study",
   },
   {

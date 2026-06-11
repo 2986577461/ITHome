@@ -93,122 +93,139 @@
               :key="i"
               :class="['msg-wrap', msg.role]"
             >
+              <div class="msg-avatar">
+                <img
+                  v-if="msg.role === 'user'"
+                  :src="userStore.effectiveAvatar"
+                  alt=""
+                />
+                <img
+                  v-else
+                  :src="msg.streaming ? '/AgentAvatar.gif' : '/AgentAvatar.png'"
+                  alt="AI"
+                />
+              </div>
               <div v-if="msg.role === 'user'" class="user-bubble">
                 {{ msg.text }}
               </div>
               <template v-if="msg.role === 'ai'">
-                <div
-                  class="ai-text"
-                  v-html="renderMarkdown(kbBefore(msg))"
-                ></div>
-                <div
-                  v-if="msg.kbResults != null"
-                  class="search-link"
-                  @click="msg.kbOpen = !msg.kbOpen"
-                >
-                  Searched the knowledge base
-                  <span class="arrow" :class="{ open: msg.kbOpen }">▸</span>
-                </div>
-                <div
-                  v-if="msg.kbOpen && msg.kbResults && msg.kbResults.length > 0"
-                  class="search-dropdown"
-                >
+                <div class="msg-body">
                   <div
-                    v-for="(r, ri) in msg.kbResults"
-                    :key="ri"
-                    class="search-dropdown-item"
+                    class="ai-text"
+                    v-html="renderMarkdown(kbBefore(msg))"
+                  ></div>
+                  <div
+                    v-if="msg.kbResults != null"
+                    class="search-link"
+                    @click="msg.kbOpen = !msg.kbOpen"
+                  >
+                    Searched the knowledge base
+                    <span class="arrow" :class="{ open: msg.kbOpen }">▸</span>
+                  </div>
+                  <div
+                    v-if="
+                      msg.kbOpen && msg.kbResults && msg.kbResults.length > 0
+                    "
+                    class="search-dropdown"
+                  >
+                    <div
+                      v-for="(r, ri) in msg.kbResults"
+                      :key="ri"
+                      class="search-dropdown-item"
+                      style="cursor: default"
+                    >
+                      <div class="search-dropdown-title">{{ r.title }}</div>
+                      <div class="search-dropdown-src">{{ r.snippet }}</div>
+                    </div>
+                  </div>
+                  <div
+                    v-if="
+                      msg.kbOpen &&
+                      (!msg.kbResults || msg.kbResults.length === 0)
+                    "
+                    class="search-dropdown"
+                  >
+                    <div
+                      class="search-dropdown-item"
+                      style="
+                        cursor: default;
+                        color: var(--text-muted);
+                        font-size: 13px;
+                      "
+                    >
+                      未找到相关内容
+                    </div>
+                  </div>
+                  <div
+                    v-if="betweenText(msg)"
+                    class="ai-text"
+                    v-html="renderMarkdown(betweenText(msg))"
+                  ></div>
+                  <div
+                    v-if="msg.webResults != null && !msg.searching"
+                    class="search-link"
+                    @click="msg.webOpen = !msg.webOpen"
+                  >
+                    Searched the web
+                    <span class="arrow" :class="{ open: msg.webOpen }">▸</span>
+                  </div>
+                  <div
+                    v-if="
+                      msg.webOpen && msg.webResults && msg.webResults.length > 0
+                    "
+                    class="search-dropdown"
+                  >
+                    <a
+                      v-for="(r, ri) in msg.webResults"
+                      :key="ri"
+                      :href="r.url"
+                      target="_blank"
+                      class="search-dropdown-item"
+                      style="
+                        display: block;
+                        text-decoration: none;
+                        color: inherit;
+                      "
+                    >
+                      <div class="search-dropdown-title">{{ r.title }}</div>
+                      <div class="search-dropdown-src">
+                        {{ extractDomain(r.url) }}
+                      </div>
+                    </a>
+                  </div>
+                  <div
+                    v-if="msg.searching"
+                    class="search-link"
                     style="cursor: default"
                   >
-                    <div class="search-dropdown-title">{{ r.title }}</div>
-                    <div class="search-dropdown-src">{{ r.snippet }}</div>
-                  </div>
-                </div>
-                <div
-                  v-if="
-                    msg.kbOpen && (!msg.kbResults || msg.kbResults.length === 0)
-                  "
-                  class="search-dropdown"
-                >
-                  <div
-                    class="search-dropdown-item"
-                    style="
-                      cursor: default;
-                      color: var(--text-muted);
-                      font-size: 13px;
-                    "
-                  >
-                    未找到相关内容
-                  </div>
-                </div>
-                <div
-                  v-if="betweenText(msg)"
-                  class="ai-text"
-                  v-html="renderMarkdown(betweenText(msg))"
-                ></div>
-                <div
-                  v-if="msg.webResults != null && !msg.searching"
-                  class="search-link"
-                  @click="msg.webOpen = !msg.webOpen"
-                >
-                  Searched the web
-                  <span class="arrow" :class="{ open: msg.webOpen }">▸</span>
-                </div>
-                <div
-                  v-if="
-                    msg.webOpen && msg.webResults && msg.webResults.length > 0
-                  "
-                  class="search-dropdown"
-                >
-                  <a
-                    v-for="(r, ri) in msg.webResults"
-                    :key="ri"
-                    :href="r.url"
-                    target="_blank"
-                    class="search-dropdown-item"
-                    style="
-                      display: block;
-                      text-decoration: none;
-                      color: inherit;
-                    "
-                  >
-                    <div class="search-dropdown-title">{{ r.title }}</div>
-                    <div class="search-dropdown-src">
-                      {{ extractDomain(r.url) }}
-                    </div>
-                  </a>
-                </div>
-                <div
-                  v-if="msg.searching"
-                  class="search-link"
-                  style="cursor: default"
-                >
-                  <template v-if="msg.searchType === 'web'"
-                    >The web searching...</template
-                  >
-                  <template v-else-if="msg.searchType === 'kb'"
-                    >Searching in the knowledge base...</template
-                  >
-                  <template v-else>Searching...</template>
-                </div>
-                <div
-                  v-if="afterText(msg)"
-                  class="ai-text"
-                  v-html="renderMarkdown(afterText(msg))"
-                ></div>
-                <div class="msg-toolbar" v-if="!msg.streaming">
-                  <button class="btn-copy" @click="copyText(msg.text)">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
+                    <template v-if="msg.searchType === 'web'"
+                      >The web searching...</template
                     >
-                      <rect x="9" y="9" width="13" height="13" rx="2" />
-                      <path
-                        d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"
-                      />
-                    </svg>
-                  </button>
+                    <template v-else-if="msg.searchType === 'kb'"
+                      >Searching in the knowledge base...</template
+                    >
+                    <template v-else>Searching...</template>
+                  </div>
+                  <div
+                    v-if="afterText(msg)"
+                    class="ai-text"
+                    v-html="renderMarkdown(afterText(msg))"
+                  ></div>
+                  <div class="msg-toolbar" v-if="!msg.streaming">
+                    <button class="btn-copy" @click="copyText(msg.text)">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <rect x="9" y="9" width="13" height="13" rx="2" />
+                        <path
+                          d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </template>
             </div>
@@ -258,7 +275,8 @@
                 <textarea
                   ref="inputBox"
                   v-model="question"
-                  @keydown.enter.exact.prevent="send()"
+                  @keydown.enter.exact.prevent="handleEnter"
+                  @keydown.alt.enter.prevent="insertNewline"
                   placeholder="Write a message..."
                   :disabled="loading"
                   rows="1"
@@ -314,6 +332,7 @@
 
 <script setup>
 import { ref, reactive, nextTick, onMounted, onUnmounted } from "vue";
+import { useUserStore } from "@/stores/user";
 import { marked } from "marked";
 import {
   getConversations,
@@ -326,6 +345,7 @@ import {
 
 const CHAT_STREAM_URL = "/chat-stream";
 
+const userStore = useUserStore();
 const question = ref("");
 const messages = ref([]);
 const loading = ref(false);
@@ -522,6 +542,21 @@ function stopStream() {
     es = null;
   }
   loading.value = false;
+}
+
+let lastEnter = 0;
+function handleEnter() {
+  var now = Date.now();
+  if (now - lastEnter < 1000) {
+    send();
+    lastEnter = 0;
+  } else {
+    lastEnter = now;
+  }
+}
+function insertNewline() {
+  question.value += "\n";
+  autoResize();
 }
 
 async function send() {
@@ -865,11 +900,29 @@ onUnmounted(() => {
 }
 
 .msg-wrap {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
   margin-bottom: 24px;
 }
 .msg-wrap.user {
-  display: flex;
-  justify-content: flex-end;
+  flex-direction: row-reverse;
+}
+.msg-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.msg-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.msg-body {
+  flex: 1;
+  min-width: 0;
 }
 .user-bubble {
   background: var(--user-bubble);
@@ -884,9 +937,9 @@ onUnmounted(() => {
   line-height: 1.75;
   color: var(--text);
 }
-.ai-text hr {
+.ai-text :deep(hr) {
   border: none;
-  border-top: 1px solid #d1d5db;
+  border-top: 1px solid rgb(205, 205, 205);
   margin: 1em 0;
 }
 
