@@ -133,38 +133,38 @@ init_kb_db()
 # 三、知识库检索工具工厂
 # ============================================================
 from langchain_core.tools import tool
+from langchain_core.runnables import RunnableConfig
 
 
-def _make_search_knowledge_base(user_id: str):
-    """为指定用户创建知识库检索工具，仅检索该用户上传的文档。"""
-    @tool
-    def search_knowledge_base(query: str) -> str:
-        """
-        检索本地知识库中用户上传的文档内容。
-        用户可能通过文档告诉你个人信息（名字、背景、偏好等），
-        回答问题前必须先调用此工具查文档。
-        参数 query 可以使用关键词（2-5个词），也可以是简短的问句。
-        如果用户问"知识库里有啥"，用"全部文档"作为 query 即可。
-        """
-        if not query.strip():
-            return "查询内容为空"
+@tool
+def search_knowledge_base(query: str, config: RunnableConfig) -> str:
+    """
+    检索本地知识库中用户上传的文档内容。
+    用户可能通过文档告诉你个人信息（名字、背景、偏好等），
+    回答问题前必须先调用此工具查文档。
+    参数 query 可以使用关键词（2-5个词），也可以是简短的问句。
+    如果用户问"知识库里有啥"，用"全部文档"作为 query 即可。
+    """
+    user_id = config.get("configurable", {}).get("user_id", "")
+    if not query.strip():
+        return "查询内容为空"
 
-        # 1) 向量化查询
-        try:
-            q_vec = _embed([query])[0]
-        except Exception as e:
-            return f"查询向量化失败：{e}"
+    # 1) 向量化查询
+    try:
+        q_vec = _embed([query])[0]
+    except Exception as e:
+        return f"查询向量化失败：{e}"
 
-        # 2) 仅加载当前用户的文档 chunks
-        conn = get_kb_db()
-        try:
-            rows = conn.execute(
-                "SELECT c.doc_id, c.chunk_idx, c.content, c.embedding "
-                "FROM chunks_vec c JOIN documents d ON c.doc_id = d.id "
-                "WHERE d.user_id = ?", (user_id,)
-            ).fetchall()
-        finally:
-            conn.close()
+    # 2) 仅加载当前用户的文档 chunks
+    conn = get_kb_db()
+    try:
+        rows = conn.execute(
+            "SELECT c.doc_id, c.chunk_idx, c.content, c.embedding "
+            "FROM chunks_vec c JOIN documents d ON c.doc_id = d.id "
+            "WHERE d.user_id = ?", (user_id,)
+        ).fetchall()
+    finally:
+        conn.close()
 
         if not rows:
             return "[KB]{\"results\": []}\n---\n知识库中暂无文档，请先上传文档。"
@@ -207,10 +207,8 @@ def _make_search_knowledge_base(user_id: str):
                 "snippet": "向量未匹配，已将全部文档提供给 AI 分析",
             }]
 
-        ctx = "\n\n".join(context_parts)
-        return f"[KB]{json.dumps({'results': cards}, ensure_ascii=False)}\n---\n{ctx}"
-
-    return search_knowledge_base
+    ctx = "\n\n".join(context_parts)
+    return f"[KB]{json.dumps({'results': cards}, ensure_ascii=False)}\n---\n{ctx}"
 
 
 # ============================================================

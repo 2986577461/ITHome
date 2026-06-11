@@ -13,7 +13,6 @@ API 文档：启动后访问 http://localhost:8000/docs
 
 import asyncio
 import os
-import uuid
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -26,27 +25,20 @@ from langchain.agents import create_agent  # 创建智能体（agent）
 from langchain.chat_models import init_chat_model  # 自动识别模型提供商（DeepSeek）
 from langchain_tavily import TavilySearch  # Tavily 联网搜索工具
 from langgraph.checkpoint.sqlite import SqliteSaver  # SQLite 持久化对话状态
-from pydantic import BaseModel, Field  # 请求/响应数据校验
+from pydantic import Field  # 请求/响应数据校验
 
-# ---------- LangChain 消息类型 ----------
-
-# ============================================================
-# 一、初始化：加载环境变量 & 数据库路径
-# ============================================================
 load_dotenv()
 
 # JWT 鉴权已提取到 conversation_manager.py
 from conversation_manager import get_current_user
-
 
 DB_DIR = os.path.join(os.path.dirname(__file__), "db")
 os.makedirs(DB_DIR, exist_ok=True)
 DB_PATH = os.path.join(DB_DIR, "conversations.db")  # SQLite 数据库文件（LangGraph 用）
 SYSTEM_PROMPT_PATH = os.path.join(os.path.dirname(__file__), "SystemPrompt.md")
 
-
 # 知识库（向量化、检索、API）已提取到 knowledge_base_manager
-from knowledge_base_manager import _make_search_knowledge_base, kb_router
+from knowledge_base_manager import search_knowledge_base, kb_router
 
 
 def load_system_prompt() -> str:
@@ -68,18 +60,17 @@ web_search = TavilySearch(
     description="用于搜索实时信息",  # 告诉 LLM 这个工具何时使用
 )
 
-
 # 获取用户身份工具（调用业务模块 localhost:8080）
-from langchain_core.tools import tool as langchain_tool
+from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
 
 
-@langchain_tool
+@tool
 def get_user_identity(config: RunnableConfig) -> str:
     """
     从协会业务系统获取当前登录用户的信息（id、姓名、学号、身份、学院、专业、班级、性别、文章数量、资料数量）。
     """
-    import asyncio as _asyncio
+
     from business_client import business_client
 
     runtime = config.get("configurable", {})
@@ -91,10 +82,11 @@ def get_user_identity(config: RunnableConfig) -> str:
     async def _fetch():
         return await business_client.get_user_info(token)
 
-    result = _asyncio.run(_fetch())
-    if result.get("ok"):
-        return str(result["data"])
-    return f"获取用户信息失败: {result.get('data', '未知错误')}"
+    result = asyncio.run(_fetch())
+    # 业务模块返回 {"code":"200", "data":{studentId, name, ...}}
+    if result.get("code") == "200":
+        return str(result.get("data", {}))
+    return f"获取用户信息失败: {result.get('msg', '未知错误')}"
 
 
 # 发表文章工具（调用业务模块 localhost:8080）
@@ -103,7 +95,8 @@ from pydantic import BaseModel as PydanticBaseModel
 
 class ArticleInput(PydanticBaseModel):
     """发表文章的参数结构，供 LLM 填充"""
-    type: int = Field(..., description="文章类型编号：1=c/c++, 2=前端, 3=数据结构与算法, 4=mysql数据库, 5=java, 6=python/AI")
+    type: int = Field(...,
+                      description="文章类型编号：1=c/c++, 2=前端, 3=数据结构与算法, 4=mysql数据库, 5=java, 6=python/AI")
     head: str = Field(..., description="文章标题，15字以内")
     content: str = Field(
         ...,
@@ -118,7 +111,7 @@ class ArticleInput(PydanticBaseModel):
     )
 
 
-@langchain_tool(args_schema=ArticleInput)
+@tool(args_schema=ArticleInput)
 def publish_article(type: int, head: str, content: str, config: RunnableConfig) -> str:
     """
     帮用户在协会网站上发表一篇技术文章。
@@ -145,14 +138,14 @@ def publish_article(type: int, head: str, content: str, config: RunnableConfig) 
         )
 
     result = _asyncio.run(_fetch())
-    if result.get("ok"):
-        return f"文章《{head}》发布成功！{result['data']}"
-    return f"发布失败: {result.get('data', result)}"
+    # 业务模块返回 {"code":"200", "data":{...}}
+    if result.get("code") == "200":
+        return f"文章《{head}》发布成功！"
+    return f"发布失败: {result.get('msg', '未知错误')}"
 
 
 # 对话模型（API Key 从环境变量 DEEPSEEK_API_KEY 自动读取）
 model = init_chat_model(model="deepseek-v4-flash")
-
 
 # ============================================================
 # 三、应用数据库（会话管理 & 消息记录）
@@ -160,19 +153,6 @@ model = init_chat_model(model="deepseek-v4-flash")
 # 应用数据库（app.db）已提取到 conversation_manager，自动建表
 from conversation_manager import ensure_conversation_and_save_user, save_ai_message, generate_and_save_title
 
-
-
-
-# ============================================================
-# 四、创建智能体（Agent）
-# 注意：checkpointer 在请求处理中动态创建，因为 with 语句限制
-# ============================================================
-def build_agent():
-    """构建一个带联网搜索 + SQLite 记忆的智能体"""
-    checkpointer = SqliteSaver.from_conn_string(DB_PATH)  # 不退出 with 块，手动管理
-    # 注意：SqliteSaver.from_conn_string 返回的是上下文管理器，
-    # 但进入 with 后内部的 connection 需要用 __enter__ 激活
-    return checkpointer
 
 
 # ============================================================
@@ -187,6 +167,7 @@ app = FastAPI(
 # 允许前端跨域访问（开发时前端可能在不同端口或直接用 file:// 打开）
 # 注册 conversation 模块的路由（会话 CRUD）
 from conversation_manager import conversation_router
+
 app.include_router(conversation_router)
 
 # 注册 knowledge_base 模块的路由（知识库文档管理）
@@ -200,20 +181,11 @@ app.add_middleware(
 )
 
 
-# ---------- 定义请求体结构 ----------
-class ChatRequest(BaseModel):
-    question: str = Field(..., description="用户问题", examples=["协会的成立时间是什么时候？"])
-    thread_id: str = Field(
-        default_factory=lambda: str(uuid.uuid4())[:8],
-        description="对话线程 ID，用于区分不同会话。不传则自动生成新会话。",
-    )
-
-
 # 知识库 API 已提取到 knowledge_base_manager（kb_router）
 
 
 # ---- 时间工具 ----
-@langchain_tool
+@tool
 def get_current_time() -> str:
     """获取当前系统时间，返回 ISO 格式的日期时间字符串。当用户询问"昨天、今年，上个月"等关键词时调用"""
     return datetime.now().isoformat()
@@ -222,16 +194,14 @@ def get_current_time() -> str:
 # ---------- 流式聊天接口（GET） ----------
 @app.get("/chat-stream", summary="流式聊天 SSE（EventSource 用）")
 async def chat_stream(question: str, thread_id: str = "default",
-                       user_id: str = Depends(get_current_user),
-                       token: str = Query(default="")):
+                      user_id: str = Depends(get_current_user),
+                      token: str = Query(default="")):
     """
     供前端 EventSource 调用的 GET 接口。
     EventSource 不支持自定义 Header，通过 ?token=xxx 传递 JWT。
     """
-    # 提取原始 JWT（兼容 bearer token 格式）
-    raw_token = (token or "").replace("Bearer ", "").replace("bearer ", "")
     return StreamingResponse(
-        _stream_chat(question, thread_id, user_id, raw_token),
+        _stream_chat(question, thread_id, user_id, token),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -275,20 +245,19 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
         try:
             agent = create_agent(
                 model=model,
-                tools=[get_current_time, _make_search_knowledge_base(user_id), web_search, get_user_identity, publish_article],
+                tools=[get_current_time, search_knowledge_base, web_search, get_user_identity,publish_article],
                 checkpointer=checkpointer,
                 system_prompt=load_system_prompt(),
             )
             # 用 user_id 前缀隔离不同用户的 LangGraph checkpoint，防止 agent 记忆串号
             # 同时注入 token，供 get_user_identity 工具调用业务模块使用
-            config = {"configurable": {"thread_id": f"{user_id}:{thread_id}", "token": token}}
+            config = {"configurable": {"thread_id": f"{user_id}:{thread_id}", "token": token, "user_id": user_id}}
             searching_sent = False  # 避免重复发送 [SEARCHING]
-            current_tool_name = ""   # 记录当前正在调用的工具名
+            current_tool_name = ""  # 记录当前正在调用的工具名
             for chunk, metadata in agent.stream(
                     {"messages": [{"role": "user", "content": question}]},
                     config=config,
-                    stream_mode="messages",
-            ):
+                    stream_mode="messages"):
                 if isinstance(chunk, AIMessageChunk):
                     # 检测到 tool call → 通知前端"正在搜索"
                     if (chunk.tool_calls or chunk.tool_call_chunks) and not searching_sent:
@@ -302,13 +271,9 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
                             # 只在拿到非空名字时才更新，防止后续 chunk 的 None 覆盖掉正确值
                             if name:
                                 current_tool_name = name
-                        print(f"[DEBUG] 检测到 tool_call: name='{current_tool_name}', searching_sent={searching_sent}")
                         # 只有 KB 和 web 搜索才需要前端展示搜索栏，其他工具跳过
                         _show_searching = ("knowledge" in current_tool_name.lower() or "tavily" in current_tool_name.lower())
-                        if not _show_searching:
-                            print(f"[DEBUG] '{current_tool_name}' → 不触发搜索栏")
-                            pass
-                        else:
+                        if _show_searching:
                             searching_sent = True
                             search_info["split_pos"] = len("".join(ai_reply_chunks))
                             if "knowledge" in current_tool_name.lower():
@@ -317,81 +282,44 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
                             else:
                                 marker = "[[WEB_MARK]]"
                                 search_info["web_marker_pos"] = search_info["split_pos"]
-                            print(f"[DEBUG] 发送 marker='{marker}' + [SEARCHING]")
+
                             loop.call_soon_threadsafe(queue.put_nowait, marker)
-                            loop.call_soon_threadsafe(
-                                queue.put_nowait, "[SEARCHING]"
-                            )
+                            loop.call_soon_threadsafe(queue.put_nowait, "[SEARCHING]")
                     # 普通文本 token
                     if chunk.content and not chunk.tool_calls and not chunk.tool_call_chunks:
                         ai_reply_chunks.append(chunk.content)
-                        print(f"[DEBUG-STREAM] token: '{chunk.content}'")  # 每个 token 打印
-                        loop.call_soon_threadsafe(
-                            queue.put_nowait, chunk.content
-                        )
+                        loop.call_soon_threadsafe(queue.put_nowait, chunk.content)
                 elif isinstance(chunk, ToolMessage) or type(chunk).__name__ == "ToolMessage":
-                    print(f"[DEBUG] ToolMessage 到达: current_tool_name='{current_tool_name}', content='{str(chunk.content)[:150]}'")
                     # 只有 KB 和 web 搜索才发送搜索结果标记给前端
                     _is_search_tool = ("knowledge" in current_tool_name.lower() or "tavily" in current_tool_name.lower())
+                    current_tool_name = ""
+
                     if not _is_search_tool:
-                        print(f"[DEBUG] '{current_tool_name}' → 跳过搜索结果标记")
-                        current_tool_name = ""
                         continue
                     # 搜索完成 → 发给前端，同时收集结果用于持久化
                     searching_sent = False
-                    current_tool_name = ""
                     results_json = _format_search_results(chunk.content)
                     # 区分 KB 搜索和 web 搜索
                     raw = str(chunk.content)
                     if raw.startswith("[KB]"):
-                        print(f"[DEBUG] 发送 [KB_RESULT]")
                         _parse_kb_results(raw, search_info)
-                        loop.call_soon_threadsafe(
-                            queue.put_nowait, f"[KB_RESULT]{results_json}"
-                        )
+                        loop.call_soon_threadsafe(queue.put_nowait, f"[KB_RESULT]{results_json}")
                     else:
-                        print(f"[DEBUG] 发送 [SEARCH_RESULT]")
                         _parse_web_results(raw, search_info)
-                        loop.call_soon_threadsafe(
-                            queue.put_nowait, f"[SEARCH_RESULT]{results_json}"
-                        )
+                        loop.call_soon_threadsafe(queue.put_nowait, f"[SEARCH_RESULT]{results_json}")
         except Exception as e:
             error_msg = str(e)
-            # LangGraph checkpoint 可能因上次中断而残留未完成的 tool_call
             if "insufficient tool messages" in error_msg or "tool_calls" in error_msg:
-                print(f"[Checkpoint修复] 检测到损坏的 checkpoint (thread={thread_id})，使用新会话重试", flush=True)
-                # 用新 thread_id 重建 agent（跳过损坏的 checkpoint），工具与原始一致
-                fallback_config = {"configurable": {"thread_id": f"{user_id}:{thread_id}-retry", "token": token}}
-                try:
-                    fallback_agent = create_agent(
-                        model=model,
-                        tools=[get_current_time, _make_search_knowledge_base(user_id), web_search, get_user_identity, publish_article],
-                        checkpointer=checkpointer,
-                        system_prompt=load_system_prompt(),
-                    )
-                    for chunk, metadata in fallback_agent.stream(
-                        {"messages": [{"role": "user", "content": question}]},
-                        config=fallback_config,
-                        stream_mode="messages",
-                    ):
-                        if isinstance(chunk, AIMessageChunk) and chunk.content:
-                            if not chunk.tool_calls and not chunk.tool_call_chunks:
-                                loop.call_soon_threadsafe(queue.put_nowait, chunk.content)
-                except Exception as retry_err:
-                    loop.call_soon_threadsafe(queue.put_nowait, f"[ERROR] {retry_err}")
+                loop.call_soon_threadsafe(queue.put_nowait, "[ERROR] 网络错误，请刷新页面重试")
             else:
-                loop.call_soon_threadsafe(
-                    queue.put_nowait, f"[ERROR] {e}"
-                )
+                loop.call_soon_threadsafe(queue.put_nowait, f"[ERROR] {e}")
         finally:
             try:
                 checkpointer_ctx.__exit__(None, None, None)
             except Exception:
                 pass
             # 发送结束信号
-            loop.call_soon_threadsafe(
-                queue.put_nowait, None
-            )
+            loop.call_soon_threadsafe(queue.put_nowait, None)
 
     # 启动独立线程跑 agent
     executor = ThreadPoolExecutor(max_workers=1)
@@ -406,7 +334,6 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
             if full_reply:
                 save_ai_message(thread_id, full_reply, search_info, user_id)
                 generate_and_save_title(thread_id, question, full_reply, model)
-
             yield "data: [DONE]\n\n"
             break
         if str(data).startswith("[ERROR]"):

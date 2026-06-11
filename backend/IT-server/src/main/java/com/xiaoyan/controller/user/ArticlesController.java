@@ -57,11 +57,11 @@ public class ArticlesController {
         return Result.success(articlesService.getMyArticles(page, size, studentId));
     }
 
-    @GetMapping("{id}/page")
-    @Operation(summary = "返回文章所在页数")
-    public Result<Integer> getArticlePage(@PathVariable Long id, @NonNull Integer size) {
-        log.info("获取文章{}所在页数, 每页{}条", id, size);
-        return Result.success(articlesService.getArticlePage(id, size));
+    @GetMapping("position")
+    @Operation(summary = "返回文章所在位置")
+    public Result<Integer> getArticlePosition(long id) {
+        log.info("获取文章{}所在页数",id);
+        return Result.success(articlesService.getArticlePosition(id));
     }
 
     @PostMapping

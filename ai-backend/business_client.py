@@ -27,60 +27,49 @@ class BusinessClient:
     # ---------- 通用请求方法 ----------
 
     async def get(self, path: str, *, params: dict | None = None, token: str | None = None):
-        """GET 请求业务模块"""
+        """GET 请求业务模块，直接返回业务模块的 JSON 响应"""
         async with httpx.AsyncClient(timeout=10) as client:
             headers = {"Authorization": token} if token else {}
             res = await client.get(f"{self.base_url}{path}", params=params, headers=headers)
-            return self._parse(res)
+            res.raise_for_status()
+            return res.json()
 
     async def post(self, path: str, *, json_data: dict | None = None, token: str | None = None):
-        """POST 请求业务模块"""
+        """POST 请求业务模块，直接返回业务模块的 JSON 响应"""
         async with httpx.AsyncClient(timeout=10) as client:
             headers = {"Authorization": token} if token else {}
             if json_data:
                 headers["Content-Type"] = "application/json"
             res = await client.post(f"{self.base_url}{path}", json=json_data, headers=headers)
-            return self._parse(res)
+            res.raise_for_status()
+            return res.json()
 
     async def put(self, path: str, *, json_data: dict | None = None, token: str | None = None):
-        """PUT 请求业务模块"""
+        """PUT 请求业务模块，直接返回业务模块的 JSON 响应"""
         async with httpx.AsyncClient(timeout=10) as client:
             headers = {"Authorization": token} if token else {}
             if json_data:
                 headers["Content-Type"] = "application/json"
             res = await client.put(f"{self.base_url}{path}", json=json_data, headers=headers)
-            return self._parse(res)
+            res.raise_for_status()
+            return res.json()
 
     async def delete(self, path: str, *, token: str | None = None):
-        """DELETE 请求业务模块"""
+        """DELETE 请求业务模块，直接返回业务模块的 JSON 响应"""
         async with httpx.AsyncClient(timeout=10) as client:
             headers = {"Authorization": token} if token else {}
             res = await client.delete(f"{self.base_url}{path}", headers=headers)
-            return self._parse(res)
+            res.raise_for_status()
+            return res.json()
 
     # ---------- 业务常用方法 ----------
 
     async def get_user_info(self, token: str) -> dict:
-        """获取当前登录用户信息"""
         return await self.get("/user/users", token=token)
-
-    async def get_common_urls(self) -> dict:
-        """获取常用链接"""
-        return await self.get("/user/common/url")
 
     async def get_user_resources(self, token: str) -> dict:
         """获取用户资源"""
         return await self.get("/user/resources/all", token=token)
-
-    # ---------- 内部方法 ----------
-
-    @staticmethod
-    def _parse(response: httpx.Response) -> dict:
-        """统一解析响应"""
-        try:
-            return {"ok": response.is_success, "status": response.status_code, "data": response.json()}
-        except Exception:
-            return {"ok": response.is_success, "status": response.status_code, "data": response.text}
 
 
 # 单例，全局复用

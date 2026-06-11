@@ -13,12 +13,10 @@ import com.xiaoyan.mapper.ArticleMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.mapper.UserMapper;
 import com.xiaoyan.pojo.Article;
-import com.xiaoyan.pojo.Student;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.ArticlesService;
 import com.xiaoyan.service.CommonService;
 import com.xiaoyan.service.UsersService;
-import com.xiaoyan.utils.RedisUtil;
 import com.xiaoyan.vo.ArticleImageVO;
 import com.xiaoyan.vo.ArticleVO;
 import com.xiaoyan.vo.StudentVO;
@@ -354,25 +352,13 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     }
 
     @Override
-    public Integer getArticlePage(Long articleId, @NonNull Integer size) {
-        /*
-         * 思路：文章列表按 updated_date_time DESC 排序。
-         * 统计有多少篇文章排在该文章前面（rank），
-         * 则 page = rank / size + 1。
-         *
-         * 例：size=5
-         *   rank=0（最新）  → 0/5 + 1 = 1  第1页
-         *   rank=4（第5篇） → 4/5 + 1 = 1  第1页
-         *   rank=5（第6篇） → 5/5 + 1 = 2  第2页
-         *   rank=9（第10篇）→ 9/5 + 1 = 2  第2页
-         */
+    public Integer getArticlePosition(Long articleId) {
+
         Article article = this.getById(articleId);
         if (article == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
-        // 统计排在它前面的文章数（updated_date_time 更大，或时间相同时 id 更大）
-        long rank = articleMapper.countBefore(article.getUpdatedDateTime(), article.getId());
-        return (int) (rank / size) + 1;
+        return articleMapper.countBefore(article.getUpdatedDateTime());
     }
 
     @Override

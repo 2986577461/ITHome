@@ -9,7 +9,6 @@ import sqlite3
 import uuid
 from datetime import datetime
 
-import jwt as pyjwt
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException, Header, Query, Depends
 from pydantic import BaseModel, Field
@@ -21,34 +20,37 @@ DB_DIR = os.path.join(os.path.dirname(__file__), "db")
 os.makedirs(DB_DIR, exist_ok=True)
 APP_DB_PATH = os.path.join(DB_DIR, "app.db")
 
-# ---- JWT ----
-JWT_SECRET = os.getenv("JWT_SECRET", "xiaoyan")
-JWT_ALGORITHM = "HS256"
-
 
 # ============================================================
-# JWT 鉴权
+# 鉴权：委托 business_client 验证 token
 # ============================================================
-def get_current_user(authorization: str = Header(default=""),
-                     token: str = Query(default="")) -> str:
+from business_client import business_client
+
+
+async def get_current_user(authorization: str = Header(default=""),
+                           token: str = Query(default="")) -> str:
     """
-    从 Header 或 query string 提取并验证 JWT，返回 user_id。
-    未登录直接拒绝。
+    拿着 token 请求业务模块 GET /user/users，取 data.studentId 作为 user_id。
+    FastAPI 支持 async Depends，同步路由也能用。
     """
     raw = ""
     if authorization:
-        raw = authorization.replace("Bearer ", "").replace("bearer ", "")
+        raw = authorization
     elif token:
         raw = token
     if not raw:
         raise HTTPException(401, "请先登录")
-    try:
-        payload = pyjwt.decode(raw, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return str(payload.get("user") or payload.get("admin") or payload.get("sub") or payload.get("userId") or payload.get("id") or "")
-    except pyjwt.ExpiredSignatureError:
-        raise HTTPException(401, "登录已过期，请重新登录")
-    except pyjwt.InvalidTokenError:
+
+    result = await business_client.get_user_info(raw)
+    if result.get("code") != "200":
         raise HTTPException(401, "身份验证失败")
+
+    user_data = (result.get("data") or {}) if isinstance(result, dict) else {}
+    student_id = user_data.get("studentId", "")
+    if not student_id:
+        raise HTTPException(401, "身份验证失败：缺少 studentId")
+
+    return str(student_id)
 
 
 # ============================================================
@@ -197,7 +199,7 @@ def generate_and_save_title(thread_id: str, question: str, first_reply: str, mod
         resp = model.invoke(
             f"用户问题：{question}\n"
             f"助手回答：{first_reply[:300]}\n\n"
-            f"请为这段对话起一个标题，15个字以内，只输出标题本身不要引号："
+            f"为这段对话起一个标题，15个字以内"
         )
         generated_title = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
         if len(generated_title) > 30:

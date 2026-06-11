@@ -1,6 +1,7 @@
 package com.xiaoyan.controller.user;
 
 import com.xiaoyan.context.BaseContext;
+import com.xiaoyan.dto.StudentDTO;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.UsersService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -61,5 +62,10 @@ public class UsersController {
     public Result<StudentVO> login(@RequestBody @Valid LoginDTO message) {
         log.info("用户登录{}", message);
         return userService.login(message);
+    }
+    @PostMapping("profile")
+    public Result<String> updateSelf(@RequestBody StudentDTO studentDTO){
+        log.info("学生修改自身信息");
+        return userService.updateSelf(studentDTO);
     }
 }

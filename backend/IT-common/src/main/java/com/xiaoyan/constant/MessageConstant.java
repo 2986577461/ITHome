@@ -10,7 +10,7 @@ public class MessageConstant {
     public static final String ACCOUNT_NOT_FOUND = "账号不存在";
     public static final String ACCOUNT_LOCKED = "账号被锁定";
     public static final String PERMISSION_DENIED ="没有权限";
-    public static final String NAME_MISMATCH="姓名不匹配";
+    public static final String POSITION_MISMATCH="姓名不匹配";
     public static final String USER_NOT_LOGIN = "用户未登录";
     public static final String LOGIN_FAILED = "登录失败";
     public static final String FILE_DELETE_FAILED = "文件删除失败";

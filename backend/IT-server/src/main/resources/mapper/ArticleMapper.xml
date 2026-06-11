@@ -22,9 +22,8 @@
         LIMIT #{offset},#{size}
     </select>
 
-    <select id="countBefore" resultType="long">
+    <select id="countBefore" resultType="int">
         SELECT COUNT(*) FROM article
         WHERE updated_date_time > #{updatedDateTime}
-           OR (updated_date_time = #{updatedDateTime} AND id > #{id})
     </select>
 </mapper>

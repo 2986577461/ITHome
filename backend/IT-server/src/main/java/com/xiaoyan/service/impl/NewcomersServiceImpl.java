@@ -48,19 +48,19 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
     @Override
     public void agreeNewcomer(Long id) {
         transactionTemplate.execute(status -> {
-            Object n = stringRedisTemplate.opsForHash().get(CACHE_NEWCOMERS, String.valueOf(id));
+            Newcomer newcomer = redisUtil.queryHashWithMutex(CACHE_NEWCOMERS,
+                    String.valueOf(id), Newcomer.class, r -> this.getById(id));
 
-            if (n == null) {
+            if (newcomer == null) {
                 throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
             }
 
-            Newcomer newcomer = JSONUtil.toBean((String) n, Newcomer.class);
             Integer studentId = newcomer.getStudentId();
 
-            Object s = stringRedisTemplate.opsForHash().
-                    get(CACHE_STUDENTS, String.valueOf(studentId));
+            Student oldStudent = redisUtil.queryHashWithMutex(CACHE_STUDENTS,
+                    String.valueOf(studentId), Student.class, s -> userMapper.selectByStudentId(studentId));
 
-            if (s != null) {
+            if (oldStudent != null) {
                 throw new ParameterException(MessageConstant.REPEATREQUEST);
             }
 

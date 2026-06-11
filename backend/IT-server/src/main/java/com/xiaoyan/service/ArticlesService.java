@@ -36,5 +36,5 @@ public interface ArticlesService extends IService<Article> {
      */
     List<ArticleImageVO> batchUploadFiles(List<MultipartFile> files);
 
-    Integer getArticlePage(Long articleId, @NonNull Integer size);
+    Integer getArticlePosition(Long articleId);
 }

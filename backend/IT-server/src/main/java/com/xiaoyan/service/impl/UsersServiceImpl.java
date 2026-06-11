@@ -8,6 +8,7 @@ import com.xiaoyan.constant.PositionConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.LoginDTO;
 import com.xiaoyan.dto.PasswordDTO;
+import com.xiaoyan.dto.StudentDTO;
 import com.xiaoyan.interceptor.JwtWhiteList;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.mapper.UserMapper;
@@ -164,6 +165,17 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         return ResponseEntity.ok()
                 .headers(headers)
                 .body(excelBytes);
+    }
+
+    @Override
+    public Result<String> updateSelf(StudentDTO studentDTO) {
+        Student student = BeanUtil.toBean(studentDTO, Student.class);
+        if (!BaseContext.getCurrentStudentId().equals(studentDTO.getStudentId())) {
+            return Result.error(MessageConstant.POSITION_MISMATCH);
+        }
+        this.updateById(student);
+        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS,String.valueOf(student.getStudentId()));
+        return Result.success();
     }
 
     @Override
