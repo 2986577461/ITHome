@@ -26,5 +26,8 @@ export const uploadArticleImageBatch = (formData) =>
 export const deleteArticleImageBatch = (ids) =>
   axiosInstance.delete("user/articles/image", { data: ids });
 
+export const getArticlePosition = (id) =>
+  axiosInstance.get("user/articles/position", { params: { id } });
+
 export const deleteById = async (id) =>
   axiosInstance.delete("user/articles/" + id);

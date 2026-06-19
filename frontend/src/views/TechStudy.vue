@@ -1,17 +1,5 @@
 <template>
   <div class="tech-page">
-    <div
-      class="page-hero hero-accent-blue"
-      style="background: linear-gradient(180deg, #f0f4ff 0%, #f5f5f7 100%)"
-    >
-      <div class="hero-bg-mesh"></div>
-      <div class="section-inner">
-        <div class="pill">技术教学</div>
-        <h1>学习资源库</h1>
-        <p>C/C++ · 前端 · 数据结构与算法 · MySQL数据库 · Java · Python/AI</p>
-      </div>
-    </div>
-
     <section ref="scrollRoot" class="section scroll-section">
       <div v-if="loadingMore" class="page-loading-overlay">
         <div class="page-loading-spinner"></div>
@@ -45,7 +33,12 @@
           </template>
 
           <template v-else>
-            <div v-for="a in filteredArticles" :key="a.id" class="article-card">
+            <div
+              v-for="a in filteredArticles"
+              :key="a.id"
+              :data-article-id="a.id"
+              class="article-card"
+            >
               <div class="ac-head">
                 <span class="ac-badge">{{ typeLabel(a.type) }}</span>
                 <div
@@ -292,7 +285,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from "vue";
+import { ref, reactive, computed, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useUserStore } from "@/stores/user";
 import { useArticleStore } from "@/stores/updateArticle";
@@ -306,6 +299,8 @@ import {
   addComment as apiAddComment,
   replyComment as apiReplyComment,
 } from "@/request/axiosForComments.js";
+import hljs from "highlight.js";
+import "highlight.js/styles/atom-one-dark.css";
 import { ElMessage } from "element-plus";
 
 const router = useRouter();
@@ -389,6 +384,27 @@ function typeLabel(t) {
   );
 }
 
+function highlightCode() {
+  nextTick(function () {
+    document.querySelectorAll(".ac-body pre code").forEach(function (block) {
+      var txt = block.textContent.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+      block.textContent = txt;
+      var result = hljs.highlightAuto(txt, [
+        "java",
+        "csharp",
+        "cpp",
+        "python",
+        "javascript",
+        "css",
+        "html",
+        "sql",
+      ]);
+      block.innerHTML = result.value;
+      block.className = "hljs language-" + result.language;
+    });
+  });
+}
+
 async function fetchPage(p) {
   const type = activeCat.value === "all" ? null : activeCat.value;
   loadingMore.value = true;
@@ -416,6 +432,7 @@ async function goToPage(p) {
   loading.value = true;
   await fetchPage(p);
   loading.value = false;
+  highlightCode();
   if (scrollRoot.value) scrollRoot.value.scrollTop = 0;
 }
 
@@ -428,6 +445,7 @@ async function switchCat(key) {
   await fetchPage(1);
   await fetchCount();
   loading.value = false;
+  highlightCode();
   if (scrollRoot.value) scrollRoot.value.scrollTop = 0;
 }
 
@@ -525,9 +543,24 @@ function shareArticle() {
 
 onMounted(async () => {
   loading.value = true;
-  await fetchPage(1);
+  var q = router.currentRoute.value.query;
+  var pageNum = q.page ? Number(q.page) : 1;
+  await fetchPage(pageNum);
+  currentPage.value = pageNum;
   await fetchCount();
   loading.value = false;
+  highlightCode();
+  if (q.highlight) {
+    await nextTick();
+    setTimeout(function () {
+      var id = q.highlight;
+      var el = scrollRoot.value?.querySelector(
+        "[data-article-id='" + id + "']",
+      );
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      router.replace("/tech-study");
+    }, 300);
+  }
 });
 </script>
 
@@ -713,10 +746,10 @@ onMounted(async () => {
   font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
 }
 .ac-body :deep(code) {
-  background: rgba(0,0,0,.05);
+  background: rgba(0, 0, 0, 0.05);
   padding: 2px 7px;
   border-radius: 5px;
-  font-size: .88em;
+  font-size: 0.88em;
   font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
 }
 .ac-body :deep(pre code) {

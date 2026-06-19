@@ -20,6 +20,9 @@ export const useUserStore = defineStore("user", {
     condition: false,
     position: "",
     academy: "",
+    sex: "",
+    major: "",
+    className: "",
     avatar: null,
   }),
   getters: {
@@ -35,6 +38,9 @@ export const useUserStore = defineStore("user", {
       this.condition = false;
       this.position = "";
       this.academy = "";
+      this.sex = "";
+      this.major = "";
+      this.className = "";
       this.avatar = null;
     },
     setAvatar(url) {
@@ -46,6 +52,9 @@ export const useUserStore = defineStore("user", {
       if (data.name !== undefined) this.name = data.name;
       if (data.position !== undefined) this.position = data.position;
       if (data.academy !== undefined) this.academy = data.academy;
+      if (data.sex !== undefined) this.sex = data.sex;
+      if (data.major !== undefined) this.major = data.major;
+      if (data.className !== undefined) this.className = data.className;
       if (data.avatar !== undefined) this.avatar = data.avatar;
       this.condition = true;
     },

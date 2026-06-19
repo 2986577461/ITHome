@@ -202,7 +202,10 @@
                       >The web searching...</template
                     >
                     <template v-else-if="msg.searchType === 'kb'"
-                      >Searching in the knowledge base...</template
+                      >The knowledge base Searching ...</template
+                    >
+                    <template v-else-if="msg.searchType === 'publish'"
+                      >Publishing...</template
                     >
                     <template v-else>Searching...</template>
                   </div>
@@ -333,7 +336,29 @@
 <script setup>
 import { ref, reactive, nextTick, onMounted, onUnmounted } from "vue";
 import { useUserStore } from "@/stores/user";
+import { ElMessage, ElMessageBox } from "element-plus";
+import hljs from "highlight.js";
+import "highlight.js/styles/atom-one-dark.css";
 import { marked } from "marked";
+var hljsRenderer = new marked.Renderer();
+hljsRenderer.code = function (o) {
+  var lang = o.lang,
+    text = o.text;
+  var language = lang && hljs.getLanguage(lang) ? lang : "plaintext";
+  try {
+    var hl = hljs.highlight(text, { language: language }).value;
+    return (
+      '<pre class="code-block"><code class="hljs language-' +
+      language +
+      '">' +
+      hl +
+      "</code></pre>"
+    );
+  } catch (e) {
+    return '<pre class="code-block"><code>' + text + "</code></pre>";
+  }
+};
+marked.setOptions({ renderer: hljsRenderer });
 import {
   getConversations,
   getMessages,
@@ -341,6 +366,7 @@ import {
   getKbDocuments,
   uploadKbDocument,
   deleteKbDocument,
+  createTask,
 } from "@/request/axiosForAi.js";
 
 const CHAT_STREAM_URL = "/chat-stream";
@@ -374,19 +400,13 @@ function _buildMsg(role, content, searchInfo) {
     kbResults: null,
     webOpen: false,
     kbOpen: false,
-    searchSplitPos: null,
-    kbSplitPos: null,
-    webSplitPos: null,
-    kbMarkerPos: null,
-    webMarkerPos: null,
+    taskId: null,
   });
   if (searchInfo) {
     try {
       const si =
         typeof searchInfo === "string" ? JSON.parse(searchInfo) : searchInfo;
       if (si.split_pos != null) m.searchSplitPos = si.split_pos;
-      if (si.kb_marker_pos != null) m.kbMarkerPos = si.kb_marker_pos;
-      if (si.web_marker_pos != null) m.webMarkerPos = si.web_marker_pos;
       if (si.web) {
         m.webResults = si.web;
         if (!m.searchType) m.searchType = "web";
@@ -395,7 +415,9 @@ function _buildMsg(role, content, searchInfo) {
         m.kbResults = si.kb;
         if (!m.searchType) m.searchType = "kb";
       }
-    } catch {}
+    } catch (err) {
+      console.error("上传失败:", f.name, err);
+    }
   }
   return m;
 }
@@ -488,10 +510,15 @@ function triggerUpload() {
 async function onFileSelect(e) {
   for (const f of e.target.files || []) {
     try {
-      const buf = await f.arrayBuffer();
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      const b64 = await new Promise((r) => {
+        const fr = new FileReader();
+        fr.onload = () => r(fr.result.split(",")[1]);
+        fr.readAsDataURL(f);
+      });
       await uploadKbDocument(f.name, b64);
-    } catch {}
+    } catch (err) {
+      console.error("上传失败:", f.name, err);
+    }
   }
   e.target.value = "";
   await loadKbDocuments();
@@ -526,9 +553,18 @@ function newConversation() {
   nextTick(() => inputBox.value?.focus());
 }
 async function delConversation(threadId) {
-  if (!confirm("删除？")) return;
+  try {
+    await ElMessageBox.confirm("确定删除该会话？", "删除确认", {
+      confirmButtonText: "删除",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+  } catch {
+    return;
+  }
   try {
     await deleteConversation(threadId);
+    ElMessage.success("已删除");
   } catch {}
   if (currentThreadId.value === threadId) {
     currentThreadId.value = "";
@@ -590,60 +626,82 @@ async function send() {
 
   const token = localStorage.getItem("authorization") || "";
   const url = `${CHAT_STREAM_URL}?question=${encodeURIComponent(text)}&thread_id=${currentThreadId.value}&token=${encodeURIComponent(token)}`;
-  const evtSource = new EventSource(url);
-  es = evtSource;
-  evtSource.onmessage = async (e) => {
-    const msg = messages.value[aiIdx];
-    if (e.data === "[DONE]") {
-      evtSource.close();
-      es = null;
-      msg.streaming = false;
-      msg.searching = false;
+  // 先创建任务获取 taskId，再连 SSE
+  createTask(text, currentThreadId.value)
+    .then((r) => {
+      const msg = messages.value[aiIdx];
+      if (msg) {
+        msg.taskId = r.task_id;
+        const sseUrl = url + "&task_id=" + encodeURIComponent(r.task_id);
+        es = new EventSource(sseUrl);
+        setupSSEHandlers(msg);
+      }
+    })
+    .catch(() => {});
+
+  // createTask 内 `es = new EventSource(sseUrl)` 之后，
+  // 将 onmessage / onerror 绑定到当前的 es
+  function setupSSEHandlers(taskMsg) {
+    if (!es) return;
+    es.onmessage = async (e) => {
+      if (!taskMsg) return;
+      if (e.data === "[DONE]") {
+        es.close();
+        es = null;
+        taskMsg.streaming = false;
+        loading.value = false;
+        await loadConversations();
+        nextTick(() => inputBox.value?.focus());
+      } else if (e.data.startsWith("[ERROR]")) {
+        es.close();
+        es = null;
+        taskMsg.text += "\\n\\n[错误] " + e.data.replace("[ERROR] ", "");
+        taskMsg.streaming = false;
+        loading.value = false;
+      } else if (e.data.startsWith("[STATE]")) {
+        try {
+          const st = JSON.parse(e.data.replace("[STATE]", ""));
+          if (
+            st.state === "searching_kb" ||
+            st.state === "searching_web" ||
+            st.state === "publishing"
+          ) {
+            taskMsg.searching = true;
+            taskMsg.searchType =
+              st.state === "publishing"
+                ? "publish"
+                : st.state === "searching_kb"
+                  ? "kb"
+                  : "web";
+            if (taskMsg.searchSplitPos == null)
+              taskMsg.searchSplitPos = taskMsg.text.length;
+          } else if (st.state === "generating") {
+            taskMsg.searching = false;
+            if (st.search_done && st.results && st.results.results) {
+              if (taskMsg.searchType === "kb")
+                taskMsg.kbResults = st.results.results;
+              else
+                taskMsg.webResults = st.results.results;
+            }
+          }
+        } catch (err) {}
+      } else {
+        const t = e.data.replace(/\\n/g, "\n");
+        taskMsg.text += t;
+        nextTick(() => scrollBottom());
+      }
+    };
+    es.onerror = () => {
+      if (es) {
+        es.close();
+        es = null;
+      }
+      if (taskMsg) {
+        taskMsg.streaming = false;
+      }
       loading.value = false;
-      await loadConversations();
-      nextTick(() => inputBox.value?.focus());
-    } else if (e.data === "[SEARCHING]") {
-      msg.searching = true;
-      if (msg.searchSplitPos == null) msg.searchSplitPos = msg.text.length;
-    } else if (e.data.startsWith("[SEARCH_RESULT]")) {
-      msg.searching = false;
-      msg.searchType = "web";
-      try {
-        msg.webResults =
-          JSON.parse(e.data.replace("[SEARCH_RESULT]", "")).results || [];
-      } catch {}
-    } else if (e.data.startsWith("[KB_RESULT]")) {
-      msg.searching = false;
-      if (msg.searchSplitPos == null) msg.searchSplitPos = msg.text.length;
-      try {
-        msg.kbResults =
-          JSON.parse(e.data.replace("[KB_RESULT]", "")).results || [];
-      } catch {}
-    } else if (e.data.startsWith("[ERROR]")) {
-      evtSource.close();
-      es = null;
-      msg.text = "出错：" + e.data.replace("[ERROR] ", "");
-      msg.streaming = false;
-      loading.value = false;
-    } else {
-      msg.searching = false;
-      const t = e.data.replace(/\\n/g, "\n");
-      if (t === "[[KB_MARK]]") msg.kbMarkerPos = msg.text.length;
-      else if (t === "[[WEB_MARK]]") msg.webMarkerPos = msg.text.length;
-      else msg.text += t;
-      nextTick(() => scrollBottom());
-    }
-  };
-  evtSource.onerror = () => {
-    evtSource.close();
-    es = null;
-    const msg = messages.value[aiIdx];
-    if (msg) {
-      msg.streaming = false;
-      msg.searching = false;
-    }
-    loading.value = false;
-  };
+    };
+  }
 }
 
 onMounted(async () => {
@@ -944,27 +1002,30 @@ onUnmounted(() => {
 }
 
 .search-link {
-  display: block;
+  display: inline-flex;
+  align-items: end;
+  gap: 10px;
   clear: both;
-  width: 100%;
   color: var(--text-link);
-  font-size: 14px;
+  font-size: 17px;
   cursor: pointer;
   user-select: none;
-  margin: 12px 0 6px;
+  -webkit-user-select: none;
+  margin: 0px 0 0px;
   transition: color 0.15s;
 }
 .search-link:hover {
   color: #1a1a2e;
 }
 .search-link .arrow {
-  font-size: 12px;
-  margin-left: 2px;
+  font-size: 30px;
   transition: transform 0.2s;
   display: inline-block;
+  line-height: 1;
+  user-select: none;
 }
 .search-link .arrow.open {
-  transform: rotate(90deg);
+  transform: rotate(90deg) translateY(-1px);
 }
 
 .search-dropdown {
@@ -972,7 +1033,7 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  background: #fafbfc;
+  background: #fdfdfd;
 }
 .search-dropdown-item {
   display: block;

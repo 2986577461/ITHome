@@ -89,6 +89,18 @@
                   <input v-model="form.name" />
                 </div>
                 <div class="form-field">
+                  <label>性别</label>
+                  <input v-model="form.sex" />
+                </div>
+                <div class="form-field">
+                  <label>专业</label>
+                  <input v-model="form.major" />
+                </div>
+                <div class="form-field">
+                  <label>班级</label>
+                  <input v-model="form.className" />
+                </div>
+                <div class="form-field">
                   <label>学院</label>
                   <input v-model="form.academy" />
                 </div>
@@ -269,6 +281,7 @@ import {
 } from "@/request/axiosForProfile.js";
 import { ElMessage } from "element-plus";
 import { getThis, uploadAvatar } from "@/request/axiosForUser";
+import { getArticlePosition } from "@/request/axiosForArticles";
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -287,6 +300,9 @@ const submittingAvatar = ref(false);
 const form = reactive({
   studentId: "",
   name: "",
+  sex: "",
+  major: "",
+  className: "",
   academy: "",
 });
 
@@ -305,9 +321,14 @@ const myResources = ref([]);
 
 function typeLabel(t) {
   return (
-    { 1: "C/C++", 2: "前端", 3: "数据结构与算法", 4: "MySQL数据库", 5: "Java", 6: "Python/AI" }[
-      String(t)
-    ] || "其他"
+    {
+      1: "C/C++",
+      2: "前端",
+      3: "数据结构与算法",
+      4: "MySQL数据库",
+      5: "Java",
+      6: "Python/AI",
+    }[String(t)] || "其他"
   );
 }
 
@@ -375,11 +396,19 @@ async function submitAvatar() {
 async function saveProfile() {
   try {
     const resp = await updateProfile({
+      id: userStore.id,
+      studentId: userStore.studentId,
       name: form.name,
+      sex: form.sex,
+      major: form.major,
+      className: form.className,
       academy: form.academy,
     });
     if (resp?.code === "200") {
       userStore.name = form.name;
+      userStore.sex = form.sex;
+      userStore.major = form.major;
+      userStore.className = form.className;
       userStore.academy = form.academy;
       ElMessage.success("保存成功");
     }
@@ -439,8 +468,18 @@ function nextArticlePage() {
 }
 
 function editArticle(a) {
-  articleStore.setArticle(a.id, a.head, a.content, a.type);
-  router.push("/upload-article");
+  getArticlePosition(a.id)
+    .then(function (r) {
+      if (r && r.data != null) {
+        var page = Math.floor(r.data / 5) + 1;
+        router.push("/tech-study?page=" + page + "&highlight=" + a.id);
+      } else {
+        router.push("/tech-study");
+      }
+    })
+    .catch(function () {
+      router.push("/tech-study");
+    });
 }
 
 onMounted(async () => {
@@ -455,6 +494,9 @@ onMounted(async () => {
 
   form.studentId = userStore.studentId || "";
   form.name = userStore.name || "";
+  form.sex = userStore.sex || "";
+  form.major = userStore.major || "";
+  form.className = userStore.className || "";
   form.academy = userStore.academy || "";
 
   fetchMyArticles(1);

@@ -60,5 +60,4 @@ onMounted(async () => {
 }
 </style>
 
-<style>
-</style>
+<style></style>
