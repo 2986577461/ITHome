@@ -40,6 +40,17 @@ SYSTEM_PROMPT_PATH = os.path.join(os.path.dirname(__file__), "SystemPrompt.md")
 # 知识库（向量化、检索、API）已提取到 knowledge_base_manager
 from knowledge_base_manager import search_knowledge_base, kb_router
 
+# RAGAS 评估路由（延迟加载，没装 ragas 也不影响启动）
+try:
+    from ragas_evaluation import eval_router
+    _HAS_RAGAS = True
+except ImportError:
+    eval_router = None
+    _HAS_RAGAS = False
+    print("[启动] RAGAS 未安装，跳过评估路由 — pip3 install ragas datasets")
+from state_manager import get_state_manager, state_router
+
+
 
 def load_system_prompt() -> str:
     """从 SystemPrompt.md 加载系统提示词"""
@@ -117,8 +128,10 @@ def publish_article(type: int, head: str, content: str, config: RunnableConfig) 
     帮用户在协会网站上发表一篇技术文章。
     当用户说"帮我发一篇文章"、"发表文章"、"写一篇文章发出去"、"发布"等时调用。
     type 根据文章主题判断：1=c/c++, 2=前端, 3=数据结构与算法, 4=mysql数据库, 5=java, 6=python/AI
-    content 必须是严格 HTML，只允许 <h1>-<h7>, <p>, <strong>, <em>, <ul><li>, <ol><li>,
-    <pre class=\"code-block\"><code>, <a target=\"_blank\" href=\"...\">, style=\"text-align:left/right/center\"。
+    head 为文章起一个标题
+    content 必须是严格的纯文本的HTML，只允许 <h1>-<h7>, <p>, <strong>, <em>, <ul><li>, <ol><li>,<hr>,
+    <a target=_blank href=...>,<p style=text-align:left/right/center></p>,
+    <pre class=code-block><code>  <code>双标签内如需要换行，请直接输出 \n ,前端和数据库会自动转义
     发布的内容按照"语气与态度"一栏的要求
     """
     import asyncio as _asyncio
@@ -173,6 +186,11 @@ app.include_router(conversation_router)
 # 注册 knowledge_base 模块的路由（知识库文档管理）
 app.include_router(kb_router)
 
+# 注册 RAGAS 评估路由（如有）
+if eval_router is not None:
+    app.include_router(eval_router)
+app.include_router(state_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 允许所有来源（生产环境应限制为具体域名）
@@ -195,13 +213,15 @@ def get_current_time() -> str:
 @app.get("/chat-stream", summary="流式聊天 SSE（EventSource 用）")
 async def chat_stream(question: str, thread_id: str = "default",
                       user_id: str = Depends(get_current_user),
-                      token: str = Query(default="")):
+                      token: str = Query(default=""),
+                      task_id: str = Query(default="")):
     """
     供前端 EventSource 调用的 GET 接口。
     EventSource 不支持自定义 Header，通过 ?token=xxx 传递 JWT。
+    task_id 由前端 POST /api/tasks 创建后传入，保持前后端状态一致。
     """
     return StreamingResponse(
-        _stream_chat(question, thread_id, user_id, token),
+        _stream_chat(question, thread_id, user_id, token, task_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -212,103 +232,106 @@ async def chat_stream(question: str, thread_id: str = "default",
 
 
 # ---------- SSE 流式生成器 ----------
-async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: str = ""):
+async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: str = "", task_id: str = ""):
     """
     核心流式逻辑：
     1. 自动创建会话 + 保存用户消息到 app.db
     2. agent.stream() 在独立线程运行，避免阻塞事件循环
-    3. 通过 asyncio.Queue 将 token 从工作线程传到 async 生成器
-    4. 异步地从队列取 token，逐个通过 SSE 推送到前端
+    3. 状态写入 Redis（state_manager），前端通过 REST API 轮询
+    4. SSE 只推纯文本 token + [DONE] / [ERROR] 控制信号
     5. 流结束后保存 AI 完整回复到 app.db
     """
     from concurrent.futures import ThreadPoolExecutor
     from langchain_core.messages import AIMessageChunk, ToolMessage
+    from state_manager import S  # 状态常量
 
-    # ---- 0. 确保会话记录存在 + 保存用户消息（已提取到 conversation_manager） ----
+    # ---- 0. 确保会话记录存在 + 保存用户消息 ----
     thread_id = ensure_conversation_and_save_user(thread_id, question, user_id)
 
-    queue: asyncio.Queue = asyncio.Queue()  # 线程间通信的队列
-    loop = asyncio.get_running_loop()  # 在主协程中捕获事件循环，供子线程使用
+    # ---- 0.5 创建/更新任务状态 ----
+    sm = get_state_manager()
+    if not task_id:
+        task_id = sm.create_task(question=question, user_id=user_id, conversation_id=thread_id)
+    else:
+        sm.update(task_id, state=S.RUNNING, question=question, progress=5)
 
-    # 用列表收集 AI 回复 token + 搜索信息
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
     ai_reply_chunks: list[str] = []
-    search_info: dict = {}  # {"web": [...], "kb": [...], "split_pos": 0}
+    search_info: dict = {}
 
     def run_agent():
-        """
-        在独立线程中运行 agent.stream()（同步操作）。
-        每拿到一个 token 就 put 到队列，async 主循环再从队列取走推送。
-        """
         nonlocal ai_reply_chunks
         checkpointer_ctx = SqliteSaver.from_conn_string(DB_PATH)
         checkpointer = checkpointer_ctx.__enter__()
         try:
+            sm.update(task_id, state=S.RUNNING, progress=5)
+
             agent = create_agent(
                 model=model,
                 tools=[get_current_time, search_knowledge_base, web_search, get_user_identity,publish_article],
                 checkpointer=checkpointer,
                 system_prompt=load_system_prompt(),
             )
-            # 用 user_id 前缀隔离不同用户的 LangGraph checkpoint，防止 agent 记忆串号
-            # 同时注入 token，供 get_user_identity 工具调用业务模块使用
             config = {"configurable": {"thread_id": f"{user_id}:{thread_id}", "token": token, "user_id": user_id}}
-            searching_sent = False  # 避免重复发送 [SEARCHING]
-            current_tool_name = ""  # 记录当前正在调用的工具名
+            searching_sent = False
+            gen_sent = False
+            current_tool_name = ""
             for chunk, metadata in agent.stream(
                     {"messages": [{"role": "user", "content": question}]},
                     config=config,
                     stream_mode="messages"):
                 if isinstance(chunk, AIMessageChunk):
-                    # 检测到 tool call → 通知前端"正在搜索"
                     if (chunk.tool_calls or chunk.tool_call_chunks) and not searching_sent:
-                        # 提取工具名（兼容 dict 和 ToolCallChunk 对象两种格式）
                         if chunk.tool_call_chunks:
                             tc = chunk.tool_call_chunks[0]
                             if isinstance(tc, dict):
                                 name = tc.get("name") or ""
                             else:
                                 name = getattr(tc, "name", "") or ""
-                            # 只在拿到非空名字时才更新，防止后续 chunk 的 None 覆盖掉正确值
                             if name:
                                 current_tool_name = name
-                        # 只有 KB 和 web 搜索才需要前端展示搜索栏，其他工具跳过
-                        _show_searching = ("knowledge" in current_tool_name.lower() or "tavily" in current_tool_name.lower())
-                        if _show_searching:
+                        _lower = current_tool_name.lower()
+                        if "knowledge" in _lower or "tavily" in _lower or "publish" in _lower:
                             searching_sent = True
                             search_info["split_pos"] = len("".join(ai_reply_chunks))
-                            if "knowledge" in current_tool_name.lower():
-                                marker = "[[KB_MARK]]"
-                                search_info["kb_marker_pos"] = search_info["split_pos"]
+                            if "knowledge" in _lower:
+                                tool_state = S.SEARCHING_KB
+                            elif "tavily" in _lower:
+                                tool_state = S.SEARCHING_WEB
                             else:
-                                marker = "[[WEB_MARK]]"
-                                search_info["web_marker_pos"] = search_info["split_pos"]
-
-                            loop.call_soon_threadsafe(queue.put_nowait, marker)
-                            loop.call_soon_threadsafe(queue.put_nowait, "[SEARCHING]")
-                    # 普通文本 token
+                                tool_state = S.PUBLISHING
+                            sm.update(task_id, state=tool_state, tool_name=current_tool_name, progress=30)
+                            loop.call_soon_threadsafe(queue.put_nowait, '[STATE]{"state":"' + tool_state + '"}')
                     if chunk.content and not chunk.tool_calls and not chunk.tool_call_chunks:
                         ai_reply_chunks.append(chunk.content)
+                        sm.append_token(task_id, chunk.content)
+                        sm.update(task_id, state=S.GENERATING, progress=70)
+                        if not gen_sent:
+                            gen_sent = True
+                            loop.call_soon_threadsafe(queue.put_nowait, '[STATE]{"state":"generating"}')
                         loop.call_soon_threadsafe(queue.put_nowait, chunk.content)
                 elif isinstance(chunk, ToolMessage) or type(chunk).__name__ == "ToolMessage":
-                    # 只有 KB 和 web 搜索才发送搜索结果标记给前端
                     _is_search_tool = ("knowledge" in current_tool_name.lower() or "tavily" in current_tool_name.lower())
                     current_tool_name = ""
-
                     if not _is_search_tool:
                         continue
-                    # 搜索完成 → 发给前端，同时收集结果用于持久化
                     searching_sent = False
-                    results_json = _format_search_results(chunk.content)
-                    # 区分 KB 搜索和 web 搜索
                     raw = str(chunk.content)
                     if raw.startswith("[KB]"):
                         _parse_kb_results(raw, search_info)
-                        loop.call_soon_threadsafe(queue.put_nowait, f"[KB_RESULT]{results_json}")
+                        sm.set_search_results(task_id, search_info.get("kb", []), "kb")
                     else:
                         _parse_web_results(raw, search_info)
-                        loop.call_soon_threadsafe(queue.put_nowait, f"[SEARCH_RESULT]{results_json}")
+                        sm.set_search_results(task_id, search_info.get("web", []), "web")
+                    sm.update(task_id, progress=60)
+                    gen_sent = False  # 搜索结果到达后重置，使下一个 generating 状态能被推送
+                    results_json = _format_search_results(chunk.content)
+                    loop.call_soon_threadsafe(queue.put_nowait, '[STATE]{"state":"generating","search_done":true,"results":' + results_json + '}')
         except Exception as e:
             error_msg = str(e)
+            sm.finalize(task_id, state=S.FAILED, error=error_msg)
             if "insufficient tool messages" in error_msg or "tool_calls" in error_msg:
                 loop.call_soon_threadsafe(queue.put_nowait, "[ERROR] 网络错误，请刷新页面重试")
             else:
@@ -318,7 +341,9 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
                 checkpointer_ctx.__exit__(None, None, None)
             except Exception:
                 pass
-            # 发送结束信号
+            # 标记完成
+            sm.update(task_id, state=S.COMPLETED if not sm.get_state(task_id).get("state") == S.FAILED else S.FAILED,
+                      progress=100)
             loop.call_soon_threadsafe(queue.put_nowait, None)
 
     # 启动独立线程跑 agent

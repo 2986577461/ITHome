@@ -107,9 +107,7 @@ def get_app_db() -> sqlite3.Connection:
 init_app_db()
 
 
-# ============================================================
-# 请求模型
-# ============================================================
+
 class CreateConversationRequest(BaseModel):
     title: str = Field(default="新的对话", description="会话标题")
 
@@ -273,8 +271,6 @@ def delete_conversation(thread_id: str, user_id: str = Depends(get_current_user)
             raise HTTPException(status_code=404, detail="会话不存在")
     finally:
         conn.close()
-    return {"ok": True}
-
 
 @conversation_router.get("/{thread_id}/messages", summary="获取会话消息")
 def get_messages(thread_id: str, user_id: str = Depends(get_current_user)):
@@ -290,7 +286,7 @@ def get_messages(thread_id: str, user_id: str = Depends(get_current_user)):
 
         rows = conn.execute(
             "SELECT role, content, search_info, created_at FROM messages "
-            "WHERE thread_id = ? ORDER BY id ASC",
+            "WHERE thread_id = ? ORDER BY id ",
             (thread_id,),
         ).fetchall()
         return [dict(r) for r in rows]

@@ -1,7 +1,8 @@
 """
-知识库管理模块 — 文档上传、向量化、检索 + API 路由
+知识库管理模块 — 文档上传、语义向量化、Milvus 检索 + API 路由
 
-本模块通过 FastAPI APIRouter 注册路由，在 Agent.py 中用 app.include_router() 挂载。
+向量存储由 vector_store.VectorStore（Milvus Lite + BGE 中文语义模型）提供。
+SQLite 仅保留文档元数据（documents 表）。
 """
 
 import base64
@@ -26,45 +27,8 @@ from conversation_manager import get_current_user
 
 
 # ============================================================
-# 一、向量化（纯 Python，零依赖）
+# 一、分块工具（纯文本分割，无向量化）
 # ============================================================
-def _text_to_vector(text: str) -> list[float]:
-    """
-    把文本转为固定长度向量（字符 bigram 哈希 + TF 权重）。
-    不需要任何 embedding API，纯本地计算。
-    """
-    DIM = 512
-    vec = [0.0] * DIM
-    if not text:
-        return vec
-    chars = list(text)
-    for i in range(len(chars)):
-        h = ord(chars[i]) % DIM          # unigram
-        vec[h] += 1.0
-        if i + 1 < len(chars):
-            h2 = (ord(chars[i]) * 31 + ord(chars[i + 1])) % DIM  # bigram
-            vec[h2] += 0.5
-    norm = (sum(v * v for v in vec)) ** 0.5
-    if norm > 0:
-        vec = [v / norm for v in vec]
-    return vec
-
-
-def _embed(texts: list[str]) -> list[list[float]]:
-    """批量文本转向量"""
-    return [_text_to_vector(t) for t in texts]
-
-
-def _cosine_similarity(a: list[float], b: list[float]) -> float:
-    """纯 Python 余弦相似度（无 numpy 依赖）"""
-    dot = sum(x * y for x, y in zip(a, b))
-    norm_a = (sum(x * x for x in a)) ** 0.5
-    norm_b = (sum(x * x for x in b)) ** 0.5
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-    return dot / (norm_a * norm_b)
-
-
 def _chunk_text(text: str, chunk_size: int = 400, overlap: int = 60) -> list[str]:
     """把长文本切成有重叠的段落"""
     chunks = []
@@ -79,10 +43,10 @@ def _chunk_text(text: str, chunk_size: int = 400, overlap: int = 60) -> list[str
 
 
 # ============================================================
-# 二、数据库
+# 二、SQLite（仅存文档元数据）
 # ============================================================
 def init_kb_db():
-    """创建知识库表：documents（文档元数据）+ chunks_vec（文本块+向量JSON）"""
+    """创建 documents 表（chunks_vec 已废弃，由 Milvus 替代）"""
     conn = sqlite3.connect(KB_DB_PATH)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("""
@@ -97,17 +61,8 @@ def init_kb_db():
                      user_id     TEXT DEFAULT ''
                  )
                  """)
-    conn.execute("""
-                 CREATE TABLE IF NOT EXISTS chunks_vec
-                 (
-                     id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                     doc_id    INTEGER NOT NULL,
-                     chunk_idx INTEGER NOT NULL,
-                     content   TEXT    NOT NULL,
-                     embedding TEXT    NOT NULL,
-                     FOREIGN KEY (doc_id) REFERENCES documents (id) ON DELETE CASCADE
-                 )
-                 """)
+    # 清理旧版 chunks_vec 表（已迁移到 Milvus）
+    conn.execute("DROP TABLE IF EXISTS chunks_vec")
     try:
         conn.execute("ALTER TABLE documents ADD COLUMN user_id TEXT DEFAULT ''")
     except sqlite3.OperationalError:
@@ -125,12 +80,18 @@ def get_kb_db() -> sqlite3.Connection:
     return conn
 
 
-# 启动时建表
+# 启动时建表 + 清理旧 chunks_vec
 init_kb_db()
 
 
 # ============================================================
-# 三、知识库检索工具工厂
+# 三、向量存储（Milvus Lite + BGE 语义 embedding）
+# ============================================================
+from vector_store import get_vector_store
+
+
+# ============================================================
+# 四、知识库检索工具
 # ============================================================
 from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
@@ -149,70 +110,31 @@ def search_knowledge_base(query: str, config: RunnableConfig) -> str:
     if not query.strip():
         return "查询内容为空"
 
-    # 1) 向量化查询
+    # 语义检索
     try:
-        q_vec = _embed([query])[0]
+        hits = get_vector_store().search(query, user_id=user_id, top_k=8)
     except Exception as e:
-        return f"查询向量化失败：{e}"
+        return f"[KB]{json.dumps({'results': []})}\n---\n检索失败：{e}"
 
-    # 2) 仅加载当前用户的文档 chunks
-    conn = get_kb_db()
-    try:
-        rows = conn.execute(
-            "SELECT c.doc_id, c.chunk_idx, c.content, c.embedding "
-            "FROM chunks_vec c JOIN documents d ON c.doc_id = d.id "
-            "WHERE d.user_id = ?", (user_id,)
-        ).fetchall()
-    finally:
-        conn.close()
+    if not hits:
+        return "[KB]{\"results\": []}\n---\n知识库中暂无文档，请先上传文档。"
 
-        if not rows:
-            return "[KB]{\"results\": []}\n---\n知识库中暂无文档，请先上传文档。"
-
-        scored = []
-        for r in rows:
-            try:
-                vec = json.loads(r["embedding"])
-            except Exception:
-                continue
-            sim = _cosine_similarity(q_vec, vec)
-            scored.append((sim, r["doc_id"], r["content"]))
-
-        # 3) 取 Top-5 向量相似片段
-        scored.sort(key=lambda x: x[0], reverse=True)
-        top = scored[:5]
-
-        cards = []
-        context_parts = []
-        for sim, doc_id, content in top:
-            if sim >= 0.1:
-                cards.append({
-                    "title": f"文档#{doc_id} 片段（相似度 {sim:.0%}）",
-                    "url": "",
-                    "snippet": content.strip()[:150],
-                })
-                context_parts.append(f"[文档#{doc_id}]\n{content.strip()}")
-
-        # 4) 向量没命中时，把所有文档都给 Agent 让 LLM 自己判断
-        if not context_parts:
-            seen = set()
-            for _, doc_id, content in scored:
-                c = content.strip()
-                if c not in seen:
-                    seen.add(c)
-                    context_parts.append(f"[文档#{doc_id}]\n{c}")
-            cards = [{
-                "title": f"全文检索（共 {len(context_parts)} 个片段）",
-                "url": "",
-                "snippet": "向量未匹配，已将全部文档提供给 AI 分析",
-            }]
+    cards = []
+    context_parts = []
+    for h in hits:
+        cards.append({
+            "title": f"文档#{h['doc_id']} 片段（相似度 {h['score']:.0%}）",
+            "url": "",
+            "snippet": h["content"].strip()[:150],
+        })
+        context_parts.append(f"[文档#{h['doc_id']}]\n{h['content'].strip()}")
 
     ctx = "\n\n".join(context_parts)
     return f"[KB]{json.dumps({'results': cards}, ensure_ascii=False)}\n---\n{ctx}"
 
 
 # ============================================================
-# 四、请求模型
+# 五、请求模型
 # ============================================================
 class KbUploadRequest(BaseModel):
     filename: str = Field(..., description="文件名，如 doc.txt")
@@ -220,14 +142,14 @@ class KbUploadRequest(BaseModel):
 
 
 # ============================================================
-# 五、API 路由
+# 六、API 路由
 # ============================================================
 kb_router = APIRouter(prefix="/api/kb", tags=["知识库"])
 
 
 @kb_router.post("/upload", summary="上传文档到知识库")
 async def kb_upload(body: KbUploadRequest, user_id: str = Depends(get_current_user)):
-    """上传 txt/md 文件（base64 编码），自动分块、向量化、存入数据库"""
+    """上传 txt/md 文件（base64 编码），自动分块、语义向量化、存入 Milvus"""
     # 1) 解码文件内容
     try:
         raw = base64.b64decode(body.content_b64)
@@ -243,18 +165,14 @@ async def kb_upload(body: KbUploadRequest, user_id: str = Depends(get_current_us
     if not text.strip():
         raise HTTPException(400, "文件内容为空")
 
-    # 2) 分块
-    chunks = _chunk_text(text)
+    # 2) 分块（大文件用更大的块减少数量）
+    chunk_size = 800 if len(text) > 500000 else 500 if len(text) > 100000 else 300
+    chunks = _chunk_text(text, chunk_size=chunk_size)
     if not chunks:
         raise HTTPException(400, "文件无法分块")
 
-    # 3) 向量化
-    try:
-        vectors = _embed(chunks)
-    except Exception as e:
-        raise HTTPException(500, f"向量化失败：{e}")
-
-    # 4) 存入数据库
+    # 3) 存入 Milvus（内部完成 embedding + 入库）
+    vs = get_vector_store()
     conn = get_kb_db()
     try:
         now = datetime.now().isoformat()
@@ -264,18 +182,17 @@ async def kb_upload(body: KbUploadRequest, user_id: str = Depends(get_current_us
             (body.filename, ext, len(text), len(chunks), now, user_id),
         )
         doc_id = cur.lastrowid
-        for i, (chunk, vec) in enumerate(zip(chunks, vectors)):
-            conn.execute(
-                "INSERT INTO chunks_vec (doc_id, chunk_idx, content, embedding) "
-                "VALUES (?, ?, ?, ?)",
-                (doc_id, i, chunk, json.dumps(vec)),
-            )
+
+        chunk_count = vs.insert_chunks(doc_id, chunks, user_id)
         conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(500, f"存储失败：{e}")
     finally:
         conn.close()
 
     return {"ok": True, "doc_id": doc_id, "filename": body.filename,
-            "chunks": len(chunks), "char_count": len(text)}
+            "chunks": chunk_count, "char_count": len(text)}
 
 
 @kb_router.get("/documents", summary="知识库文档列表")
@@ -295,12 +212,16 @@ def kb_list_documents(user_id: str = Depends(get_current_user)):
 
 @kb_router.delete("/documents/{doc_id}", summary="删除知识库文档")
 def kb_delete_document(doc_id: int, user_id: str = Depends(get_current_user)):
-    """删除文档及其所有向量块（仅允许删除自己的文档）"""
+    """删除文档及其向量块（SQLite 元数据 + Milvus 向量）"""
     conn = get_kb_db()
     try:
         conn.execute("DELETE FROM documents WHERE id = ? AND user_id = ?", (doc_id, user_id))
-        conn.execute("DELETE FROM chunks_vec WHERE doc_id = ?", (doc_id,))
         conn.commit()
     finally:
         conn.close()
+    # 从 Milvus 删除向量
+    try:
+        get_vector_store().delete_document(doc_id)
+    except Exception:
+        pass
     return {"ok": True}

@@ -12,7 +12,7 @@
 import os
 import httpx
 
-BUSINESS_BASE_URL = os.getenv("BUSINESS_BASE_URL", "http://localhost:8080")
+BUSINESS_BASE_URL = os.getenv("BUSINESS_BASE_URL", "http://www.myzyitzj.cn")
 
 
 class BusinessClient:
