@@ -1,7 +1,6 @@
 package com.xiaoyan.utils;
 
 
-import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.xiaoyan.baseinterface.HashCacheId;
@@ -23,7 +22,6 @@ import java.util.function.Supplier;
 
 @Component
 public class RedisUtil {
-
 
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -58,9 +56,6 @@ public class RedisUtil {
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value), DEFAULT_TTL, DEFAULT_TIME_UNIT);
     }
 
-    public void putHash(@NonNull String key, @NonNull String hashKey, Object value) {
-        stringRedisTemplate.opsForHash().put(key, hashKey, JSONUtil.toJsonStr(value));
-    }
 
     public void saveWithLogicalExpire(@NonNull String key, @NonNull Object value) {
         RedisData redisData = new RedisData();
@@ -251,7 +246,7 @@ public class RedisUtil {
                 stringRedisTemplate.opsForValue().set(key, "", VOID_VALUE_TTL, TIME_UNIT);
                 return null;
             }
-            this.putHash(key, hashKey, r);
+            stringRedisTemplate.opsForHash().put(key, hashKey, JSONUtil.toJsonStr(r));
             return r;
         } finally {
             this.unlock(lockKey);
@@ -267,10 +262,8 @@ public class RedisUtil {
         stringRedisTemplate.delete(key);
     }
 
-    public <P extends HashCacheId> List<P> getAllWithHashCache(String cacheKey,
-                                                                                         Supplier<Long> countSupplier,
-                                                                                         Supplier<List<P>> dbFallback,
-                                                                                         Class<P> pojoType) {
+    public <P extends HashCacheId> List<P> getAllWithHashCache(String cacheKey, Supplier<Long> countSupplier,
+                                                               Supplier<List<P>> dbFallback, Class<P> pojoType) {
         // 1. 获取缓存总数
         long count = countSupplier.get();
 
@@ -280,7 +273,7 @@ public class RedisUtil {
         // 3. 校验缓存，如果数量匹配，则返回缓存数据
         if (caches.size() == count) {
             return caches.stream()
-                    .map(o -> JSONUtil.toBean((String) o, pojoType))
+                    .map(o -> JSONUtil.toBean((String) o,pojoType ))
                     .toList();
         }
 
@@ -293,6 +286,6 @@ public class RedisUtil {
         list.forEach(p -> map.put(p.getCacheId(), JSONUtil.toJsonStr(p)));
         stringRedisTemplate.opsForHash().putAll(cacheKey, map);
 
-       return list;
+        return list;
     }
 }

@@ -18,22 +18,14 @@ public interface ArticlesService extends IService<Article> {
 
     void upload(ArticleDTO articleDTO);
 
-    List<ArticleVO> getPage(@NonNull Integer page, Integer type, @NonNull Integer size);
+    List<ArticleVO> getPage(@NonNull Integer page, Integer type, @NonNull Integer size, Integer studentId);
 
     void delete(Long id);
 
     void update(ArticleDTO article);
 
-    List<ArticleVO> getMyArticles(@NonNull Integer page, @NonNull Integer size, Integer studentId);
-
-    /**
-     * 批量删除图片（删OSS文件 + student_file记录 + article_image关联记录）
-     */
     void deleteBatch(List<Long> studentFileIds);
 
-    /**
-     * 批量上传 MultipartFile 到 OSS，返回 student_file_id + file_url 列表（保持输入顺序）
-     */
     List<ArticleImageVO> batchUploadFiles(List<MultipartFile> files);
 
     Integer getArticlePosition(Long articleId);

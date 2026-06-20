@@ -58,7 +58,7 @@ xiaoyan:
     - "/user/users/login"
     - "/user/resources/all"
     - "/v3/api-docs/**"
-    - "/user/newcomers/apply-join"
+    - "/user/newcomers"
     - "/user/articles/page"
     - "/user/articles/count"
     - "/ws/**"

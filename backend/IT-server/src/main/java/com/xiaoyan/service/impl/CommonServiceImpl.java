@@ -29,7 +29,7 @@ public class CommonServiceImpl implements CommonService {
     private StudentFileMapper studentFileMapper;
 
     @Override
-    public Long upload(MultipartFile file) throws IOException {
+    public StudentFile upload(MultipartFile file) throws IOException {
         String originalName = file.getOriginalFilename();
         if (originalName == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
@@ -54,8 +54,7 @@ public class CommonServiceImpl implements CommonService {
 
         studentFileMapper.insert(record);
 
-        //回显id
-        return record.getId();
+        return record;
     }
 
     @Override

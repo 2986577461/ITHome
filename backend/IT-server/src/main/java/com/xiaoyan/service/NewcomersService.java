@@ -3,6 +3,7 @@ package com.xiaoyan.service;
 
 import com.xiaoyan.pojo.Newcomer;
 import com.xiaoyan.vo.NewcomerVO;
+import lombok.NonNull;
 
 import java.util.List;
 
@@ -12,7 +13,7 @@ public interface NewcomersService {
 
     void agreeNewcomer(Long id);
 
-    void applyJoin(Newcomer newComer);
+    void applyJoin(@NonNull Newcomer newComer);
 
     List<Newcomer> getAll();
 

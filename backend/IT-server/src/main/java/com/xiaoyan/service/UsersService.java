@@ -26,12 +26,8 @@ public interface UsersService extends IService<Student> {
 
     void update(Student student);
 
-    void updatePassword(PasswordDTO passwordDTO, Integer studentId);
-
     void uploadAvatar(MultipartFile avatar) throws IOException;
 
     ResponseEntity<byte[]> downloadExcel() throws IOException;
-
-    Result<String> updateSelf(StudentDTO studentDTO);
 
 }

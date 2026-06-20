@@ -3,7 +3,6 @@ package com.xiaoyan.interceptor;
 
 import com.xiaoyan.context.BaseContext;
 import lombok.AllArgsConstructor;
-import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -17,17 +16,19 @@ public class JwtWhiteList {
 
     private StringRedisTemplate stringRedisTemplate;
 
+    private static final String HASH_KEY = "jwt:active_sessions";
+
     public boolean validation(Integer studentId, String token) {
-        HashOperations<String, String, Object> hash = stringRedisTemplate.opsForHash();
-        String hashKey = "jwt:active_sessions";
-        String storedtToken = (String) hash.get(hashKey, String.valueOf(studentId));
+        String storedtToken = (String) stringRedisTemplate.opsForHash().get(HASH_KEY, String.valueOf(studentId));
         return storedtToken != null && storedtToken.equals(token);
     }
 
-    public void addOrUpdateTokenHash(String token) {
+    public void updateToken(String token) {
         Integer studentId = BaseContext.getCurrentStudentId();
-        HashOperations<String, String, Object> opsForHash = stringRedisTemplate.opsForHash();
-        String hashKey = "jwt:active_sessions";
-        opsForHash.put(hashKey, String.valueOf(studentId), token);
+        stringRedisTemplate.opsForHash().put(HASH_KEY, String.valueOf(studentId), token);
+    }
+
+    public void deleteToken(String ... studentIds) {
+        stringRedisTemplate.opsForHash().delete(HASH_KEY, studentIds);
     }
 }

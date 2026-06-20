@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.xiaoyan.dto.ResourcesDTO;
 import com.xiaoyan.vo.ResourcesVO;
 
+import java.io.IOException;
 import java.util.List;
 
 @Slf4j
@@ -30,8 +31,15 @@ import java.util.List;
 @Validated
 public class ResourcesController {
 
-
     private ResourcesService resourcesService;
+
+    @GetMapping("count")
+    @Operation(summary = "获取资料总数")
+    public Result<Long> getCount() {
+        log.info("获取资料总数");
+        Long count = resourcesService.getCount();
+        return Result.success(count);
+    }
 
     @GetMapping("all")
     @Operation(summary = "返回所有资料")
@@ -42,19 +50,18 @@ public class ResourcesController {
     }
 
     @DeleteMapping("{id}")
-    @Operation(summary = "删除自己的资料")
+    @Operation(summary = "删除资料")
     public Result<String> deleteByid(@PathVariable Long id) {
         Integer studentId = BaseContext.getCurrentStudentId();
-        log.info("用户{}删除自己的资料{}", studentId, id);
         resourcesService.deleteById(id, studentId);
         return Result.success();
     }
 
     @PostMapping
     @Operation(summary = "上传资料")
-    public Result<String> saveResource(@ModelAttribute @Valid ResourcesDTO resourcesDTO) {
+    public Result<String> saveResource(@ModelAttribute @Valid ResourcesDTO resourcesDTO) throws IOException {
         Integer studentId = BaseContext.getCurrentStudentId();
-        log.info("用户{}上传文章{}",studentId,resourcesDTO);
+        log.info("用户{}上传文章{}", studentId, resourcesDTO);
         resourcesService.saveResource(resourcesDTO, studentId);
         return Result.success();
     }

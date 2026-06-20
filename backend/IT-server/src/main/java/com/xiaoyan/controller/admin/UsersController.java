@@ -1,5 +1,6 @@
 package com.xiaoyan.controller.admin;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.UsersService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,17 +50,8 @@ public class UsersController {
     @DeleteMapping
     @Operation(summary = "删除学生,记得清理localStorage")
     public Result<String> removeStudents(@RequestBody List<Long> ids) {
-        log.info("删除学生{}",ids);
+        log.info("删除学生{}", ids);
         userService.removeStudents(ids);
-        return Result.success();
-    }
-    @PutMapping
-    @Operation(summary = "修改信息")
-    public Result<String> updateStudent(@RequestBody @Valid StudentDTO studentDTO) {
-        log.info("修改学生{}的信息",studentDTO);
-        Student student = new Student();
-        BeanUtils.copyProperties(studentDTO, student);
-        userService.update(student);
         return Result.success();
     }
 }

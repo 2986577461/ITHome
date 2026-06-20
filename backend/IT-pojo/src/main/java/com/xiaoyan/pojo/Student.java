@@ -6,7 +6,6 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.xiaoyan.baseinterface.HashCacheId;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,7 +18,7 @@ import java.io.Serializable;
 @AllArgsConstructor
 @Builder
 @TableName(value = "it_student")
-public class Student implements Serializable , HashCacheId {
+public class Student implements Serializable {
 
     @TableId("id")
     private Long id;
@@ -49,15 +48,6 @@ public class Student implements Serializable , HashCacheId {
     private String position;
 
     private Long avatarId;
-
-    private Integer articleCount;
-
-    private Integer resourceCount;
-
-    @Override
-    public String getCacheId() {
-        return String.valueOf(this.id);
-    }
 
     @TableLogic
     private Boolean deleted;

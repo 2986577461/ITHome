@@ -17,4 +17,6 @@ public interface ArticleMapper extends BaseMapper<Article> {
 
     /** 统计排在指定文章前面的文章数（updated_date_time DESC, id DESC） */
     int countBefore(LocalDateTime updatedDateTime);
+
+    int selectCountByStudentId(Integer studentId);
 }

@@ -13,8 +13,6 @@ CREATE TABLE it_student
     academy        VARCHAR(20)      NOT NULL,
     position       varchar(20)      NOT NULL,
     avatar_id      bigint           not null,
-    article_count  int              not null default 0,
-    resource_count int              not null default 0,
     password       VARCHAR(100)     NOT NULL,
     deleted        boolean          not null default 0
 ) ENGINE = InnoDB
@@ -49,7 +47,7 @@ CREATE TABLE article
     head              varchar(100)   not null,
     content           varchar(10000) not null,
     student_id        int            not null,
-    release_date_time DATETIME       not null,
+    release_date_time DATETIME       not null ,
     updated_date_time datetime       not null
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4

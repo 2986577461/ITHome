@@ -9,7 +9,10 @@ import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.LoginDTO;
 import com.xiaoyan.dto.PasswordDTO;
 import com.xiaoyan.dto.StudentDTO;
+import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.interceptor.JwtWhiteList;
+import com.xiaoyan.mapper.ArticleMapper;
+import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.mapper.UserMapper;
 import com.xiaoyan.pojo.Student;
@@ -44,6 +47,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
 
@@ -56,6 +60,8 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         implements UsersService {
 
     private static final BCryptPasswordEncoder ENCODER = new BCryptPasswordEncoder();
+    private final ArticleMapper articleMapper;
+    private final ResourcesMapper resourcesMapper;
     private JwtProperties jwtProperties;
     private StringRedisTemplate stringRedisTemplate;
     private StudentFileMapper studentFileMapper;
@@ -97,9 +103,9 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
                 commonService.delete(oldAvatar.getObjectName());
             }
         }
-        Long newAvatarId = commonService.upload(avatar);
+        Long newAvatarId = commonService.upload(avatar).getId();
         student.setAvatarId(newAvatarId);
-        redisUtil.save(CACHE_STUDENTS + studentId, student);
+        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentId);
         this.lambdaUpdate().set(Student::getAvatarId, newAvatarId).update();
 
     }
@@ -167,16 +173,6 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
                 .body(excelBytes);
     }
 
-    @Override
-    public Result<String> updateSelf(StudentDTO studentDTO) {
-        Student student = BeanUtil.toBean(studentDTO, Student.class);
-        if (!BaseContext.getCurrentStudentId().equals(studentDTO.getStudentId())) {
-            return Result.error(MessageConstant.POSITION_MISMATCH);
-        }
-        this.updateById(student);
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS,String.valueOf(student.getStudentId()));
-        return Result.success();
-    }
 
     @Override
     public Result<StudentVO> login(LoginDTO message) {
@@ -213,7 +209,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
                 claims);
         vo.setToken(token);
         //添加到token白名单
-        jwtWhiteList.addOrUpdateTokenHash(token);
+        jwtWhiteList.updateToken(token);
         return Result.success(vo);
     }
 
@@ -239,19 +235,26 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
                     .forEach(file -> avatarUrlMap.put(file.getId(), file.getFileUrl()));
         }
 
-        // Student → StudentVO，填入头像 URL
         return list.stream().map(student -> {
             StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
             Long avatarId = student.getAvatarId();
             if (avatarId != null) {
                 vo.setAvatar(avatarUrlMap.get(avatarId));
             }
+            Integer studentId = student.getStudentId();
+            vo.setArticleCount(articleMapper.selectCountByStudentId(studentId));
+            vo.setResourceCount(resourcesMapper.selectCountByStudentId(studentId));
+
             return vo;
         }).toList();
     }
 
     @Override
     public void removeStudents(List<Long> ids) {
+        String[] studentIds = (String[]) this.listByIds(ids).stream()
+                .map(student -> String.valueOf(student.getStudentId())).toArray();
+        jwtWhiteList.deleteToken(studentIds);
+
         userMapper.deleteByIds(ids);
         stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS,
                 (Object[]) ids.stream().map(String::valueOf).toArray(String[]::new));
@@ -260,21 +263,22 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public void update(Student student) {
+        if (student == null) {
+            return;
+        }
+        Integer studentId = student.getStudentId();
+
+        StudentVO vo = this.getUser(BaseContext.getCurrentStudentId());
+        //不是管理员却想修改别人
+        if (!JwtClaimsConstant.ADMIN_ID.equals(vo.getPosition()) && !studentId.equals(vo.getStudentId())) {
+            throw new ParameterException(MessageConstant.PERMISSION_DENIED);
+        }
         String password = student.getPassword();
         if (password != null) {
             student.setPassword(ENCODER.encode(password));
         }
         userMapper.updateById(student);
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, String.valueOf(student.getStudentId()));
-    }
-
-    @Override
-    public void updatePassword(PasswordDTO passwordDTO, Integer studentId) {
-        this.lambdaUpdate().set(Student::getPassword, ENCODER.encode(passwordDTO.getPassword())).
-                eq(Student::getStudentId, studentId).update();
-
         stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, String.valueOf(studentId));
     }
-
 
 }

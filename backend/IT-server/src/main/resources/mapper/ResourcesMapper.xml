@@ -6,5 +6,7 @@
 <mapper namespace="com.xiaoyan.mapper.ResourcesMapper">
 
 
-
+    <select id="selectCountByStudentId" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM resources WHERE resources.student_id=#{studentId}
+    </select>
 </mapper>

@@ -1,7 +1,9 @@
 package com.xiaoyan.controller.user;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.StudentDTO;
+import com.xiaoyan.pojo.Student;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.UsersService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,15 +34,6 @@ public class UsersController {
 
     private UsersService userService;
 
-    @PutMapping
-    @Operation(summary = "修改密码")
-    public Result<String> updateStudent(@RequestBody @Valid PasswordDTO passwordDTO) {
-        Integer studentId = BaseContext.getCurrentStudentId();
-        log.info("用户{}修改密码为:{}", studentId, passwordDTO);
-        userService.updatePassword(passwordDTO, studentId);
-        return Result.success();
-    }
-
     @PostMapping("avatar")
     public Result<String> uploadAvatar(MultipartFile avatar) throws IOException {
         log.info("头像上传");
@@ -63,9 +56,11 @@ public class UsersController {
         log.info("用户登录{}", message);
         return userService.login(message);
     }
-    @PostMapping("profile")
-    public Result<String> updateSelf(@RequestBody StudentDTO studentDTO){
-        log.info("学生修改自身信息");
-        return userService.updateSelf(studentDTO);
+
+    @PutMapping
+    @Operation(summary = "修改信息")
+    public Result<String> updateStudent(@RequestBody @Valid StudentDTO studentDTO) {
+        userService.update(BeanUtil.toBean(studentDTO, Student.class));
+        return Result.success();
     }
 }

@@ -16,7 +16,7 @@ public class CacheWarmUpRunner implements CommandLineRunner {
     public void run(String... args) {
         System.out.println("🚀 缓存预热任务开始...");
 
-        articlesServiceImpl.buildLatestCache(null);
+        articlesServiceImpl.buildLatestCache();
         System.out.println("✅ 缓存预热任务完成");
     }
 

@@ -26,4 +26,7 @@
         SELECT COUNT(*) FROM article
         WHERE updated_date_time > #{updatedDateTime}
     </select>
+    <select id="selectCountByStudentId" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM article WHERE article.student_id=#{studentId}
+    </select>
 </mapper>

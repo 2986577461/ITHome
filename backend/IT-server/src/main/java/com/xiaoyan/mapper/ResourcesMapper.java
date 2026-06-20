@@ -6,4 +6,5 @@ import com.xiaoyan.pojo.Resources;
 
 @Mapper
 public interface ResourcesMapper extends BaseMapper<Resources> {
+    int selectCountByStudentId(Integer studentId);
 }

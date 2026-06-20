@@ -37,6 +37,6 @@ public class StudentVO implements Serializable, HashCacheId {
 
     @Override
     public String getCacheId() {
-        return String.valueOf(this.id);
+        return String.valueOf(this.studentId);
     }
 }

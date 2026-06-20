@@ -34,12 +34,12 @@ public class ArticlesController {
     @Resource
     private ArticlesService articlesService;
 
-    @GetMapping("page")
-    @Operation(summary = "返回文章")
-    public Result<List<ArticleVO>> getPage(@NonNull Integer page, Integer type, @NonNull Integer size) {
-        log.info("返回文章");
-        List<ArticleVO> list = articlesService.getPage(page, type, size);
-        return Result.success(list);
+    @GetMapping
+    @Operation(summary = "分页查询文章，my=true 则查自己的")
+    public Result<List<ArticleVO>> getPage(@NonNull Integer page, Integer type, @NonNull Integer size,
+                                           @RequestParam(required = false) Boolean my) {
+        Integer studentId = Boolean.TRUE.equals(my) ? BaseContext.getCurrentStudentId() : null;
+        return Result.success(articlesService.getPage(page, type, size, studentId));
     }
 
     @GetMapping("count")
@@ -47,14 +47,6 @@ public class ArticlesController {
     public Result<Long> getCount(Integer type) {
         log.info("获取文章总数");
         return Result.success(articlesService.getCount(type));
-    }
-
-    @GetMapping("my-articles")
-    @Operation(summary = "返回自己的文章")
-    public Result<List<ArticleVO>> getMyArticles(@NonNull Integer page, @NonNull Integer size) {
-        Integer studentId = BaseContext.getCurrentStudentId();
-        log.info("返回{}的文章", studentId);
-        return Result.success(articlesService.getMyArticles(page, size, studentId));
     }
 
     @GetMapping("position")
