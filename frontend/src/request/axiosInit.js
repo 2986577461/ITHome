@@ -13,13 +13,22 @@ const axiosInstance = axios.create({
 });
 
 axiosInstance.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    var body = response.data;
+    if (body && body.code != null && Number(body.code) !== 200) {
+      ElMessage.error(body.msg);
+    }
+    return body;
+  },
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 500) {
+      ElMessage.error("服务器内部出错！");
+    } else if (error.response?.status === 401) {
       const token = localStorage.getItem("authorization");
       ElMessage.error(token ? "身份验证失败，请重新登录!" : "请登录后再尝试!");
+    } else if (error.response?.status === 503) {
+      ElMessage.error("访问频率过高，请稍后尝试！");
     }
-    return Promise.reject(error);
   },
 );
 

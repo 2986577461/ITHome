@@ -280,7 +280,7 @@ import {
   getMyResources,
 } from "@/request/axiosForProfile.js";
 import { ElMessage } from "element-plus";
-import { getThis, uploadAvatar } from "@/request/axiosForUser";
+import { getThis, update, uploadAvatar } from "@/request/axiosForUser";
 import { getArticlePosition } from "@/request/axiosForArticles";
 
 const router = useRouter();
@@ -374,7 +374,7 @@ async function submitAvatar() {
     }
     const resp = await uploadAvatar(fd);
     if (resp?.code === "200") {
-      avatarPreview.value = resp.data || dialogAvatar.value;
+      avatarPreview.value = resp || dialogAvatar.value;
       userStore.setAvatar(avatarPreview.value);
       ElMessage.success("头像已更新");
     } else {
@@ -394,26 +394,22 @@ async function submitAvatar() {
 }
 
 async function saveProfile() {
-  try {
-    const resp = await updateProfile({
-      id: userStore.id,
-      studentId: userStore.studentId,
-      name: form.name,
-      sex: form.sex,
-      major: form.major,
-      className: form.className,
-      academy: form.academy,
-    });
-    if (resp?.code === "200") {
-      userStore.name = form.name;
-      userStore.sex = form.sex;
-      userStore.major = form.major;
-      userStore.className = form.className;
-      userStore.academy = form.academy;
-      ElMessage.success("保存成功");
-    }
-  } catch {
-    ElMessage.error("保存失败");
+  const resp = await update({
+    id: userStore.id,
+    studentId: userStore.studentId,
+    name: form.name,
+    sex: form.sex,
+    major: form.major,
+    className: form.className,
+    academy: form.academy,
+  });
+  if (resp?.code === "200") {
+    userStore.name = form.name;
+    userStore.sex = form.sex;
+    userStore.major = form.major;
+    userStore.className = form.className;
+    userStore.academy = form.academy;
+    ElMessage.success("保存成功");
   }
 }
 
@@ -427,9 +423,10 @@ async function changePassword() {
     return;
   }
   try {
-    const resp = await updatePassword({
-      oldPassword: pwdForm.oldPassword,
-      newPassword: pwdForm.newPassword,
+    const resp = await update({
+      id: userStore.id,
+      studentId: userStore.studentId,
+      password: newPassword,
     });
     if (resp?.code === "200") {
       ElMessage.success("密码修改成功");

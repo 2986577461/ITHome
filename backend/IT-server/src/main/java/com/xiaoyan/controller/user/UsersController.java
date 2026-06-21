@@ -46,8 +46,7 @@ public class UsersController {
     public Result<StudentVO> getUser() {
         Integer studentId = BaseContext.getCurrentStudentId();
         log.info("用户信息回显:{}", studentId);
-        StudentVO user = userService.getUser(studentId);
-        return Result.success(user);
+        return Result.success(userService.getUser(studentId));
     }
 
     @PostMapping("login")
@@ -60,6 +59,7 @@ public class UsersController {
     @PutMapping
     @Operation(summary = "修改信息")
     public Result<String> updateStudent(@RequestBody @Valid StudentDTO studentDTO) {
+        System.out.println(studentDTO);
         userService.update(BeanUtil.toBean(studentDTO, Student.class));
         return Result.success();
     }

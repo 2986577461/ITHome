@@ -45,7 +45,7 @@ const router = createRouter({
       path: "/colony-govern",
       name: "colony-govern",
       component: () => import("@/views/ColonyGovern.vue"),
-      meta: { requiresAuth: true, requiresRole: ["会长", "副会长"] },
+      meta: { requiresAuth: true, requiresRole: ["admin"] },
     },
     {
       path: "/upload-article",

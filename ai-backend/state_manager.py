@@ -35,17 +35,19 @@ class S:
     SEARCHING_KB = "searching_kb"
     SEARCHING_WEB = "searching_web"
     PUBLISHING = "publishing"
+    REASONING = "reasoning"
+    THINKING = "thinking"
     CALLING_TOOL = "calling_tool"
     GENERATING = "generating"
     COMPLETED = "completed"
     FAILED = "failed"
     INTERRUPTED = "interrupted"
     ALL = [PENDING, QUEUED, RUNNING, SEARCHING_KB, SEARCHING_WEB, PUBLISHING,
-           CALLING_TOOL, GENERATING, COMPLETED, FAILED, INTERRUPTED]
+           REASONING, THINKING, CALLING_TOOL, GENERATING, COMPLETED, FAILED, INTERRUPTED]
 
 # 还在运行中的状态（非终结态）
 ACTIVE_STATES = [S.PENDING, S.QUEUED, S.RUNNING, S.SEARCHING_KB, S.SEARCHING_WEB,
-                 S.PUBLISHING, S.CALLING_TOOL, S.GENERATING]
+                 S.PUBLISHING, S.REASONING, S.THINKING, S.CALLING_TOOL, S.GENERATING]
 
 
 class StateManager:
@@ -59,7 +61,8 @@ class StateManager:
     # SQLite 持久化
     # ------------------------------------------------------------------
 
-    def _init_db(self):
+    @staticmethod
+    def _init_db():
         conn = sqlite3.connect(TASKS_DB)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("""

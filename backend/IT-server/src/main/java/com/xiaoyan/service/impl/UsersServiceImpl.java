@@ -1,24 +1,24 @@
 package com.xiaoyan.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.constant.MessageConstant;
-import com.xiaoyan.constant.PositionConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.LoginDTO;
-import com.xiaoyan.dto.PasswordDTO;
-import com.xiaoyan.dto.StudentDTO;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.interceptor.JwtWhiteList;
 import com.xiaoyan.mapper.ArticleMapper;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.mapper.UserMapper;
+import com.xiaoyan.pojo.Article;
 import com.xiaoyan.pojo.Student;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.result.Result;
+import com.xiaoyan.service.ArticlesService;
 import com.xiaoyan.service.CommonService;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.JwtUtil;
@@ -41,15 +41,17 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
+import static com.xiaoyan.service.impl.ArticlesServiceImpl.IMAGE_PATTERN;
 
 /**
  * @author yuchao
@@ -87,6 +89,8 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             StudentFile avatar = studentFileMapper.selectById(avatarId);
             if (avatar != null) {
                 vo.setAvatar(avatar.getFileUrl());
+                vo.setArticleCount(articleMapper.selectCountByStudentId(studentId));
+                vo.setResourceCount(resourcesMapper.selectCountByStudentId(studentId));
             }
         }
         return vo;
@@ -112,7 +116,8 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public ResponseEntity<byte[]> downloadExcel() throws IOException {
-        List<StudentVO> all = this.getAll();
+        List<Student> all = userMapper.selectThisYearsStudents();
+
         XSSFWorkbook xssfWorkbook = new XSSFWorkbook();
         XSSFSheet sheet = xssfWorkbook.createSheet();
         for (int i = 0; i <= 6; i++) {
@@ -134,6 +139,9 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         row1.createCell(6).setCellValue("职务");
 
         for (int i = 2, s = 0; s < all.size(); i++, s++) {
+            if (all.get(s).getName().equals("AI协会助手")) {
+                s++;
+            }
             XSSFRow row2 = sheet.createRow(i);
             row2.createCell(0).setCellValue(all.get(s).getStudentId());
             row2.createCell(1).setCellValue(all.get(s).getName());
@@ -141,7 +149,9 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             row2.createCell(3).setCellValue(all.get(s).getMajor());
             row2.createCell(4).setCellValue(all.get(s).getClassName());
             row2.createCell(5).setCellValue(all.get(s).getAcademy());
-            row2.createCell(6).setCellValue(all.get(s).getPosition());
+
+            String position = all.get(s).getPosition();
+            row2.createCell(6).setCellValue("admin".equals(position) ? "会长" : "学员");
         }
 
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -152,8 +162,8 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
         HttpHeaders headers = new HttpHeaders();
         // Content-Type: 告诉浏览器响应的内容类型是 Excel 文件
-        headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml" +
-                ".sheet"));
+        headers.setContentType(MediaType.
+                parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
 
         // Content-Disposition: 告诉浏览器这是一个附件，并指定下载的文件名
         String fileName = "IT之家协会花名册.xlsx";
@@ -195,7 +205,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
         BaseContext.setCurrentStudentId(vo.getStudentId());
         String tokenName;
-        if (vo.getPosition().equals(PositionConstant.MASTER)) {
+        if (vo.getPosition().equals(JwtClaimsConstant.ADMIN_ID)) {
             tokenName = JwtClaimsConstant.ADMIN_ID;
         } else {
             tokenName = JwtClaimsConstant.USER_ID;
@@ -242,6 +252,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
                 vo.setAvatar(avatarUrlMap.get(avatarId));
             }
             Integer studentId = student.getStudentId();
+            log.error(String.valueOf(studentId));
             vo.setArticleCount(articleMapper.selectCountByStudentId(studentId));
             vo.setResourceCount(resourcesMapper.selectCountByStudentId(studentId));
 
@@ -250,15 +261,33 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     }
 
     @Override
-    public void removeStudents(List<Long> ids) {
-        String[] studentIds = (String[]) this.listByIds(ids).stream()
-                .map(student -> String.valueOf(student.getStudentId())).toArray();
-        jwtWhiteList.deleteToken(studentIds);
+    public void removeStudents(List<Integer> studentIds) {
+        List<String> list = studentIds.stream().map(String::valueOf).toList();
+        Set<String> position = userMapper.selectPositionByIds(studentIds);
+        if (position.contains(JwtClaimsConstant.ADMIN_ID)) {
+            throw new RuntimeException(MessageConstant.PERMISSION_DENIED);
+        }
 
-        userMapper.deleteByIds(ids);
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS,
-                (Object[]) ids.stream().map(String::valueOf).toArray(String[]::new));
+        jwtWhiteList.deleteToken(list.toArray());
+        userMapper.deletebyStudentIds(list);
+        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, list.toArray());
 
+      studentIds.forEach(this::deleteBatch);
+    }
+
+    public void deleteBatch(Integer studentId){
+        List<Article> articles = articleMapper.selectPageByStudentId(0, studentId, Integer.MAX_VALUE);
+
+        List<String> objectNames = new ArrayList<>();
+        for (Article article : articles) {
+            Matcher matcher = IMAGE_PATTERN.matcher(article.getContent());
+            while (matcher.find()) {
+                String url = matcher.group(1);
+                objectNames.add(url.substring(url.lastIndexOf('/') + 1));
+            }
+        }
+        commonService.delete(objectNames.toArray(new String[0]));
+        articleMapper.deleteByStudentId(studentId);
     }
 
     @Override
@@ -270,8 +299,8 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
         StudentVO vo = this.getUser(BaseContext.getCurrentStudentId());
         //不是管理员却想修改别人
-        if (!JwtClaimsConstant.ADMIN_ID.equals(vo.getPosition()) && !studentId.equals(vo.getStudentId())) {
-            throw new ParameterException(MessageConstant.PERMISSION_DENIED);
+        if (!JwtClaimsConstant.ADMIN_ID.equals(vo.getPosition()) && !vo.getStudentId().equals(studentId)) {
+            throw new RuntimeException(MessageConstant.PERMISSION_DENIED);
         }
         String password = student.getPassword();
         if (password != null) {

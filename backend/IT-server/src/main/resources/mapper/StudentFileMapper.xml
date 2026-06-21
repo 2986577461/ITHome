@@ -8,4 +8,10 @@
 <mapper namespace="com.xiaoyan.mapper.StudentFileMapper">
 
 
+    <delete id="deleteByObjectNames">
+        DELETE FROM student_file WHERE student_file.object_name IN
+        <foreach collection="objectNames" item="objectName" open="(" separator="," close=")">
+            #{objectName}
+        </foreach>
+    </delete>
 </mapper>

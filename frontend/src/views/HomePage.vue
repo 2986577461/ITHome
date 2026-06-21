@@ -10,7 +10,7 @@
       </div>
       <div class="hero-content">
         <h1 class="hero-title reveal reveal-delay-1">
-          <span style="color: red" class="fw-light">IT之家</span>
+          <span class="fw-light">IT之家</span>
         </h1>
         <p class="hero-desc reveal reveal-delay-2">
           成立于 2013 年，专注物联网硬件设计与软件开发。<br />探索前沿技术，分享实践经验。

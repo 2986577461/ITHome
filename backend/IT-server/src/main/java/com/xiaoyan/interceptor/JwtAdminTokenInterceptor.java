@@ -56,6 +56,7 @@ public class JwtAdminTokenInterceptor implements HandlerInterceptor {
             BaseContext.setCurrentStudentId(studentId);
             return true;
         } catch (RuntimeException ex) {
+            ex.printStackTrace();
             response.setStatus(401);
             return false;
         }

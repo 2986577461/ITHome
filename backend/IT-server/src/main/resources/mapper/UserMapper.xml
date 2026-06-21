@@ -4,6 +4,12 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.xiaoyan.mapper.UserMapper">
+    <delete id="deletebyStudentIds">
+        DELETE FROM it_student WHERE student_id IN
+        <foreach collection="studentIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
 
 
     <select id="selectByStudentIds" resultType="com.xiaoyan.pojo.Student">
@@ -11,5 +17,17 @@
         <foreach collection="studentIds" item="id" open="(" separator="," close=")">
             #{id}
         </foreach>
+    </select>
+    <select id="selectPositionByIds" resultType="java.lang.String">
+        SELECT position FROM it_student where student_id IN
+        <foreach collection="studentIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="selectThisYearsStudents" resultType="com.xiaoyan.pojo.Student">
+        SELECT s.*
+        FROM it_student s
+                 CROSS JOIN (SELECT FLOOR(MAX(student_id) / 100000) AS p FROM it_student) t
+        WHERE FLOOR(s.student_id / 100000) IN (t.p, t.p - 1);
     </select>
 </mapper>

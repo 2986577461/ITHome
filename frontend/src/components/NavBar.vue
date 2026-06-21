@@ -25,9 +25,7 @@
         <router-link to="/ai-dialog" class="nav-item">AI对话</router-link>
         <router-link to="/join-us" class="nav-item">加入我们</router-link>
         <router-link
-          v-if="
-            userStore.position === '会长' || userStore.position === '副会长'
-          "
+          v-if="userStore.position === 'admin'"
           to="/colony-govern"
           class="nav-item"
           >学员管理</router-link
@@ -249,7 +247,9 @@ onUnmounted(() => window.removeEventListener("scroll", onScroll));
   backdrop-filter: blur(24px) saturate(1.4);
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02), 0 4px 16px rgba(0, 0, 0, 0.03);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.02),
+    0 4px 16px rgba(0, 0, 0, 0.03);
 }
 .nav-inner {
   max-width: var(--max-width);
@@ -297,7 +297,7 @@ onUnmounted(() => window.removeEventListener("scroll", onScroll));
   position: relative;
 }
 .nav-item::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -4px;
   left: 0;
@@ -404,10 +404,14 @@ onUnmounted(() => window.removeEventListener("scroll", onScroll));
   z-index: var(--z-dropdown);
 }
 .drop-enter-active {
-  transition: opacity 0.2s var(--easing-spring), transform 0.25s var(--easing-spring);
+  transition:
+    opacity 0.2s var(--easing-spring),
+    transform 0.25s var(--easing-spring);
 }
 .drop-leave-active {
-  transition: opacity 0.12s, transform 0.15s;
+  transition:
+    opacity 0.12s,
+    transform 0.15s;
 }
 .drop-enter-from,
 .drop-leave-to {

@@ -5,6 +5,9 @@
 
 
 <mapper namespace="com.xiaoyan.mapper.ArticleMapper">
+    <delete id="deleteByStudentId">
+        DELETE FROM article WHERE article.student_id=#{studentId}
+    </delete>
 
     <select id="selectPage" resultType="com.xiaoyan.pojo.Article">
         SELECT * FROM article

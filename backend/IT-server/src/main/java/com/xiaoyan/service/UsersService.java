@@ -1,12 +1,10 @@
 package com.xiaoyan.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.xiaoyan.dto.StudentDTO;
 import com.xiaoyan.result.Result;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 import com.xiaoyan.dto.LoginDTO;
-import com.xiaoyan.dto.PasswordDTO;
 import com.xiaoyan.pojo.Student;
 import com.xiaoyan.vo.StudentVO;
 
@@ -20,7 +18,7 @@ public interface UsersService extends IService<Student> {
 
     Result<StudentVO> login(LoginDTO message);
 
-    void removeStudents(List<Long> ids);
+    void removeStudents(List<Integer > studentIds);
 
     List<StudentVO> getAll();
 

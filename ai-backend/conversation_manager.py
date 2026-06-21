@@ -202,9 +202,7 @@ def generate_and_save_title(thread_id: str, question: str, first_reply: str, mod
         generated_title = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
         if len(generated_title) > 30:
             generated_title = generated_title[:30]
-        print(f"[标题生成] thread={thread_id} title={generated_title!r}", flush=True)
     except Exception:
-        print(f"[标题生成失败] thread={thread_id}", flush=True)
         traceback.print_exc()
 
     if generated_title:

@@ -1,7 +1,7 @@
 import axiosInstance from "./axiosInit.js";
 
 export const sendApply = async (newcomer) =>
-  axiosInstance.post("user/newcomers/apply-join", newcomer);
+  axiosInstance.post("user/newcomers", newcomer);
 
 export const refuse = async (id) =>
   axiosInstance.delete("admin/newcomers/" + id);

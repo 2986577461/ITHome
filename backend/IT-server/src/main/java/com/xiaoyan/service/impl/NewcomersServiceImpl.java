@@ -55,14 +55,14 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
                     Newcomer.class, this::getById);
 
             if (newcomer == null) {
-                throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
+                throw new RuntimeException(MessageConstant.ACCOUNT_NOT_FOUND);
             }
 
             Integer studentId = newcomer.getStudentId();
 
             StudentVO oldStudent = usersService.getUser(studentId);
             if (oldStudent != null) {
-                throw new ParameterException(MessageConstant.REPEATREQUEST);
+                throw new RuntimeException(MessageConstant.REPEATREQUEST);
             }
 
             this.removeById(id);

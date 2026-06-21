@@ -33,9 +33,6 @@ public class Resources implements Serializable, HashCacheId {
 
     private Integer studentId;
 
-    @TableLogic
-    private Boolean deleted;
-
     @Override
     public String getCacheId() {
         return String.valueOf(this.id);

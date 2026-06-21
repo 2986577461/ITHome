@@ -5,7 +5,6 @@ package com.xiaoyan.constant;
  */
 public class MessageConstant {
 
-    public static final String ACCOUNT_ALREADY_EXISTS="账户已存在";
     public static final String PASSWORD_ERROR = "密码错误";
     public static final String ACCOUNT_NOT_FOUND = "账号不存在";
     public static final String ACCOUNT_LOCKED = "账号被锁定";
@@ -19,6 +18,7 @@ public class MessageConstant {
     public static final String VERIFICATION_CODE_MISMATCH="验证码不匹配";
     public static final String PARAMETER_ERROR ="参数错误";
     public static final String SESSION_NO_FOUND="会话没找到！";
+    public static final String ALIOSS_NETWORK_ERROR="oss网络异常";
 
 
 

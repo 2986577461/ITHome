@@ -207,6 +207,9 @@
                     <template v-else-if="msg.searchType === 'publish'"
                       >Publishing...</template
                     >
+                    <template v-else-if="msg.searchType === 'thinking'"
+                      >Thinking...</template
+                    >
                     <template v-else>Searching...</template>
                   </div>
                   <div

@@ -6,7 +6,6 @@ vector_store.py — Milvus Lite 向量存储 + fastembed 语义 embedding
 """
 
 import os
-import json
 
 # 抑制 Milvus Lite 的 gRPC 和 fork 日志
 import logging

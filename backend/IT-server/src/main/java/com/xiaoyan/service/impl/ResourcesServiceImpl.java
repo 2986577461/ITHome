@@ -5,7 +5,6 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.constant.MessageConstant;
-import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.service.CommonService;
@@ -50,11 +49,13 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public List<ResourcesVO> getList() {
+    public List<ResourcesVO> getList(Integer studentId) {
         List<ResourcesVO> list = redisUtil.getAllWithHashCache(CACHE_RESOURCES, this::count, this::queryResourcesByDB,
                 ResourcesVO.class);
-
-        return list.stream().toList();
+        if (studentId != null) {
+            list.removeIf(vo->!studentId.equals(vo.getStudentId()));
+        }
+        return list;
     }
 
     private List<ResourcesVO> queryResourcesByDB() {
@@ -117,7 +118,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
 
         if (!JwtClaimsConstant.ADMIN_ID.equals(user.getPosition()) && !studentId.equals(resource.getStudentId())) {
-            throw new ParameterException(MessageConstant.PERMISSION_DENIED);
+            throw new RuntimeException(MessageConstant.PERMISSION_DENIED);
         }
 
         StudentFile file = studentFileMapper.selectById(resource.getStudentFileFileId());

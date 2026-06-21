@@ -19,4 +19,6 @@ public interface ArticleMapper extends BaseMapper<Article> {
     int countBefore(LocalDateTime updatedDateTime);
 
     int selectCountByStudentId(Integer studentId);
+
+    void deleteByStudentId(Integer studentId);
 }

@@ -24,7 +24,7 @@ public interface ArticlesService extends IService<Article> {
 
     void update(ArticleDTO article);
 
-    void deleteBatch(List<Long> studentFileIds);
+    void deleteBatch(List<String> objectNames);
 
     List<ArticleImageVO> batchUploadFiles(List<MultipartFile> files);
 

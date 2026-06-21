@@ -5,13 +5,12 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.ArticleDTO;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ArticleMapper;
-import com.xiaoyan.mapper.StudentFileMapper;
-import com.xiaoyan.mapper.UserMapper;
 import com.xiaoyan.pojo.Article;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.ArticlesService;
@@ -39,9 +38,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.xiaoyan.constant.RedisConstant.CACHE_ARTICLES;
-import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
 
 @Service
 @AllArgsConstructor
@@ -54,10 +54,10 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     public static final int MAX_CACHE_SIZE = 50;
     private final UsersService usersService;
     private ArticleMapper articleMapper;
-    private UserMapper userMapper;
     private StringRedisTemplate stringRedisTemplate;
     private CommonService commonService;
-    private StudentFileMapper studentFileMapper;
+
+    public static final Pattern IMAGE_PATTERN = Pattern.compile("https?://[^/]+\\.aliyuncs\\.com/([^\"'\\s]+)");
 
     @Override
     public Long getCount(Integer type) {
@@ -69,7 +69,6 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     }
 
     @Override
-    @Transactional
     public void upload(ArticleDTO articleDTO) {
         Article article = BeanUtil.toBean(articleDTO, Article.class);
         Integer studentId = BaseContext.getCurrentStudentId();
@@ -87,11 +86,8 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         vo.setName(user.getName());
         vo.setAvatar(user.getAvatar());
 
-        stringRedisTemplate.opsForZSet().add(CACHE_ARTICLES,
-                JSONUtil.toJsonStr(vo), vo.getScore());
+        stringRedisTemplate.opsForZSet().add(CACHE_ARTICLES, JSONUtil.toJsonStr(vo), vo.getScore());
         stringRedisTemplate.opsForZSet().removeRange(CACHE_ARTICLES, 0, -(MAX_CACHE_SIZE + 1));
-
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, String.valueOf(studentId));
     }
 
     /**
@@ -141,19 +137,15 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
             // 无过滤，直接取范围
             Set<String> set = ops.reverseRange(CACHE_ARTICLES, start, end);
             if (set != null && set.size() == size) {
-                return set.stream()
-                        .map(s -> JSONUtil.toBean(s, ArticleVO.class))
-                        .toList();
+                return set.stream().map(s -> JSONUtil.toBean(s, ArticleVO.class)).toList();
             }
         } else {
             // 有过滤：拉全量50条 → Java筛选 → 截取
             Set<String> set = ops.reverseRange(CACHE_ARTICLES, 0, -1);
             if (set != null) {
-                List<ArticleVO> filtered = set.stream()
-                        .map(s -> JSONUtil.toBean(s, ArticleVO.class))
+                List<ArticleVO> filtered = set.stream().map(s -> JSONUtil.toBean(s, ArticleVO.class))
                         .filter(vo -> (type == null || vo.getType().equals(type))
-                                && (studentId == null || vo.getStudentId().equals(studentId)))
-                        .toList();
+                                && (studentId == null || vo.getStudentId().equals(studentId))).toList();
 
                 if (filtered.size() > start) {
                     int toIndex = Math.min(start + size, filtered.size());
@@ -231,12 +223,49 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     }
 
     @Override
+    @Transactional
     public void update(ArticleDTO articleDTO) {
+        Article oldArticle = this.getById(articleDTO.getId());
+        if (oldArticle == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
+
+        // 权限校验：仅作者或管理员可修改
+        Integer studentId = BaseContext.getCurrentStudentId();
+        StudentVO user = usersService.getUser(studentId);
+        if (!JwtClaimsConstant.ADMIN_ID.equals(user.getPosition()) && !studentId.equals(oldArticle.getStudentId())) {
+            throw new RuntimeException(MessageConstant.PERMISSION_DENIED);
+        }
+
+        // 删掉旧内容中不再引用的 OSS 文件
+        Set<String> oldObjectNames = extractObjectNames(oldArticle.getContent());
+        Set<String> newObjectNames = extractObjectNames(articleDTO.getContent());
+        List<String> toDelete = oldObjectNames.stream()
+                .filter(name -> !newObjectNames.contains(name))
+                .toList();
+        if (!toDelete.isEmpty()) {
+            commonService.delete(toDelete.toArray(String[]::new));
+        }
+
+        // 更新文章
         Article article = BeanUtil.toBean(articleDTO, Article.class);
         article.setUpdatedDateTime(LocalDateTime.now());
         articleMapper.updateById(article);
-        // 更新可能导致score变化，直接重建最新50条缓存
+
+        // 重建缓存
         buildLatestCache();
+    }
+
+    private Set<String> extractObjectNames(String content) {
+        if (content == null || content.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> names = new HashSet<>();
+        Matcher matcher = IMAGE_PATTERN.matcher(content);
+        while (matcher.find()) {
+            names.add(matcher.group(1));
+        }
+        return names;
     }
 
     @Override
@@ -253,13 +282,27 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     public void delete(Long id) {
         Article article = this.getById(id);
         Integer studentId = BaseContext.getCurrentStudentId();
-        if (article == null || !studentId.equals(article.getStudentId())) {
+        if (article == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
+        StudentVO user = usersService.getUser(studentId);
+        if (!JwtClaimsConstant.ADMIN_ID.equals(user.getPosition()) && !studentId.equals(article.getStudentId())) {
+            throw new RuntimeException(MessageConstant.PERMISSION_DENIED);
+        }
+        // 提取文章内容中的所有图片 objectName 并删除 OSS 文件
+        deleteImages(article.getContent());
 
         articleMapper.deleteById(id);
         // 从ZSET中精确移除该条
         removeFromCache(id);
+    }
+
+
+    private void deleteImages(String content) {
+        Set<String> objectNames = extractObjectNames(content);
+        if (!objectNames.isEmpty()) {
+            commonService.delete(objectNames.toArray(String[]::new));
+        }
     }
 
     /**
@@ -278,42 +321,30 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         }
     }
 
-    @Override
     public List<ArticleImageVO> batchUploadFiles(List<MultipartFile> files) {
         if (files == null || files.isEmpty()) {
             return Collections.emptyList();
         }
-
         List<ArticleImageVO> results = new ArrayList<>();
-        for (MultipartFile file : files) {
-            try {
+        try {
+            for (MultipartFile file : files) {
                 StudentFile sf = commonService.upload(file);
-                // upload 只返回了 id，需要通过 mapper 查一下拿 url
                 results.add(new ArticleImageVO(sf.getId(), sf.getFileUrl()));
-            } catch (IOException e) {
-                throw new RuntimeException("上传文件失败: " + file.getOriginalFilename(), e);
             }
+        } catch (IOException e) {
+            throw new RuntimeException(MessageConstant.ALIOSS_NETWORK_ERROR);
         }
         return results;
     }
 
     @Override
-    public void deleteBatch(List<Long> studentFileIds) {
-        if (studentFileIds == null || studentFileIds.isEmpty()) {
+    public void deleteBatch(List<String> objectNames) {
+        if (objectNames == null || objectNames.isEmpty()) {
             return;
         }
-
-        // ① 查所有要删的 StudentFile，收集 objectName
-        List<StudentFile> files = studentFileMapper.selectBatchIds(studentFileIds);
-        if (files.isEmpty()) {
-            return;
-        }
-        List<String> objectNames = files.stream()
-                .map(StudentFile::getObjectName)
-                .toList();
 
         // ② 批量删 OSS + 软删 student_file
-        commonService.delete(objectNames.toArray(new String[0]));
+        commonService.delete(objectNames.toArray(String[]::new));
 
     }
 }

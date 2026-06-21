@@ -15,7 +15,7 @@ public interface ResourcesService extends IService<Resources> {
 
     Long getCount();
 
-    List<ResourcesVO> getList();
+    List<ResourcesVO> getList(Integer studentId);
 
     void saveResource(ResourcesDTO resourcesDTO, Integer studentId) throws IOException;
 

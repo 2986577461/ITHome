@@ -33,6 +33,4 @@ public class StudentFile {
 
     private LocalDateTime createDateTime;
 
-    @TableLogic
-    private Boolean deleted;
 }

@@ -34,7 +34,7 @@ public class ArticlesController {
     @Resource
     private ArticlesService articlesService;
 
-    @GetMapping
+    @GetMapping("page")
     @Operation(summary = "分页查询文章，my=true 则查自己的")
     public Result<List<ArticleVO>> getPage(@NonNull Integer page, Integer type, @NonNull Integer size,
                                            @RequestParam(required = false) Boolean my) {
@@ -86,13 +86,5 @@ public class ArticlesController {
         log.info("批量上传 {} 张图片", files.size());
         List<ArticleImageVO> results = articlesService.batchUploadFiles(files);
         return Result.success(results);
-    }
-
-    @DeleteMapping("image")
-    @Operation(summary = "批量删除文章图片")
-    public Result<String> deleteBatch(@RequestBody List<Long> studentFileIds) {
-        log.info("批量删除 {} 张图片", studentFileIds.size());
-        articlesService.deleteBatch(studentFileIds);
-        return Result.success();
     }
 }

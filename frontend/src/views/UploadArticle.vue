@@ -498,14 +498,11 @@ async function submitArticle() {
   }
 
   article.content = finalContent;
-  try {
-    const resp = article.id ? await update(article) : await upload(article);
-    if (resp?.code === "200") {
-      ElMessage.success("文章发布成功");
-      setTimeout(() => router.push("/tech-study"), 700);
-    }
-  } catch {
-    ElMessage.error("发布失败");
+
+  const resp = article.id ? await update(article) : await upload(article);
+  if (resp?.code === "200") {
+    ElMessage.success("文章发布成功");
+    setTimeout(() => router.push("/tech-study"), 700);
   }
   submitting.value = false;
 }

@@ -28,7 +28,7 @@ public class JwtWhiteList {
         stringRedisTemplate.opsForHash().put(HASH_KEY, String.valueOf(studentId), token);
     }
 
-    public void deleteToken(String ... studentIds) {
+    public void deleteToken(Object ... studentIds) {
         stringRedisTemplate.opsForHash().delete(HASH_KEY, studentIds);
     }
 }

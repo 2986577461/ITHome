@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.xiaoyan.dto.ResourcesDTO;
 import com.xiaoyan.vo.ResourcesVO;
@@ -43,9 +44,9 @@ public class ResourcesController {
 
     @GetMapping("all")
     @Operation(summary = "返回所有资料")
-    public Result<List<ResourcesVO>> getList() {
-        log.info("返回所有资料");
-        List<ResourcesVO> list = resourcesService.getList();
+    public Result<List<ResourcesVO>> getList(@RequestParam(required = false) Boolean my) {
+        Integer studentId = Boolean.TRUE.equals(my) ? BaseContext.getCurrentStudentId() : null;
+        List<ResourcesVO> list = resourcesService.getList(studentId);
         return Result.success(list);
     }
 

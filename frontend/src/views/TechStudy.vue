@@ -472,8 +472,9 @@ function confirmDelete(a) {
 
 async function doDelete() {
   if (!toDelete.value) return;
-  await deleteById(toDelete.value.id);
-  ElMessage.success("删除成功");
+  if ((await deleteById(toDelete.value.id)).code === "200") {
+    ElMessage.success("删除成功");
+  }
   articles.value = articles.value.filter((a) => a.id !== toDelete.value.id);
   totalCount.value = Math.max(0, totalCount.value - 1);
   deleteDialog.value = false;
@@ -731,8 +732,12 @@ onMounted(async () => {
 }
 .ac-body :deep(img) {
   max-width: 100%;
-  border-radius: 8px;
-  margin: 8px 0;
+  max-height: 400px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 10px;
+  margin: 16px 0;
 }
 .ac-body :deep(pre) {
   overflow-x: auto;

@@ -51,6 +51,19 @@ except ImportError:
 from state_manager import get_state_manager, state_router
 
 
+# SSE 信号常量 —— 所有标记集中定义，避免硬编码
+import json as _json
+
+class SSE:
+    """SSE 事件构建器"""
+    DONE = "[DONE]"
+    ERROR = "[ERROR]"
+
+    @staticmethod
+    def state(**kw) -> str:
+        """构建状态信号：[STATE]{"state":"xxx",...}"""
+        return "[STATE]" + _json.dumps(kw, ensure_ascii=False)
+
 
 def load_system_prompt() -> str:
     """从 SystemPrompt.md 加载系统提示词"""
@@ -244,6 +257,8 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
     from concurrent.futures import ThreadPoolExecutor
     from langchain_core.messages import AIMessageChunk, ToolMessage
     from state_manager import S  # 状态常量
+    from agent_logger import get_agent_logger
+    alog = get_agent_logger()
 
     # ---- 0. 确保会话记录存在 + 保存用户消息 ----
     thread_id = ensure_conversation_and_save_user(thread_id, question, user_id)
@@ -267,6 +282,7 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
         checkpointer = checkpointer_ctx.__enter__()
         try:
             sm.update(task_id, state=S.RUNNING, progress=5)
+            alog.info(task_id, 0, "running", "任务开始", {"question": question[:80]})
 
             agent = create_agent(
                 model=model,
@@ -275,9 +291,11 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
                 system_prompt=load_system_prompt(),
             )
             config = {"configurable": {"thread_id": f"{user_id}:{thread_id}", "token": token, "user_id": user_id}}
+            step = 0
             searching_sent = False
             gen_sent = False
             current_tool_name = ""
+            has_reasoned = False
             for chunk, metadata in agent.stream(
                     {"messages": [{"role": "user", "content": question}]},
                     config=config,
@@ -292,6 +310,13 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
                                 name = getattr(tc, "name", "") or ""
                             if name:
                                 current_tool_name = name
+                        # 首次推理或调工具前，标记 reasoning
+                        step += 1
+                        if not has_reasoned:
+                            has_reasoned = True
+                            sm.update(task_id, state=S.REASONING, progress=20)
+                            loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state='reasoning', step=step))
+                            alog.info(task_id, step, "reasoning", "LLM推理决策")
                         _lower = current_tool_name.lower()
                         if "knowledge" in _lower or "tavily" in _lower or "publish" in _lower:
                             searching_sent = True
@@ -303,20 +328,27 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
                             else:
                                 tool_state = S.PUBLISHING
                             sm.update(task_id, state=tool_state, tool_name=current_tool_name, progress=30)
-                            loop.call_soon_threadsafe(queue.put_nowait, '[STATE]{"state":"' + tool_state + '"}')
+                            loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state=tool_state))
+                            alog.info(task_id, step, tool_state, "调用工具", {"tool": current_tool_name})
                     if chunk.content and not chunk.tool_calls and not chunk.tool_call_chunks:
                         ai_reply_chunks.append(chunk.content)
                         sm.append_token(task_id, chunk.content)
                         sm.update(task_id, state=S.GENERATING, progress=70)
                         if not gen_sent:
                             gen_sent = True
-                            loop.call_soon_threadsafe(queue.put_nowait, '[STATE]{"state":"generating"}')
+                            loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state='generating'))
+                            alog.info(task_id, step, "generating", "开始生成回答")
                         loop.call_soon_threadsafe(queue.put_nowait, chunk.content)
                 elif isinstance(chunk, ToolMessage) or type(chunk).__name__ == "ToolMessage":
                     _is_search_tool = ("knowledge" in current_tool_name.lower() or "tavily" in current_tool_name.lower())
                     current_tool_name = ""
                     if not _is_search_tool:
+                        # 非搜索工具的返回结果后标记 thinking
+                        step += 1
+                        sm.update(task_id, state=S.THINKING, progress=50)
+                        loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state='thinking', step=step))
                         continue
+                    step += 1
                     searching_sent = False
                     raw = str(chunk.content)
                     if raw.startswith("[KB]"):
@@ -326,16 +358,18 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
                         _parse_web_results(raw, search_info)
                         sm.set_search_results(task_id, search_info.get("web", []), "web")
                     sm.update(task_id, progress=60)
-                    gen_sent = False  # 搜索结果到达后重置，使下一个 generating 状态能被推送
+                    gen_sent = False
                     results_json = _format_search_results(chunk.content)
-                    loop.call_soon_threadsafe(queue.put_nowait, '[STATE]{"state":"generating","search_done":true,"results":' + results_json + '}')
+                    loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state='generating', search_done=True, results=_json.loads(results_json)))
+                    alog.info(task_id, step, "search_done", "检索完成", {"hit_count": search_info.get("kb", []) or search_info.get("web", [])})
         except Exception as e:
             error_msg = str(e)
+            alog.error(task_id, step, "failed", "任务异常", {"error": error_msg[:200]})
             sm.finalize(task_id, state=S.FAILED, error=error_msg)
             if "insufficient tool messages" in error_msg or "tool_calls" in error_msg:
-                loop.call_soon_threadsafe(queue.put_nowait, "[ERROR] 网络错误，请刷新页面重试")
+                loop.call_soon_threadsafe(queue.put_nowait, f"{SSE.ERROR} 网络错误，请刷新页面重试")
             else:
-                loop.call_soon_threadsafe(queue.put_nowait, f"[ERROR] {e}")
+                loop.call_soon_threadsafe(queue.put_nowait, f"{SSE.ERROR} {e}")
         finally:
             try:
                 checkpointer_ctx.__exit__(None, None, None)
@@ -359,9 +393,9 @@ async def _stream_chat(question: str, thread_id: str, user_id: str = "", token: 
             if full_reply:
                 save_ai_message(thread_id, full_reply, search_info, user_id)
                 generate_and_save_title(thread_id, question, full_reply, model)
-            yield "data: [DONE]\n\n"
+            yield f"data: {SSE.DONE}\n\n"
             break
-        if str(data).startswith("[ERROR]"):
+        if str(data).startswith(SSE.ERROR):
             yield f"data: {data}\n\n"
             break
         yield f"data: {_sse_escape(data)}\n\n"
@@ -465,4 +499,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True,
+        log_level="warning",
     )

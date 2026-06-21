@@ -17,4 +17,11 @@ public interface UserMapper extends BaseMapper<Student> {
     Student selectByStudentId(Integer studentId);
 
     List<Student> selectByStudentIds(@Param("studentIds") Set<Integer> studentIds);
+
+    void deletebyStudentIds(List<String> studentIds);
+
+    Set<String> selectPositionByIds(List<Integer> studentIds);
+
+    List<Student> selectThisYearsStudents();
+
 }

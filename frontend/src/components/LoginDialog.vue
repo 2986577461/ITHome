@@ -63,25 +63,18 @@ const loading = ref(false);
 
 const handleSubmit = async () => {
   loading.value = true;
-  try {
-    const resp = await login({
-      studentId: studentId.value,
-      password: password.value,
-    });
-    if (resp.code === "200") {
-      ElMessage.success("登录成功");
-      localStorage.setItem("authorization", resp.data.token);
-      visibleStore.offVisible();
-      userStore.setUser(resp.data);
-      setTimeout(function () {
-        window.location.reload();
-      }, 800);
-    } else {
-      ElMessage.error("账号或密码错误");
-    }
-  } catch {
-    ElMessage.error("登录失败");
-  } finally {
+  const resp = await login({
+    studentId: studentId.value,
+    password: password.value,
+  });
+  if (resp.code === "200") {
+    ElMessage.success("登录成功");
+    localStorage.setItem("authorization", resp.data.token);
+    visibleStore.offVisible();
+    userStore.setUser(resp.data);
+    setTimeout(function () {
+      window.location.reload();
+    }, 800);
     loading.value = false;
   }
 };

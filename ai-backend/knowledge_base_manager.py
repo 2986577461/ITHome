@@ -106,9 +106,12 @@ def search_knowledge_base(query: str, config: RunnableConfig) -> str:
     参数 query 可以使用关键词（2-5个词），也可以是简短的问句。
     如果用户问"知识库里有啥"，用"全部文档"作为 query 即可。
     """
-    user_id = config.get("configurable", {}).get("user_id", "")
+    print(query)
+
     if not query.strip():
         return "查询内容为空"
+
+    user_id = config.get("configurable", {}).get("user_id", "")
 
     # 语义检索
     try:

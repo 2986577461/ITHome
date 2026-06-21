@@ -1,7 +1,7 @@
 import axiosInstance from "./axiosInit.js";
 
 export const getResourcesCount = async () =>
-  axiosInstance.get("admin/resources/count");
+  axiosInstance.get("user/resources/count");
 
 export const getAll = async () => axiosInstance.get("user/resources/all");
 
