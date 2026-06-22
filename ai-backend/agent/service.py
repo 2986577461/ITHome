@@ -29,6 +29,7 @@ def load_system_prompt() -> str:
 class SSE:
     DONE = "[DONE]"
     ERROR = "[ERROR]"
+
     @staticmethod
     def state(**kw) -> str:
         return "[STATE]" + json.dumps(kw, ensure_ascii=False)
@@ -83,7 +84,7 @@ def _parse_web_results(raw: str, info: dict):
 
 
 async def stream_chat(question: str, thread_id: str, user_id: str = "",
-                      token: str = "", task_id: str = "",
+                      token: str = "",
                       model=None, tools: list = None):
     """SSE 流式生成器。model 和 tools 由 main.py 传入。"""
     from conversation.service import ensure_conversation_and_save_user, save_ai_message, generate_and_save_title
@@ -125,7 +126,7 @@ async def stream_chat(question: str, thread_id: str, user_id: str = "",
                         _thinking.append(_rc)
                     elif _thinking:
                         _full = "".join(_thinking)
-                        alog.info( step, "model_thinking", "模型推理", {"think": _full[:500]})
+                        alog.info(step, "model_thinking", "模型推理", {"think": _full[:500]})
                         _thinking.clear()
                     if (chunk.tool_calls or chunk.tool_call_chunks) and not searching_sent:
                         if chunk.tool_call_chunks:
@@ -146,7 +147,7 @@ async def stream_chat(question: str, thread_id: str, user_id: str = "",
                             search_info["split_pos"] = len("".join(ai_reply_chunks))
                             tool_state = "searching_kb" if "knowledge" in _lower else "searching_web" if "tavily" in _lower else "publishing"
                             loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state=tool_state))
-                            alog.info( step, tool_state, "调用工具", {"tool": current_tool_name})
+                            alog.info(step, tool_state, "调用工具", {"tool": current_tool_name})
                     if chunk.content and not chunk.tool_calls and not chunk.tool_call_chunks:
                         ai_reply_chunks.append(chunk.content)
                         if not gen_sent:
@@ -154,7 +155,8 @@ async def stream_chat(question: str, thread_id: str, user_id: str = "",
                             loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state='generating'))
                         loop.call_soon_threadsafe(queue.put_nowait, chunk.content)
                 elif isinstance(chunk, ToolMessage) or type(chunk).__name__ == "ToolMessage":
-                    _is_search_tool = ("knowledge" in current_tool_name.lower() or "tavily" in current_tool_name.lower())
+                    _is_search_tool = (
+                                "knowledge" in current_tool_name.lower() or "tavily" in current_tool_name.lower())
                     current_tool_name = ""
                     if not _is_search_tool:
                         step += 1
@@ -170,12 +172,13 @@ async def stream_chat(question: str, thread_id: str, user_id: str = "",
                     gen_sent = False
                     results_json = _format_search_results(chunk.content)
                     loop.call_soon_threadsafe(queue.put_nowait,
-                        SSE.state(state='generating', search_done=True, results=json.loads(results_json)))
-                    alog.info( step, "search_done", "检索完成",
+                                              SSE.state(state='generating', search_done=True,
+                                                        results=json.loads(results_json)))
+                    alog.info(step, "search_done", "检索完成",
                               {"hit_count": search_info.get("kb", []) or search_info.get("web", [])})
         except Exception as e:
             error_msg = str(e)
-            alog.error( step, "failed", "任务异常", {"error": error_msg[:200]})
+            alog.error(step, "failed", "任务异常", {"error": error_msg[:200]})
             if "insufficient tool messages" in error_msg or "tool_calls" in error_msg:
                 loop.call_soon_threadsafe(queue.put_nowait, "[ERROR] 网络错误，请刷新页面重试")
             else:
@@ -193,7 +196,6 @@ async def stream_chat(question: str, thread_id: str, user_id: str = "",
                     generate_and_save_title(thread_id, question, _full, model)
             except Exception:
                 pass
-            alog.info( step, "completed", "任务完成", {"tokens": len(ai_reply_chunks)})
             loop.call_soon_threadsafe(queue.put_nowait, None)
 
     executor = ThreadPoolExecutor(max_workers=1)
