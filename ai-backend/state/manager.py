@@ -23,7 +23,7 @@ from typing import Optional
 
 import redis as _redis
 
-DB_DIR = os.path.join(os.path.dirname(__file__), "db")
+DB_DIR = os.path.join(os.path.dirname(__file__), "..", "db")
 os.makedirs(DB_DIR, exist_ok=True)
 TASKS_DB = os.path.join(DB_DIR, "tasks.db")
 
@@ -53,7 +53,8 @@ ACTIVE_STATES = [S.PENDING, S.QUEUED, S.RUNNING, S.SEARCHING_KB, S.SEARCHING_WEB
 class StateManager:
     """Agent 状态管理器"""
 
-    def __init__(self, redis_url: str = "redis://localhost:6379/0"):
+    def __init__(self, redis_url: str = ""):
+        redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self._r = _redis.from_url(redis_url, decode_responses=True)
         self._init_db()
 
@@ -239,6 +240,47 @@ class StateManager:
         return [dict(r) for r in rows]
 
     # ------------------------------------------------------------------
+    # 知识库文档缓存
+    # ------------------------------------------------------------------
+
+    def _kbc_key(self, user_id: str) -> str:
+        return f"kb:docs:{user_id}"
+
+    def cache_kb_docs(self, user_id: str, docs: list) -> None:
+        """缓存用户的文档列表到 Redis（1h 过期）"""
+        self._r.set(self._kbc_key(user_id),
+                     json.dumps(docs, ensure_ascii=False),
+                     ex=3600)
+
+    def get_cached_kb_docs(self, user_id: str) -> list | None:
+        """从 Redis 读取缓存的文档列表"""
+        raw = self._r.get(self._kbc_key(user_id))
+        return json.loads(raw) if raw else None
+
+    def invalidate_kb_docs_cache(self, user_id: str) -> None:
+        """清除用户的文档列表缓存（上传/删除后调用）"""
+        self._r.delete(self._kbc_key(user_id))
+
+    # ------------------------------------------------------------------
+    # 文档全文缓存（内容较大，TTL 2h）
+    # ------------------------------------------------------------------
+
+    def _kbd_key(self, doc_id: int, user_id: str) -> str:
+        return f"kb:doc:{user_id}:{doc_id}"
+
+    def cache_kb_doc_content(self, doc_id: int, user_id: str, data: dict) -> None:
+        self._r.set(self._kbd_key(doc_id, user_id),
+                     json.dumps(data, ensure_ascii=False),
+                     ex=7200)
+
+    def get_cached_kb_doc_content(self, doc_id: int, user_id: str) -> dict | None:
+        raw = self._r.get(self._kbd_key(doc_id, user_id))
+        return json.loads(raw) if raw else None
+
+    def invalidate_kb_doc_content_cache(self, doc_id: int, user_id: str) -> None:
+        self._r.delete(self._kbd_key(doc_id, user_id))
+
+    # ------------------------------------------------------------------
     # 清理
     # ------------------------------------------------------------------
 
@@ -264,45 +306,3 @@ def get_state_manager() -> StateManager:
 
 
 # ============================================================
-# FastAPI 路由
-# ============================================================
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-
-state_router = APIRouter(prefix="/api/tasks", tags=["Agent 任务状态"])
-
-
-class CreateTaskRequest(BaseModel):
-    question: str = Field(..., description="用户问题")
-    thread_id: str = Field(default="default", description="会话 ID")
-
-
-@state_router.post("", summary="创建 Agent 任务")
-def api_create_task(body: CreateTaskRequest):
-    """创建任务，返回 task_id 供后续 SSE 连接和状态轮询使用"""
-    sm = get_state_manager()
-    task_id = sm.create_task(
-        question=body.question,
-        conversation_id=body.thread_id,
-    )
-    return {"task_id": task_id, "conversation_id": body.thread_id}
-
-
-@state_router.get("/{task_id}", summary="查询任务状态")
-def api_get_task(task_id: str):
-    """返回任务当前状态（前端轮询用）"""
-    sm = get_state_manager()
-    entry = sm.get_state(task_id)
-    if not entry:
-        raise HTTPException(404, "任务不存在")
-    return {
-        "task_id": entry["task_id"],
-        "state": entry["state"],
-        "progress": int(entry.get("progress", 0)),
-        "tool_name": entry.get("tool_name", ""),
-        "search_results": entry.get("search_results", ""),
-        "error": entry.get("error", ""),
-        "token_count": int(entry.get("token_count", 0)),
-        "created_at": entry.get("created_at", ""),
-        "updated_at": entry.get("updated_at", ""),
-    }
