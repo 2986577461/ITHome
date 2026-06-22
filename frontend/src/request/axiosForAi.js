@@ -18,9 +18,3 @@ export const deleteKbDocument = (docId) =>
 
 export const getKbDocumentContent = (docId) =>
   axiosInstance.get(`/api/kb/documents/${docId}/content`);
-
-export const createTask = (question, threadId) =>
-  axiosInstance.post("/api/tasks", { question, thread_id: threadId });
-
-export const getTaskState = (taskId) =>
-  axiosInstance.get(`/api/tasks/${taskId}`);

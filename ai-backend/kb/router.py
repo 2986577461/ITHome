@@ -9,7 +9,7 @@ from models.schemas import KbUploadRequest
 from conversation.service import get_current_user
 from kb.tools import get_kb_db, _chunk_text
 from common.vector_store import get_vector_store
-from state.manager import get_state_manager
+from state.manager import get_cache_manager
 
 kb_router = APIRouter(prefix="/api/kb", tags=["知识库"])
 
@@ -53,14 +53,14 @@ async def kb_upload(body: KbUploadRequest, user_id: str = Depends(get_current_us
     finally:
         conn.close()
 
-    get_state_manager().invalidate_kb_docs_cache(user_id)
+    get_cache_manager().invalidate_kb_docs_cache(user_id)
     return {"ok": True, "doc_id": doc_id, "filename": body.filename,
             "chunks": chunk_count, "char_count": len(text)}
 
 
 @kb_router.get("/documents", summary="知识库文档列表")
 def kb_list_documents(user_id: str = Depends(get_current_user)):
-    sm = get_state_manager()
+    sm = get_cache_manager()
     cached = sm.get_cached_kb_docs(user_id)
     if cached is not None:
         return cached
@@ -80,7 +80,7 @@ def kb_list_documents(user_id: str = Depends(get_current_user)):
 
 @kb_router.get("/documents/{doc_id}/content", summary="获取文档全文")
 def kb_document_content(doc_id: int, user_id: str = Depends(get_current_user)):
-    sm = get_state_manager()
+    sm = get_cache_manager()
     cached = sm.get_cached_kb_doc_content(doc_id, user_id)
     if cached is not None:
         return cached
@@ -119,7 +119,7 @@ def kb_delete_document(doc_id: int, user_id: str = Depends(get_current_user)):
         get_vector_store().delete_document(doc_id)
     except Exception:
         pass
-    sm = get_state_manager()
+    sm = get_cache_manager()
     sm.invalidate_kb_docs_cache(user_id)
     sm.invalidate_kb_doc_content_cache(doc_id, user_id)
     return {"ok": True}

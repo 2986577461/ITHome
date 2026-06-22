@@ -384,7 +384,6 @@ import {
   uploadKbDocument,
   deleteKbDocument,
   getKbDocumentContent,
-  createTask,
 } from "@/request/axiosForAi.js";
 
 const CHAT_STREAM_URL = "/chat-stream";
@@ -422,7 +421,6 @@ function _buildMsg(role, content, searchInfo) {
     kbResults: null,
     webOpen: false,
     kbOpen: false,
-    taskId: null,
   });
   if (searchInfo) {
     try {
@@ -673,21 +671,8 @@ async function send() {
 
   const token = localStorage.getItem("authorization") || "";
   const url = `${CHAT_STREAM_URL}?question=${encodeURIComponent(text)}&thread_id=${currentThreadId.value}&token=${encodeURIComponent(token)}`;
-  // 先创建任务获取 taskId，再连 SSE
-  createTask(text, currentThreadId.value)
-    .then((r) => {
-      const msg = messages.value[aiIdx];
-      if (msg) {
-        msg.taskId = r.task_id;
-        const sseUrl = url + "&task_id=" + encodeURIComponent(r.task_id);
-        es = new EventSource(sseUrl);
-        setupSSEHandlers(msg);
-      }
-    })
-    .catch(() => {});
-
-  // createTask 内 `es = new EventSource(sseUrl)` 之后，
-  // 将 onmessage / onerror 绑定到当前的 es
+  es = new EventSource(url);
+  setupSSEHandlers(messages.value[aiIdx]);
   function setupSSEHandlers(taskMsg) {
     if (!es) return;
     es.onmessage = async (e) => {

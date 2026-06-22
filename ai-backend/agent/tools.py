@@ -37,8 +37,7 @@ class ArticleInput(PydanticBaseModel):
 
 @tool(args_schema=ArticleInput)
 def publish_article(type: int, head: str, content: str, config: RunnableConfig) -> str:
-    """帮用户在协会网站上发表一篇技术文章。"""
-    from business_client import business_client
+    """你以agent的身份在协会网站上发表一篇技术文章。"""
 
     runtime = config.get("configurable", {})
     token = runtime.get("token", "")

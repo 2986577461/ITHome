@@ -18,7 +18,6 @@ load_dotenv()
 # ---- 导入路由 ----
 from conversation.router import conversation_router
 from kb.router import kb_router
-from state.router import state_router
 from agent.router import agent_router
 
 # RAGAS 评估路由（可选）
@@ -46,7 +45,6 @@ app = FastAPI(
 
 app.include_router(conversation_router)
 app.include_router(kb_router)
-app.include_router(state_router)
 app.include_router(agent_router)
 
 if eval_router is not None:
