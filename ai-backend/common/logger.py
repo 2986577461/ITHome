@@ -61,12 +61,11 @@ class AgentLogger:
         console.setFormatter(logging.Formatter("%(message)s"))
         self.logger.addHandler(console)
 
-    def _log(self, level: str, task_id: str, step: int, state: str, msg: str,
+    def _log(self, level: str, step: int, state: str, msg: str,
              data: dict | None = None, exc_info=None):
         entry = {
             "t": datetime.now().isoformat(),
             "lvl": level,
-            "task": task_id[:16] if task_id else "-",
             "step": step,
             "state": state,
             "msg": msg,
@@ -79,17 +78,17 @@ class AgentLogger:
             exc_info=exc_info,
         )
 
-    def info(self, task_id: str, step: int, state: str, msg: str,
+    def info(self, step: int, state: str, msg: str,
              data: dict | None = None):
-        self._log("INFO", task_id, step, state, msg, data)
+        self._log("INFO", step, state, msg, data)
 
-    def warn(self, task_id: str, step: int, state: str, msg: str,
+    def warn(self,  step: int, state: str, msg: str,
              data: dict | None = None):
-        self._log("WARN", task_id, step, state, msg, data)
+        self._log("WARN", step, state, msg, data)
 
-    def error(self, task_id: str, step: int, state: str, msg: str,
+    def error(self,  step: int, state: str, msg: str,
               data: dict | None = None, exc_info=None):
-        self._log("ERROR", task_id, step, state, msg, data, exc_info)
+        self._log("ERROR",  step, state, msg, data, exc_info)
 
 
 _logger: AgentLogger | None = None

@@ -67,7 +67,12 @@
               </button>
             </div>
             <div class="kb-list" v-if="kbDocs.length > 0">
-              <div class="kb-doc" v-for="d in kbDocs" :key="d.id">
+              <div
+                class="kb-doc"
+                v-for="d in kbDocs"
+                :key="d.id"
+                @click="viewDocContent(d.id)"
+              >
                 <span class="kb-doc-name" :title="d.filename">{{
                   d.filename
                 }}</span>
@@ -333,6 +338,15 @@
         <polyline points="6 9 12 15 18 9" />
       </svg>
     </button>
+    <div v-if="docModal" class="doc-overlay" @click="closeDocModal">
+      <div class="doc-modal" @click.stop>
+        <div class="doc-modal-head">
+          <span>{{ docTitle }}</span>
+          <button class="doc-close" @click="closeDocModal">×</button>
+        </div>
+        <div class="doc-modal-body" v-html="docContent"></div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -369,7 +383,7 @@ import {
   getKbDocuments,
   uploadKbDocument,
   deleteKbDocument,
-  createTask,
+  getKbDocumentContent,
 } from "@/request/axiosForAi.js";
 
 const CHAT_STREAM_URL = "/chat-stream";
@@ -390,6 +404,10 @@ const toastMsg = ref("");
 const msgBox = ref(null);
 const inputBox = ref(null);
 const fileInput = ref(null);
+const docModal = ref(false);
+const docTitle = ref("");
+const docContent = ref("");
+var docCache = {};
 let es = null;
 
 function _buildMsg(role, content, searchInfo) {
@@ -403,7 +421,6 @@ function _buildMsg(role, content, searchInfo) {
     kbResults: null,
     webOpen: false,
     kbOpen: false,
-    taskId: null,
   });
   if (searchInfo) {
     try {
@@ -484,7 +501,7 @@ function extractDomain(url) {
 }
 async function copyText(t) {
   try {
-    await navigator.clipboard.writeText(t);
+    await navigator.clipboard.writeText(t.replace(/```\w*\n?|```/g, "").trim());
     toastMsg.value = "复制成功";
     toastVisible.value = true;
     setTimeout(() => {
@@ -526,6 +543,31 @@ async function onFileSelect(e) {
   e.target.value = "";
   await loadKbDocuments();
 }
+function closeDocModal() {
+  docModal.value = false;
+}
+async function viewDocContent(docId) {
+  var d = kbDocs.value.find(function (x) {
+    return x.id === docId;
+  });
+  docTitle.value = d ? d.filename : "文档内容";
+  docModal.value = true;
+  if (docCache[docId]) {
+    docContent.value = docCache[docId];
+    return;
+  }
+  docContent.value = "加载中...";
+  try {
+    var resp = await getKbDocumentContent(docId);
+    if (resp && resp.content != null) {
+      docContent.value = resp.content;
+      docCache[docId] = resp.content;
+    }
+  } catch {
+    docContent.value = "加载失败";
+  }
+}
+
 async function deleteDocument(docId) {
   await deleteKbDocument(docId);
   kbDocs.value = kbDocs.value.filter((d) => d.id !== docId);
@@ -629,21 +671,8 @@ async function send() {
 
   const token = localStorage.getItem("authorization") || "";
   const url = `${CHAT_STREAM_URL}?question=${encodeURIComponent(text)}&thread_id=${currentThreadId.value}&token=${encodeURIComponent(token)}`;
-  // 先创建任务获取 taskId，再连 SSE
-  createTask(text, currentThreadId.value)
-    .then((r) => {
-      const msg = messages.value[aiIdx];
-      if (msg) {
-        msg.taskId = r.task_id;
-        const sseUrl = url + "&task_id=" + encodeURIComponent(r.task_id);
-        es = new EventSource(sseUrl);
-        setupSSEHandlers(msg);
-      }
-    })
-    .catch(() => {});
-
-  // createTask 内 `es = new EventSource(sseUrl)` 之后，
-  // 将 onmessage / onerror 绑定到当前的 es
+  es = new EventSource(url);
+  setupSSEHandlers(messages.value[aiIdx]);
   function setupSSEHandlers(taskMsg) {
     if (!es) return;
     es.onmessage = async (e) => {
@@ -683,8 +712,7 @@ async function send() {
             if (st.search_done && st.results && st.results.results) {
               if (taskMsg.searchType === "kb")
                 taskMsg.kbResults = st.results.results;
-              else
-                taskMsg.webResults = st.results.results;
+              else taskMsg.webResults = st.results.results;
             }
           }
         } catch (err) {}
@@ -916,6 +944,11 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.kb-doc:hover {
+  background: #f3f4f6;
 }
 .kb-doc-name {
   flex: 1;
@@ -1280,5 +1313,61 @@ onUnmounted(() => {
     padding: 0 12px 12px;
     width: 100%;
   }
+}
+
+.doc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+.doc-modal {
+  background: #fff;
+  border-radius: 16px;
+  max-width: 700px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+.doc-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid #eee;
+  font-weight: 600;
+  font-size: 15px;
+}
+.doc-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: #f0f0f0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #555;
+}
+.doc-close:hover {
+  background: #e0e0e0;
+}
+.doc-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #333;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>

@@ -154,6 +154,18 @@ class VectorStore:
             })
         return hits
 
+
+    def get_chunks_by_doc(self, doc_id: int) -> list[dict]:
+        """按 doc_id 查询所有 chunk，按 chunk_idx 排序后返回"""
+        self.client.load_collection(COLLECTION)
+        results = self.client.query(
+            collection_name=COLLECTION,
+            filter=f'doc_id == {doc_id}',
+            output_fields=["chunk_idx", "content"],
+        )
+        results.sort(key=lambda r: r["chunk_idx"])
+        return [{"chunk_idx": r["chunk_idx"], "content": r["content"]} for r in results]
+
     # ------------------------------------------------------------------
     # 删除
     # ------------------------------------------------------------------
