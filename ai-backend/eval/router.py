@@ -24,22 +24,17 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from knowledge_base_manager import get_kb_db
+from kb.tools import get_kb_db
 # 项目内部依赖
-from vector_store import get_vector_store
-from conversation_manager import get_current_user
+from common.vector_store import get_vector_store
+from conversation.service import get_current_user
 
 eval_router = APIRouter(prefix="/api/eval", tags=["RAGAS 评估"])
 
-from langchain_core.messages import AIMessageChunk
-from langchain_core.tools import tool as _tool
-from datetime import datetime as _dt
 
 
-@_tool
-def _eval_tool_time() -> str:
-    """获取当前时间"""
-    return _dt.now().isoformat()
+
+
 
 
 # ============================================================
@@ -169,8 +164,8 @@ class RAGEvaluator:
 
             from langchain.agents import create_agent
             from langgraph.checkpoint.memory import InMemorySaver
-            from datetime import datetime as _dt
-            from langchain_core.tools import tool as _tool
+            
+            
             @_tool
             def _eval_time() -> str:
                 """获取当前时间"""
