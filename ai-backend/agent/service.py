@@ -30,10 +30,22 @@ def load_system_prompt() -> str:
 class SSE:
     DONE = "[DONE]"
     ERROR = "[ERROR]"
+    REASONING = "reasoning"
+    GENERATING = "generating"
+    THINKING = "thinking"
 
     @staticmethod
     def state(**kw) -> str:
         return "[STATE]" + json.dumps(kw, ensure_ascii=False)
+
+
+# 工具分类映射: keyword -> (state_name, is_visible)
+_TOOL_STATES = {
+    "knowledge": ("searching_kb", True),
+    "tavily": ("searching_web", True),
+    "publish": ("publishing", True),
+}
+_TOOL_SEARCH_KEYS = {"knowledge", "tavily"}
 
 
 def _sse_escape(text: str) -> str:
@@ -109,7 +121,8 @@ async def stream_chat(question: str, thread_id: str, user_id: str = "",
                 checkpointer=checkpointer,
                 system_prompt=load_system_prompt(),
             )
-            config:RunnableConfig = {"configurable": {"thread_id": f"{user_id}:{thread_id}", "token": token, "user_id": user_id}}
+            config: RunnableConfig = {
+                "configurable": {"thread_id": f"{user_id}:{thread_id}", "token": token, "user_id": user_id}}
             step = 0
             searching_sent = False
             gen_sent = False
@@ -117,21 +130,27 @@ async def stream_chat(question: str, thread_id: str, user_id: str = "",
             has_reasoned = False
             _thinking = []
             _last_meta = {}
+
+            chunks:list[str] = []
             for chunk, metadata in agent.stream(
                     {"messages": [{"role": "user", "content": question}]},
                     config=config,
                     stream_mode="messages"):
+                chunks.append(str(chunk))
                 if hasattr(chunk, 'usage_metadata') and chunk.usage_metadata:
                     _last_meta = chunk.usage_metadata
                 if isinstance(chunk, AIMessageChunk):
                     # 收集模型推理过程日志
                     _rc = chunk.additional_kwargs.get("reasoning_content", "")
+                    # 如果正在输出推理
                     if _rc:
                         _thinking.append(_rc)
+                    # 如果停止了输出推理并且有推理日志
                     elif _thinking:
                         _full = "".join(_thinking)
                         alog.info(step, "model_thinking", "模型推理", {"think": _full[:500]})
                         _thinking.clear()
+                    # agent想要调用tool
                     if (chunk.tool_calls or chunk.tool_call_chunks) and not searching_sent:
                         if chunk.tool_call_chunks:
                             tc = chunk.tool_call_chunks[0]
@@ -144,29 +163,29 @@ async def stream_chat(question: str, thread_id: str, user_id: str = "",
                         step += 1
                         if not has_reasoned:
                             has_reasoned = True
-                            loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state='reasoning', step=step))
+                            loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state=SSE.REASONING, step=step))
                         _lower = current_tool_name.lower()
-                        if "knowledge" in _lower or "tavily" in _lower or "publish" in _lower:
-                            searching_sent = True
-                            search_info["split_pos"] = len("".join(ai_reply_chunks))
-                            tool_state = "searching_kb" if "knowledge" in _lower else "searching_web" if "tavily" in _lower else "publishing"
-                            loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state=tool_state))
-                            alog.info(step, tool_state, "调用工具", {"tool": current_tool_name})
+                        for _kw, (_st, _) in _TOOL_STATES.items():
+                            if _kw in _lower:
+                                searching_sent = True
+                                search_info["split_pos"] = len("".join(ai_reply_chunks))
+                                loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state=_st))
+                                alog.info(step, _st, "调用工具", {"tool": current_tool_name})
+                                break
                     if chunk.content and not chunk.tool_calls and not chunk.tool_call_chunks:
                         ai_reply_chunks.append(chunk.content)
                         if hasattr(chunk, 'response_metadata') and chunk.response_metadata.get('token_usage'):
                             _last_meta = chunk.response_metadata
                         if not gen_sent:
                             gen_sent = True
-                            loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state='generating'))
+                            loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state=SSE.GENERATING))
                         loop.call_soon_threadsafe(queue.put_nowait, chunk.content)
-                elif isinstance(chunk, ToolMessage) or type(chunk).__name__ == "ToolMessage":
-                    _is_search_tool = (
-                                "knowledge" in current_tool_name.lower() or "tavily" in current_tool_name.lower())
+                elif isinstance(chunk, ToolMessage):
+                    _is_search_tool = any(k in current_tool_name.lower() for k in _TOOL_SEARCH_KEYS)
                     current_tool_name = ""
                     if not _is_search_tool:
                         step += 1
-                        loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state='thinking', step=step))
+                        loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state=SSE.THINKING, step=step))
                         continue
                     step += 1
                     searching_sent = False
@@ -178,29 +197,26 @@ async def stream_chat(question: str, thread_id: str, user_id: str = "",
                     gen_sent = False
                     results_json = _format_search_results(chunk.content)
                     loop.call_soon_threadsafe(queue.put_nowait,
-                                              SSE.state(state='generating', search_done=True,
+                                              SSE.state(state=SSE.GENERATING, search_done=True,
                                                         results=json.loads(results_json)))
                     alog.info(step, "search_done", "检索完成",
                               {"hit_count": search_info.get("kb", []) or search_info.get("web", [])})
         except Exception as e:
             error_msg = str(e)
             alog.error(step, "failed", "任务异常", {"error": error_msg[:200]})
-            if "insufficient tool messages" in error_msg or "tool_calls" in error_msg:
-                loop.call_soon_threadsafe(queue.put_nowait, "[ERROR] 网络错误，请刷新页面重试")
-            else:
-                loop.call_soon_threadsafe(queue.put_nowait, f"[ERROR] {e}")
+            loop.call_soon_threadsafe(queue.put_nowait, f"[ERROR] {e}")
         finally:
             try:
                 checkpointer_ctx.__exit__(None, None, None)
-            except Exception:
-                pass
-            # 无论 SSE 是否断开，都在线程内保存消息
-            try:
                 _full = "".join(ai_reply_chunks)
                 if _full:
                     save_ai_message(thread_id, _full, search_info, user_id)
                     generate_and_save_title(thread_id, question, _full, model)
-                    print(f'  [Token] prompt={_last_meta.get("input_tokens", "?")}  completion={_last_meta.get("output_tokens", "?")}  total={_last_meta.get("total_tokens", "?")}  reasoning={_last_meta.get("output_token_details", {}).get("reasoning", "?")}')
+                    print(f'  [Token] prompt={_last_meta.get("input_tokens", "?")} '
+                          f' completion={_last_meta.get("output_tokens", "?")} '
+                          f' total={_last_meta.get("total_tokens", "?")} '
+                          f' reasoning={_last_meta.get("output_token_details", {}).get("reasoning", "?")}')
+                    # alog.warn("test","".join(chunks))
             except Exception:
                 pass
             loop.call_soon_threadsafe(queue.put_nowait, None)

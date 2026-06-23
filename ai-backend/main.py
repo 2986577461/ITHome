@@ -20,14 +20,6 @@ from conversation.router import conversation_router
 from kb.router import kb_router
 from agent.router import agent_router
 
-# RAGAS 评估路由（可选）
-try:
-    from eval.router import eval_router
-    _HAS_RAGAS = True
-except ImportError:
-    eval_router = None
-    _HAS_RAGAS = False
-    print("[启动] RAGAS 未安装，跳过评估路由 — pip3 install ragas datasets")
 
 
 model = init_chat_model(model="deepseek-v4-flash")
@@ -37,13 +29,6 @@ web_search = TavilySearch(
     description="用于搜索实时信息",
 )
 
-# ---- 预加载向量存储（预热 Milvus + 下载 embedding 模型） ----
-from common.vector_store import get_vector_store
-try:
-    vs = get_vector_store()
-    print("[启动] 向量存储预热完成")
-except Exception as e:
-    print(f"[启动] 向量存储预热失败: {e}")
 
 app = FastAPI(
     title="协会网站聊天机器人",
@@ -55,8 +40,6 @@ app.include_router(conversation_router)
 app.include_router(kb_router)
 app.include_router(agent_router)
 
-if eval_router is not None:
-    app.include_router(eval_router)
 
 app.add_middleware(
     CORSMiddleware,

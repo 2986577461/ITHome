@@ -4,7 +4,6 @@ import base64
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Depends
-from models.schemas import KbUploadRequest
 
 from conversation.service import get_current_user
 from kb.tools import get_kb_db, _chunk_text
@@ -15,7 +14,7 @@ kb_router = APIRouter(prefix="/api/kb", tags=["知识库"])
 
 
 @kb_router.post("/upload", summary="上传文档到知识库")
-async def kb_upload(body: KbUploadRequest, user_id: str = Depends(get_current_user)):
+async def kb_upload(body, user_id: str = Depends(get_current_user)):
     try:
         raw = base64.b64decode(body.content_b64)
     except Exception:
@@ -30,7 +29,7 @@ async def kb_upload(body: KbUploadRequest, user_id: str = Depends(get_current_us
         raise HTTPException(400, "文件内容为空")
 
     chunk_size = 800 if len(text) > 500000 else 500 if len(text) > 100000 else 300
-    chunks = _chunk_text(text, chunk_size=chunk_size)
+    chunks = _chunk_text(text,chunk_size)
     if not chunks:
         raise HTTPException(400, "文件无法分块")
 
@@ -48,7 +47,6 @@ async def kb_upload(body: KbUploadRequest, user_id: str = Depends(get_current_us
         conn.commit()
     except Exception as e:
         conn.rollback()
-        print(e)
         raise HTTPException(500, f"存储失败：{e}")
     finally:
         conn.close()

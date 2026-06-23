@@ -11,7 +11,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/user": "http://localhost:8080",
+      "/user": "http://www.myzyitzj.cn",
       "/admin": "http://localhost:8080",
       "/v3/api-docs": "http://localhost:8080",
       "/api": "http://localhost:8000",
