@@ -1,12 +1,12 @@
 package com.xiaoyan.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.crypto.digest.BCrypt;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.constant.PasswordConstant;
 import com.xiaoyan.constant.PositionConstant;
-import com.xiaoyan.exception.ParameterException;
 
 import com.xiaoyan.mapper.NewcomerMapper;
 import com.xiaoyan.mapper.UserMapper;
@@ -14,12 +14,10 @@ import com.xiaoyan.pojo.Student;
 import com.xiaoyan.service.NewcomersService;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.RedisUtil;
-import com.xiaoyan.vo.NewcomerVO;
 import com.xiaoyan.vo.StudentVO;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.validation.annotation.Validated;
@@ -39,7 +37,6 @@ import static com.xiaoyan.constant.RedisConstant.CACHE_NEWCOMERS;
 public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
         implements NewcomersService {
 
-    private static final BCryptPasswordEncoder ENCODER = new BCryptPasswordEncoder();
     private final UsersService usersService;
     private final NewcomerMapper newcomerMapper;
 
@@ -69,7 +66,7 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
             stringRedisTemplate.opsForHash().delete(CACHE_NEWCOMERS, String.valueOf(id));
 
             Student student = BeanUtil.toBean(newcomer, Student.class);
-            student.setPassword(ENCODER.encode(PasswordConstant.STUDENT_PASSWORD));
+            student.setPassword(BCrypt.hashpw((PasswordConstant.STUDENT_PASSWORD)));
             student.setPosition(PositionConstant.STUDENT);
             student.setAvatarId(1L);
 

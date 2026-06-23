@@ -37,6 +37,14 @@ web_search = TavilySearch(
     description="用于搜索实时信息",
 )
 
+# ---- 预加载向量存储（预热 Milvus + 下载 embedding 模型） ----
+from common.vector_store import get_vector_store
+try:
+    vs = get_vector_store()
+    print("[启动] 向量存储预热完成")
+except Exception as e:
+    print(f"[启动] 向量存储预热失败: {e}")
+
 app = FastAPI(
     title="协会网站聊天机器人",
     description="支持联网搜索、SQLite 记忆、流式输出的智能对话接口",

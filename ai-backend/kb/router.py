@@ -20,7 +20,6 @@ async def kb_upload(body: KbUploadRequest, user_id: str = Depends(get_current_us
         raw = base64.b64decode(body.content_b64)
     except Exception:
         raise HTTPException(400, "content_b64 解码失败")
-
     ext = body.filename.rsplit(".", 1)[-1].lower() if "." in body.filename else "txt"
     if ext in ("txt", "md"):
         text = raw.decode("utf-8", errors="replace")
@@ -49,6 +48,7 @@ async def kb_upload(body: KbUploadRequest, user_id: str = Depends(get_current_us
         conn.commit()
     except Exception as e:
         conn.rollback()
+        print(e)
         raise HTTPException(500, f"存储失败：{e}")
     finally:
         conn.close()

@@ -1,13 +1,12 @@
 package com.xiaoyan.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.LoginDTO;
-import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.interceptor.JwtWhiteList;
 import com.xiaoyan.mapper.ArticleMapper;
 import com.xiaoyan.mapper.ResourcesMapper;
@@ -18,7 +17,6 @@ import com.xiaoyan.pojo.Student;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.result.Result;
-import com.xiaoyan.service.ArticlesService;
 import com.xiaoyan.service.CommonService;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.JwtUtil;
@@ -33,7 +31,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -61,7 +58,6 @@ import static com.xiaoyan.service.impl.ArticlesServiceImpl.IMAGE_PATTERN;
 public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         implements UsersService {
 
-    private static final BCryptPasswordEncoder ENCODER = new BCryptPasswordEncoder();
     private final ArticleMapper articleMapper;
     private final ResourcesMapper resourcesMapper;
     private JwtProperties jwtProperties;
@@ -193,7 +189,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         if (student == null) {
             return Result.error(MessageConstant.ACCOUNT_NOT_FOUND);
         }
-        if (!ENCODER.matches(password, student.getPassword())) {
+        if (!BCrypt.checkpw(password, student.getPassword())) {
             return Result.error(MessageConstant.PASSWORD_ERROR);
         }
         StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
@@ -304,7 +300,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         }
         String password = student.getPassword();
         if (password != null) {
-            student.setPassword(ENCODER.encode(password));
+            student.setPassword(BCrypt.hashpw(password));
         }
         userMapper.updateById(student);
         stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, String.valueOf(studentId));
