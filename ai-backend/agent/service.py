@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessageChunk, ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from common.logger import get_agent_logger
@@ -108,17 +109,20 @@ async def stream_chat(question: str, thread_id: str, user_id: str = "",
                 checkpointer=checkpointer,
                 system_prompt=load_system_prompt(),
             )
-            config = {"configurable": {"thread_id": f"{user_id}:{thread_id}", "token": token, "user_id": user_id}}
+            config:RunnableConfig = {"configurable": {"thread_id": f"{user_id}:{thread_id}", "token": token, "user_id": user_id}}
             step = 0
             searching_sent = False
             gen_sent = False
             current_tool_name = ""
             has_reasoned = False
             _thinking = []
+            _last_meta = {}
             for chunk, metadata in agent.stream(
                     {"messages": [{"role": "user", "content": question}]},
                     config=config,
                     stream_mode="messages"):
+                if hasattr(chunk, 'usage_metadata') and chunk.usage_metadata:
+                    _last_meta = chunk.usage_metadata
                 if isinstance(chunk, AIMessageChunk):
                     # 收集模型推理过程日志
                     _rc = chunk.additional_kwargs.get("reasoning_content", "")
@@ -150,6 +154,8 @@ async def stream_chat(question: str, thread_id: str, user_id: str = "",
                             alog.info(step, tool_state, "调用工具", {"tool": current_tool_name})
                     if chunk.content and not chunk.tool_calls and not chunk.tool_call_chunks:
                         ai_reply_chunks.append(chunk.content)
+                        if hasattr(chunk, 'response_metadata') and chunk.response_metadata.get('token_usage'):
+                            _last_meta = chunk.response_metadata
                         if not gen_sent:
                             gen_sent = True
                             loop.call_soon_threadsafe(queue.put_nowait, SSE.state(state='generating'))
@@ -194,6 +200,7 @@ async def stream_chat(question: str, thread_id: str, user_id: str = "",
                 if _full:
                     save_ai_message(thread_id, _full, search_info, user_id)
                     generate_and_save_title(thread_id, question, _full, model)
+                    print(f'  [Token] prompt={_last_meta.get("input_tokens", "?")}  completion={_last_meta.get("output_tokens", "?")}  total={_last_meta.get("total_tokens", "?")}  reasoning={_last_meta.get("output_token_details", {}).get("reasoning", "?")}')
             except Exception:
                 pass
             loop.call_soon_threadsafe(queue.put_nowait, None)
