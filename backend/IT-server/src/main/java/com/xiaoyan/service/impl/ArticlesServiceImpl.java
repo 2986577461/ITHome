@@ -5,20 +5,22 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.ArticleDTO;
+import com.xiaoyan.enumeration.ArticleType;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ArticleMapper;
 import com.xiaoyan.pojo.Article;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.ArticlesService;
 import com.xiaoyan.service.CommonService;
+import com.xiaoyan.service.PermissionService;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.vo.ArticleImageVO;
 import com.xiaoyan.vo.ArticleVO;
 import com.xiaoyan.vo.StudentVO;
+import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import org.springframework.data.redis.core.DefaultTypedTuple;
@@ -42,6 +44,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.xiaoyan.constant.RedisConstant.CACHE_ARTICLES;
+import static com.xiaoyan.constant.RedisConstant.RANKING_ARTICLES;
 
 @Service
 @AllArgsConstructor
@@ -53,6 +56,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
      */
     public static final int MAX_CACHE_SIZE = 50;
     private final UsersService usersService;
+    private final PermissionService permissionService;
     private ArticleMapper articleMapper;
     private StringRedisTemplate stringRedisTemplate;
     private CommonService commonService;
@@ -86,8 +90,18 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         vo.setName(user.getName());
         vo.setAvatar(user.getAvatar());
 
-        stringRedisTemplate.opsForZSet().add(CACHE_ARTICLES, JSONUtil.toJsonStr(vo), vo.getScore());
+        stringRedisTemplate.opsForZSet().add(RANKING_ARTICLES + ":" + article.getType(),
+                JSONUtil.toJsonStr(article.getId()), vo.getScore());
+        stringRedisTemplate.opsForZSet().add(RANKING_ARTICLES + ":" + ArticleType.ALL.ordinal(),
+                JSONUtil.toJsonStr(article.getId()), vo.getScore());
+
+        stringRedisTemplate.opsForHash().put(CACHE_ARTICLES, String.valueOf(article.getId()), JSONUtil.toJsonStr(vo));
         stringRedisTemplate.opsForZSet().removeRange(CACHE_ARTICLES, 0, -(MAX_CACHE_SIZE + 1));
+    }
+
+    @Override
+    public List<ArticleVO> getMyPage(@NonNull Integer page, @NonNull Integer size) {
+        return List.of();
     }
 
     /**
@@ -99,94 +113,100 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
      * </pre>
      */
     @Override
-    public List<ArticleVO> getPage(@NonNull Integer page, Integer type, @NonNull Integer size, Integer studentId) {
+    public List<ArticleVO> getPage(@NonNull Integer page, @NonNull @Min(0) Integer type, @NonNull Integer size) {
+
         int start = (page - 1) * size;
         int end = page * size - 1;
 
         List<ArticleVO> result;
 
         if (end < MAX_CACHE_SIZE) {
-            result = getPageFromCache(start, end, type, studentId, size);
+            result = getPageFromCache(start, end, type);
+            if (result != null && result.size() == size) {
+                return result;
+            }
+            buildLatestCache();
+
+            result = getPageFromCache(start, end, type);
             if (result != null && result.size() == size) {
                 return result;
             }
 
-            // 只有无过滤条件时重建缓存才有意义（重建的是全量50条）
-            if (type == null && studentId == null) {
-                buildLatestCache();
-                result = getPageFromCache(start, end, null, null, size);
-                if (result != null && result.size() == size) {
-                    return result;
-                }
-            }
         }
         // 不在缓存范围内 / 缓存不够 → 数据库兜底
-        result = queryPageFromDB(start, type, studentId, size);
+        result = queryPageFromDB(start, type, size);
         return result;
     }
 
-    private List<ArticleVO> getPageFromCache(int start, int end, Integer type, Integer studentId, int size) {
+    private List<ArticleVO> getPageFromCache(int start, int end, Integer type) {
         ZSetOperations<String, String> ops = stringRedisTemplate.opsForZSet();
-        Long cacheSize = ops.size(CACHE_ARTICLES);
+        Long cacheSize = ops.size(RANKING_ARTICLES);
 
         if (cacheSize == null || cacheSize <= end) {
             return null;
         }
-
-        if (type == null && studentId == null) {
-            // 无过滤，直接取范围
-            Set<String> set = ops.reverseRange(CACHE_ARTICLES, start, end);
-            if (set != null && set.size() == size) {
-                return set.stream().map(s -> JSONUtil.toBean(s, ArticleVO.class)).toList();
-            }
-        } else {
-            // 有过滤：拉全量50条 → Java筛选 → 截取
-            Set<String> set = ops.reverseRange(CACHE_ARTICLES, 0, -1);
-            if (set != null) {
-                List<ArticleVO> filtered = set.stream().map(s -> JSONUtil.toBean(s, ArticleVO.class))
-                        .filter(vo -> (type == null || vo.getType().equals(type))
-                                && (studentId == null || vo.getStudentId().equals(studentId))).toList();
-
-                if (filtered.size() > start) {
-                    int toIndex = Math.min(start + size, filtered.size());
-                    List<ArticleVO> result = filtered.subList(start, toIndex);
-                    if (result.size() == size) {
-                        return result;
-                    }
-                }
-            }
+//        if (studentId == null) {
+        // 无过滤，直接取范围
+        Set<String> set = ops.reverseRange(RANKING_ARTICLES + ":" + type, start, end);
+        if (set == null) {
+            return new ArrayList<>();
         }
-        return null;
+        List<Object> list = stringRedisTemplate.opsForHash().multiGet(CACHE_ARTICLES, new ArrayList<>(set));
+        return list.stream().map(s -> BeanUtil.toBean(s, ArticleVO.class)).toList();
+
+//        } else {
+//            // 有过滤：拉全量50条 → Java筛选 → 截取
+//            Set<String> set = ops.reverseRange(CACHE_ARTICLES, 0, -1);
+//            if (set != null) {
+//                List<ArticleVO> filtered = set.stream().map(s -> JSONUtil.toBean(s, ArticleVO.class))
+//                        .filter(vo -> (type == null || vo.getType().equals(type))
+//                                && (studentId == null || vo.getStudentId().equals(studentId))).toList();
+//
+//                if (filtered.size() > start) {
+//                    int toIndex = Math.min(start + size, filtered.size());
+//                    List<ArticleVO> result = filtered.subList(start, toIndex);
+//                    if (result.size() == size) {
+//                        return result;
+//                    }
+//                }
+//            }
+//        }
+//        return null;
     }
 
     public void buildLatestCache() {
-        // ① 查DB + 转换VO + 填姓名
-        List<Article> list = articleMapper.selectPage(0, null, MAX_CACHE_SIZE);
-        List<ArticleVO> vos = toArticleVOList(list);
-
-        // ② 构建 TypedTuple 集合（每个Tuple = value + score）
-        //    score = updatedDateTime 的时间戳，score越大排名越靠前（ZREVRANGE时先返回）
-        Set<ZSetOperations.TypedTuple<String>> set = new HashSet<>();
-        vos.forEach(vo ->
-                set.add(new DefaultTypedTuple<>(JSONUtil.toJsonStr(vo), vo.getScore()))
-        );
-
-        // ③ 先清空再写入（保证是干净快照），设TTL防止僵尸缓存
+        // 先清空再写入（保证是干净快照），设TTL防止僵尸缓存
         stringRedisTemplate.delete(CACHE_ARTICLES);
-        if (!set.isEmpty()) {
-            stringRedisTemplate.opsForZSet().add(CACHE_ARTICLES, set);
+        stringRedisTemplate.delete(RANKING_ARTICLES);
+
+        // 查DB + 转换VO + 填姓名
+        List<Article> window = articleMapper.selectWindow(MAX_CACHE_SIZE);
+
+        List<ArticleVO> vos = toArticleVOList(window);
+
+        Map<Integer, List<ArticleVO>> map = new HashMap<>();
+        for (ArticleVO vo : vos) {
+            map.computeIfAbsent(vo.getType(), key -> new ArrayList<>())
+                    .add(vo);
         }
-        stringRedisTemplate.expire(CACHE_ARTICLES, 2, TimeUnit.HOURS);
+
+        map.forEach((type, list) -> {
+            Set<ZSetOperations.TypedTuple<String>> set = new HashSet<>();
+            list.forEach(vo -> {
+                        set.add(new DefaultTypedTuple<>(String.valueOf(vo.getId()), vo.getScore()));
+                        stringRedisTemplate.opsForHash().put(CACHE_ARTICLES, String.valueOf(vo.getId()),
+                                JSONUtil.toJsonStr(vo));
+                    }
+            );
+            stringRedisTemplate.opsForZSet().add(RANKING_ARTICLES + ":" + type, set);
+
+        });
+
     }
 
 
-    private List<ArticleVO> queryPageFromDB(int start, Integer type, Integer studentId, int size) {
-        List<Article> list;
-        if (studentId != null) {
-            list = articleMapper.selectPageByStudentId(start, studentId, size);
-        } else {
-            list = articleMapper.selectPage(start, type, size);
-        }
+    private List<ArticleVO> queryPageFromDB(int start, Integer type, int size) {
+        List<Article> list = articleMapper.selectPage(start, type, size);
         return toArticleVOList(list);
     }
 
@@ -229,13 +249,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         if (oldArticle == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
-
-        // 权限校验：仅作者或管理员可修改
-        Integer studentId = BaseContext.getCurrentStudentId();
-        StudentVO user = usersService.getUser(studentId);
-        if (!JwtClaimsConstant.ADMIN_ID.equals(user.getPosition()) && !studentId.equals(oldArticle.getStudentId())) {
-            throw new RuntimeException(MessageConstant.PERMISSION_DENIED);
-        }
+        permissionService.checkOwnerOrAdminPermission(oldArticle.getStudentId());
 
         // 删掉旧内容中不再引用的 OSS 文件
         Set<String> oldObjectNames = extractObjectNames(oldArticle.getContent());
@@ -252,8 +266,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         article.setUpdatedDateTime(LocalDateTime.now());
         articleMapper.updateById(article);
 
-        // 重建缓存
-        buildLatestCache();
+        removeFromCache(oldArticle.getId(), oldArticle.getType());
     }
 
     private Set<String> extractObjectNames(String content) {
@@ -281,20 +294,17 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     @Override
     public void delete(Long id) {
         Article article = this.getById(id);
-        Integer studentId = BaseContext.getCurrentStudentId();
         if (article == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
-        StudentVO user = usersService.getUser(studentId);
-        if (!JwtClaimsConstant.ADMIN_ID.equals(user.getPosition()) && !studentId.equals(article.getStudentId())) {
-            throw new RuntimeException(MessageConstant.PERMISSION_DENIED);
-        }
+        permissionService.checkOwnerOrAdminPermission(article.getStudentId());
+
         // 提取文章内容中的所有图片 objectName 并删除 OSS 文件
         deleteImages(article.getContent());
 
         articleMapper.deleteById(id);
         // 从ZSET中精确移除该条
-        removeFromCache(id);
+        removeFromCache(id, article.getType());
     }
 
 
@@ -305,19 +315,13 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         }
     }
 
-    /**
-     * 从ZSET中移除指定文章（遍历最多50条，根据id匹配）。
-     */
-    private void removeFromCache(Long articleId) {
-        Set<String> set = stringRedisTemplate.opsForZSet().range(CACHE_ARTICLES, 0, -1);
-        if (set != null) {
-            for (String json : set) {
-                ArticleVO vo = JSONUtil.toBean(json, ArticleVO.class);
-                if (vo.getId().equals(articleId)) {
-                    stringRedisTemplate.opsForZSet().remove(CACHE_ARTICLES, json);
-                    break;
-                }
-            }
+
+    private void removeFromCache(Long id, Integer type) {
+        if (id != null && type != null && type >= 0) {
+            String sId = String.valueOf(id);
+            stringRedisTemplate.opsForZSet().remove(RANKING_ARTICLES + ":" + type, sId);
+            stringRedisTemplate.opsForZSet().remove(RANKING_ARTICLES + ":" + ArticleType.ALL.ordinal(), sId);
+            stringRedisTemplate.opsForHash().delete(CACHE_ARTICLES, sId);
         }
     }
 
@@ -337,14 +341,4 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         return results;
     }
 
-    @Override
-    public void deleteBatch(List<String> objectNames) {
-        if (objectNames == null || objectNames.isEmpty()) {
-            return;
-        }
-
-        // ② 批量删 OSS + 软删 student_file
-        commonService.delete(objectNames.toArray(String[]::new));
-
-    }
 }

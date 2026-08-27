@@ -13,6 +13,8 @@ public interface ArticleMapper extends BaseMapper<Article> {
 
     List<Article> selectPage(Integer offset, Integer type, Integer size);
 
+    List<Article> selectWindow(Integer size);
+
     List<Article> selectPageByStudentId(Integer offset, Integer studentId, Integer size);
 
     /** 统计排在指定文章前面的文章数（updated_date_time DESC, id DESC） */

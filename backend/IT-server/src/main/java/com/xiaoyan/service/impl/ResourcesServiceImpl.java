@@ -8,6 +8,7 @@ import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.service.CommonService;
+import com.xiaoyan.service.PermissionService;
 import com.xiaoyan.service.ResourcesService;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.RedisUtil;
@@ -35,6 +36,7 @@ import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES;
 public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources>
         implements ResourcesService {
 
+    private final PermissionService permissionService;
     private ResourcesMapper resourcesMapper;
     private StringRedisTemplate stringRedisTemplate;
     private UsersService usersService;
@@ -114,12 +116,8 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     @Override
     public void deleteById(Long id, Integer studentId) {
         Resources resource = getById(id);
-        StudentVO user = usersService.getUser(studentId);
 
-
-        if (!JwtClaimsConstant.ADMIN_ID.equals(user.getPosition()) && !studentId.equals(resource.getStudentId())) {
-            throw new RuntimeException(MessageConstant.PERMISSION_DENIED);
-        }
+        permissionService.checkOwnerOrAdminPermission(resource.getStudentId());
 
         StudentFile file = studentFileMapper.selectById(resource.getStudentFileFileId());
         commonService.delete(file.getObjectName());

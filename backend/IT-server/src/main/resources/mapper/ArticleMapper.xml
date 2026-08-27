@@ -6,7 +6,9 @@
 
 <mapper namespace="com.xiaoyan.mapper.ArticleMapper">
     <delete id="deleteByStudentId">
-        DELETE FROM article WHERE article.student_id=#{studentId}
+        DELETE
+        FROM article
+        WHERE article.student_id = #{studentId}
     </delete>
 
     <select id="selectPage" resultType="com.xiaoyan.pojo.Article">
@@ -19,17 +21,29 @@
     </select>
 
     <select id="selectPageByStudentId" resultType="com.xiaoyan.pojo.Article">
-        SELECT * FROM article
+        SELECT *
+        FROM article
         WHERE article.student_id = #{studentId}
         ORDER BY article.updated_date_time DESC
         LIMIT #{offset},#{size}
     </select>
 
     <select id="countBefore" resultType="int">
-        SELECT COUNT(*) FROM article
+        SELECT COUNT(*)
+        FROM article
         WHERE updated_date_time > #{updatedDateTime}
     </select>
     <select id="selectCountByStudentId" resultType="java.lang.Integer">
-        SELECT COUNT(*) FROM article WHERE article.student_id=#{studentId}
+        SELECT COUNT(*)
+        FROM article
+        WHERE article.student_id = #{studentId}
+    </select>
+    <select id="selectWindow" resultType="com.xiaoyan.pojo.Article">
+        SELECT * FROM (SELECT a.*,ROW_NUMBER() OVER (
+        PARTITION BY a.type
+        ORDER BY a.updated_date_time DESC, a.id DESC) AS row_num
+        FROM article a) t
+        WHERE t.row_num &lt;=#{size}
+        ORDER BY t.type ASC, t.updated_date_time DESC, t.id DESC;
     </select>
 </mapper>

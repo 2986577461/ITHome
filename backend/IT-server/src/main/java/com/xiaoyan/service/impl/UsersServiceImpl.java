@@ -18,6 +18,7 @@ import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.CommonService;
+import com.xiaoyan.service.PermissionService;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.JwtUtil;
 import com.xiaoyan.utils.RedisUtil;

@@ -1,5 +1,6 @@
 package com.xiaoyan.service.impl;
 
+import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.exception.ParameterException;
@@ -7,6 +8,7 @@ import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.CommonService;
 import com.xiaoyan.utils.AliOssUtil;
+import com.xiaoyan.vo.StudentVO;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

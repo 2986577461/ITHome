@@ -3,6 +3,7 @@
 /*/.claude/
 /frontend/node_modules/
 /*/CLAUDE.md
+/*/Dockerfile
 /backend/IT-server/src/main/resources/application-dev.yml
 
 /frontend/.vscode/

@@ -9,6 +9,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 import java.util.stream.Collectors;
 
@@ -16,9 +17,9 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GlobalException {
 
-    // 处理自定义业务异常
-    @ExceptionHandler(RuntimeException.class)
-    public Result<Void> handleBusinessException(RuntimeException e) {
+//     处理自定义业务异常
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public Result<Void> handleBusinessException(HandlerMethodValidationException e) {
         return Result.error(e.getMessage());
     }
 

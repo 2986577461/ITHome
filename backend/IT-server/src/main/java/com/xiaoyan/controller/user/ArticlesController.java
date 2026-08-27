@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -35,12 +36,17 @@ public class ArticlesController {
     private ArticlesService articlesService;
 
     @GetMapping("page")
-    @Operation(summary = "分页查询文章，my=true 则查自己的")
-    public Result<List<ArticleVO>> getPage(@NonNull Integer page, Integer type, @NonNull Integer size,
-                                           @RequestParam(required = false) Boolean my) {
-        Integer studentId = Boolean.TRUE.equals(my) ? BaseContext.getCurrentStudentId() : null;
-        return Result.success(articlesService.getPage(page, type, size, studentId));
+    @Operation(summary = "分页查询文章")
+    public Result<List<ArticleVO>> getPage(@NonNull @Min(1) Integer page, Integer type, @NonNull Integer size) {
+        return Result.success(articlesService.getPage(page, type, size));
     }
+
+    @GetMapping("my-page")
+    @Operation
+    public Result<List<ArticleVO>> getMyPage(@NonNull @Min(1) Integer page, @NonNull Integer size) {
+        return Result.success(articlesService.getMyPage(page, size));
+    }
+
 
     @GetMapping("count")
     @Operation(summary = "获取文章总数")
@@ -52,7 +58,7 @@ public class ArticlesController {
     @GetMapping("position")
     @Operation(summary = "返回文章所在位置")
     public Result<Integer> getArticlePosition(long id) {
-        log.info("获取文章{}所在页数",id);
+        log.info("获取文章{}所在页数", id);
         return Result.success(articlesService.getArticlePosition(id));
     }
 

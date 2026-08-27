@@ -1,7 +1,7 @@
 package com.xiaoyan.enumeration;
 
 public enum ArticleType {
-    ELSE,
+    ALL,
     C_LANGUAGE,
     HTML,
     CSS,
