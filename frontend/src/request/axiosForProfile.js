@@ -7,9 +7,7 @@ export function updateProfile(data) {
 
 // 分页获取我的文章
 export function getMyArticlesPage(page, size) {
-  return request.get("/user/articles/page", {
-    params: { page, size, my: true },
-  });
+  return request.get("/user/articles/my-page", { params: { page, size } });
 }
 
 // 获取我的资料列表

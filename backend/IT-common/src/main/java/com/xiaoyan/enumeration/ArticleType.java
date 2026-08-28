@@ -8,6 +8,4 @@ public enum ArticleType {
     JAVA_SCRIPT,
     JAVA,
     MYSQL
-
-
 }

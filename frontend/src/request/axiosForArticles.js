@@ -1,14 +1,13 @@
 import axiosInstance from "./axiosInit.js";
 
 export const getPage = async (page, size, type) => {
-  const params = { page, size };
-  if (type) params.type = type;
+  const params = { page, size, type: type ?? 0 };
   return axiosInstance.get("user/articles/page", { params });
 };
 
 export const getArticleCount = async (type) => {
   const params = {};
-  if (type) params.type = type;
+  if (type !== undefined && type !== null) params.type = type;
   return axiosInstance.get("user/articles/count", { params });
 };
 

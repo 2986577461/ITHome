@@ -34,12 +34,13 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -66,7 +67,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     @Override
     public Long getCount(Integer type) {
         LambdaQueryWrapper<Article> lqw = new LambdaQueryWrapper<>();
-        if (type != null) {
+        if (type != null && type != ArticleType.ALL.ordinal()) {
             lqw.eq(Article::getType, type);
         }
         return this.count(lqw);
@@ -90,18 +91,19 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         vo.setName(user.getName());
         vo.setAvatar(user.getAvatar());
 
-        stringRedisTemplate.opsForZSet().add(RANKING_ARTICLES + ":" + article.getType(),
-                JSONUtil.toJsonStr(article.getId()), vo.getScore());
-        stringRedisTemplate.opsForZSet().add(RANKING_ARTICLES + ":" + ArticleType.ALL.ordinal(),
-                JSONUtil.toJsonStr(article.getId()), vo.getScore());
-
-        stringRedisTemplate.opsForHash().put(CACHE_ARTICLES, String.valueOf(article.getId()), JSONUtil.toJsonStr(vo));
-        stringRedisTemplate.opsForZSet().removeRange(CACHE_ARTICLES, 0, -(MAX_CACHE_SIZE + 1));
+        cacheArticle(vo, null);
     }
 
     @Override
     public List<ArticleVO> getMyPage(@NonNull Integer page, @NonNull Integer size) {
-        return List.of();
+        if (page < 1 || size < 1) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
+
+        int start = (page - 1) * size;
+        List<Article> articles = articleMapper.selectPageByStudentId(
+                start, BaseContext.getCurrentStudentId(), size);
+        return toArticleVOList(articles);
     }
 
     /**
@@ -114,6 +116,9 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
      */
     @Override
     public List<ArticleVO> getPage(@NonNull Integer page, @NonNull @Min(0) Integer type, @NonNull Integer size) {
+        if (page < 1 || size < 1) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
 
         int start = (page - 1) * size;
         int end = page * size - 1;
@@ -125,8 +130,15 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
             if (result != null && result.size() == size) {
                 return result;
             }
-            buildLatestCache();
 
+            synchronized (this) {
+//                锁内复查缓存
+                result = getPageFromCache(start, end, type);
+                if (result != null && result.size() == size) {
+                    return result;
+                }
+                buildLatestCache();
+            }
             result = getPageFromCache(start, end, type);
             if (result != null && result.size() == size) {
                 return result;
@@ -140,74 +152,97 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
     private List<ArticleVO> getPageFromCache(int start, int end, Integer type) {
         ZSetOperations<String, String> ops = stringRedisTemplate.opsForZSet();
-        Long cacheSize = ops.size(RANKING_ARTICLES);
+        String rankingKey = rankingKey(type);
+        Long cacheSize = ops.size(rankingKey);
 
         if (cacheSize == null || cacheSize <= end) {
             return null;
         }
-//        if (studentId == null) {
-        // 无过滤，直接取范围
-        Set<String> set = ops.reverseRange(RANKING_ARTICLES + ":" + type, start, end);
-        if (set == null) {
-            return new ArrayList<>();
-        }
-        List<Object> list = stringRedisTemplate.opsForHash().multiGet(CACHE_ARTICLES, new ArrayList<>(set));
-        return list.stream().map(s -> BeanUtil.toBean(s, ArticleVO.class)).toList();
 
-//        } else {
-//            // 有过滤：拉全量50条 → Java筛选 → 截取
-//            Set<String> set = ops.reverseRange(CACHE_ARTICLES, 0, -1);
-//            if (set != null) {
-//                List<ArticleVO> filtered = set.stream().map(s -> JSONUtil.toBean(s, ArticleVO.class))
-//                        .filter(vo -> (type == null || vo.getType().equals(type))
-//                                && (studentId == null || vo.getStudentId().equals(studentId))).toList();
-//
-//                if (filtered.size() > start) {
-//                    int toIndex = Math.min(start + size, filtered.size());
-//                    List<ArticleVO> result = filtered.subList(start, toIndex);
-//                    if (result.size() == size) {
-//                        return result;
-//                    }
-//                }
-//            }
-//        }
-//        return null;
+        Set<String> idSet = ops.reverseRange(rankingKey, start, end);
+        if (idSet == null || idSet.isEmpty()) {
+            return List.of();
+        }
+
+        List<Object> cachedArticles = stringRedisTemplate.opsForHash()
+                .multiGet(CACHE_ARTICLES, new ArrayList<>(idSet));
+
+        return cachedArticles.stream()
+                .filter(Objects::nonNull)
+                .map(value -> JSONUtil.toBean((String) value, ArticleVO.class))
+                .toList();
     }
 
     public void buildLatestCache() {
-        // 先清空再写入（保证是干净快照），设TTL防止僵尸缓存
+        // 先清空详情和所有已知排名索引
         stringRedisTemplate.delete(CACHE_ARTICLES);
-        stringRedisTemplate.delete(RANKING_ARTICLES);
+        for (ArticleType articleType : ArticleType.values()) {
+            stringRedisTemplate.delete(rankingKey(articleType.ordinal()));
+        }
 
-        // 查DB + 转换VO + 填姓名
-        List<Article> window = articleMapper.selectWindow(MAX_CACHE_SIZE);
-
-        List<ArticleVO> vos = toArticleVOList(window);
+        // 每个类型取最新50条
+        List<ArticleVO> window = articleMapper.selectWindow(MAX_CACHE_SIZE);
 
         Map<Integer, List<ArticleVO>> map = new HashMap<>();
-        for (ArticleVO vo : vos) {
+        for (ArticleVO vo : window) {
+            stringRedisTemplate.opsForHash().put(CACHE_ARTICLES, String.valueOf(vo.getId()),
+                    JSONUtil.toJsonStr(vo));
             map.computeIfAbsent(vo.getType(), key -> new ArrayList<>())
                     .add(vo);
         }
 
-        map.forEach((type, list) -> {
-            Set<ZSetOperations.TypedTuple<String>> set = new HashSet<>();
-            list.forEach(vo -> {
-                        set.add(new DefaultTypedTuple<>(String.valueOf(vo.getId()), vo.getScore()));
-                        stringRedisTemplate.opsForHash().put(CACHE_ARTICLES, String.valueOf(vo.getId()),
-                                JSONUtil.toJsonStr(vo));
-                    }
-            );
-            stringRedisTemplate.opsForZSet().add(RANKING_ARTICLES + ":" + type, set);
+        // 全部类型只缓存全局最新50条
+        List<ArticleVO> latest = window.stream()
+                .sorted(Comparator.comparing(ArticleVO::getUpdatedDateTime, Comparator.reverseOrder())
+                        .thenComparing(ArticleVO::getId, Comparator.reverseOrder()))
+                .limit(MAX_CACHE_SIZE)
+                .toList();
+        addToRanking(ArticleType.ALL.ordinal(), latest);
 
-        });
-
+        map.forEach(this::addToRanking);
     }
 
 
     private List<ArticleVO> queryPageFromDB(int start, Integer type, int size) {
-        List<Article> list = articleMapper.selectPage(start, type, size);
-        return toArticleVOList(list);
+        Integer databaseType = type == null || type == ArticleType.ALL.ordinal() ? null : type;
+        return articleMapper.selectPage(start, databaseType, size);
+    }
+
+    private String rankingKey(Integer type) {
+        int rankingType = type == null ? ArticleType.ALL.ordinal() : type;
+        return RANKING_ARTICLES + ":" + rankingType;
+    }
+
+    private void addToRanking(Integer type, List<ArticleVO> articles) {
+        if (articles.isEmpty()) {
+            return;
+        }
+
+        Set<ZSetOperations.TypedTuple<String>> tuples = new HashSet<>();
+        articles.forEach(vo -> tuples.add(
+                new DefaultTypedTuple<>(String.valueOf(vo.getId()), vo.getScore())));
+        stringRedisTemplate.opsForZSet().add(rankingKey(type), tuples);
+    }
+
+    private void cacheArticle(ArticleVO vo, Integer oldType) {
+        String articleId = String.valueOf(vo.getId());
+        if (oldType != null && !Objects.equals(oldType, vo.getType())) {
+            stringRedisTemplate.opsForZSet().remove(rankingKey(oldType), articleId);
+        }
+
+        stringRedisTemplate.opsForHash().put(CACHE_ARTICLES, articleId, JSONUtil.toJsonStr(vo));
+        stringRedisTemplate.opsForZSet().add(rankingKey(vo.getType()), articleId, vo.getScore());
+        stringRedisTemplate.opsForZSet().add(rankingKey(ArticleType.ALL.ordinal()), articleId, vo.getScore());
+        trimRanking(rankingKey(vo.getType()));
+        trimRanking(rankingKey(ArticleType.ALL.ordinal()));
+    }
+
+    private void trimRanking(String key) {
+        Long cacheSize = stringRedisTemplate.opsForZSet().size(key);
+        if (cacheSize != null && cacheSize > MAX_CACHE_SIZE) {
+            stringRedisTemplate.opsForZSet().removeRange(key, 0,
+                    cacheSize - MAX_CACHE_SIZE - 1);
+        }
     }
 
     private List<ArticleVO> toArticleVOList(List<Article> articles) {
@@ -266,7 +301,12 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         article.setUpdatedDateTime(LocalDateTime.now());
         articleMapper.updateById(article);
 
-        removeFromCache(oldArticle.getId(), oldArticle.getType());
+        ArticleVO vo = BeanUtil.toBean(article, ArticleVO.class);
+        vo.setStudentId(oldArticle.getStudentId());
+        StudentVO user = usersService.getUser(oldArticle.getStudentId());
+        vo.setName(user.getName());
+        vo.setAvatar(user.getAvatar());
+        cacheArticle(vo, oldArticle.getType());
     }
 
     private Set<String> extractObjectNames(String content) {

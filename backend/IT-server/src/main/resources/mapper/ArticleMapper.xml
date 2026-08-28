@@ -12,19 +12,34 @@
     </delete>
 
     <select id="selectPage" resultType="com.xiaoyan.pojo.Article">
-        SELECT * FROM article
-        <if test="type!=null">
-            WHERE article.type=#{type}
+        SELECT
+        a.id,
+        a.student_id,
+        a.type,
+        a.head,
+        a.content,
+        a.updated_date_time,
+        s.name,
+        f.file_url AS avatar
+        FROM article a
+        LEFT JOIN it_student s
+        ON s.student_id = a.student_id
+        AND s.deleted = 0
+        LEFT JOIN student_file f
+        ON f.id = s.avatar_id
+        AND f.deleted = 0
+        <if test="type != null">
+            WHERE a.type = #{type}
         </if>
-        ORDER BY article.updated_date_time DESC
-        LIMIT #{offset},#{size}
+        ORDER BY a.updated_date_time DESC, a.id DESC
+        LIMIT #{offset}, #{size}
     </select>
 
     <select id="selectPageByStudentId" resultType="com.xiaoyan.pojo.Article">
         SELECT *
         FROM article
         WHERE article.student_id = #{studentId}
-        ORDER BY article.updated_date_time DESC
+        ORDER BY article.updated_date_time DESC, article.id DESC
         LIMIT #{offset},#{size}
     </select>
 
@@ -38,12 +53,28 @@
         FROM article
         WHERE article.student_id = #{studentId}
     </select>
-    <select id="selectWindow" resultType="com.xiaoyan.pojo.Article">
-        SELECT * FROM (SELECT a.*,ROW_NUMBER() OVER (
-        PARTITION BY a.type
-        ORDER BY a.updated_date_time DESC, a.id DESC) AS row_num
-        FROM article a) t
-        WHERE t.row_num &lt;=#{size}
-        ORDER BY t.type ASC, t.updated_date_time DESC, t.id DESC;
+    <select id="selectWindow" resultType="com.xiaoyan.vo.ArticleVO">
+        SELECT t.id,
+               t.student_id,
+               t.type,
+               t.head,
+               t.content,
+               t.updated_date_time,
+               s.name,
+               f.file_url AS avatar
+        FROM (SELECT a.*,
+                     ROW_NUMBER() OVER (
+                         PARTITION BY a.type
+                         ORDER BY a.updated_date_time DESC, a.id DESC
+                         ) AS row_num
+              FROM article a) t
+                 LEFT JOIN it_student s
+                           ON s.student_id = t.student_id
+                               AND s.deleted = 0
+                 LEFT JOIN student_file f
+                           ON f.id = s.avatar_id
+                               AND f.deleted = 0
+        WHERE t.row_num &lt;= #{size}
+        ORDER BY t.type ASC, t.updated_date_time DESC, t.id DESC
     </select>
 </mapper>
