@@ -11,7 +11,7 @@
         WHERE article.student_id = #{studentId}
     </delete>
 
-    <select id="selectPage" resultType="com.xiaoyan.pojo.Article">
+    <select id="selectPage" resultType="com.xiaoyan.vo.ArticleVO">
         SELECT
         a.id,
         a.student_id,
@@ -27,7 +27,6 @@
         AND s.deleted = 0
         LEFT JOIN student_file f
         ON f.id = s.avatar_id
-        AND f.deleted = 0
         <if test="type != null">
             WHERE a.type = #{type}
         </if>
