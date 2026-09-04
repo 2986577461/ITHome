@@ -18,6 +18,73 @@
             #{id}
         </foreach>
     </select>
+
+    <select id="selectStudentsWithStats" resultType="com.xiaoyan.vo.StudentVO">
+        SELECT
+            s.id,
+            s.student_id,
+            s.name,
+            s.sex,
+            s.major,
+            s.class_name,
+            s.academy,
+            s.position,
+            avatar.file_url AS avatar,
+            COALESCE(article_count.total, 0) AS article_count,
+            COALESCE(resource_count.total, 0) AS resource_count
+        FROM it_student s
+        LEFT JOIN student_file avatar
+            ON avatar.id = s.avatar_id
+        LEFT JOIN (
+            SELECT student_id, COUNT(*) AS total
+            FROM article
+            GROUP BY student_id
+        ) article_count
+            ON article_count.student_id = s.student_id
+        LEFT JOIN (
+            SELECT student_id, COUNT(*) AS total
+            FROM resources
+            GROUP BY student_id
+        ) resource_count
+            ON resource_count.student_id = s.student_id
+        WHERE s.deleted = 0
+        ORDER BY s.student_id
+    </select>
+
+    <select id="selectStudentWithStats" resultType="com.xiaoyan.vo.StudentVO">
+        SELECT
+            s.id,
+            s.student_id,
+            s.name,
+            s.sex,
+            s.major,
+            s.class_name,
+            s.academy,
+            s.position,
+            avatar.file_url AS avatar,
+            COALESCE(article_count.total, 0) AS article_count,
+            COALESCE(resource_count.total, 0) AS resource_count
+        FROM it_student s
+        LEFT JOIN student_file avatar
+            ON avatar.id = s.avatar_id
+        LEFT JOIN (
+            SELECT student_id, COUNT(*) AS total
+            FROM article
+            WHERE student_id = #{studentId}
+            GROUP BY student_id
+        ) article_count
+            ON article_count.student_id = s.student_id
+        LEFT JOIN (
+            SELECT student_id, COUNT(*) AS total
+            FROM resources
+            WHERE student_id = #{studentId}
+            GROUP BY student_id
+        ) resource_count
+            ON resource_count.student_id = s.student_id
+        WHERE s.student_id = #{studentId}
+          AND s.deleted = 0
+    </select>
+
     <select id="selectPositionByIds" resultType="java.lang.String">
         SELECT position FROM it_student where student_id IN
         <foreach collection="studentIds" item="id" open="(" separator="," close=")">
@@ -25,9 +92,18 @@
         </foreach>
     </select>
     <select id="selectThisYearsStudents" resultType="com.xiaoyan.pojo.Student">
-        SELECT s.*
+        SELECT s.student_id,
+               s.name,
+               s.sex,
+               s.major,
+               s.class_name,
+               s.academy,
+               s.position
         FROM it_student s
                  CROSS JOIN (SELECT FLOOR(MAX(student_id) / 100000) AS p FROM it_student) t
-        WHERE FLOOR(s.student_id / 100000) IN (t.p, t.p - 1);
+        WHERE s.student_id &gt;= (t.p - 1) * 100000
+          AND s.student_id &lt; (t.p + 1) * 100000
+          AND s.deleted = 0
+        ORDER BY s.student_id
     </select>
 </mapper>

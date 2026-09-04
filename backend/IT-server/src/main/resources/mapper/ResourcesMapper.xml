@@ -5,6 +5,30 @@
 
 <mapper namespace="com.xiaoyan.mapper.ResourcesMapper">
 
+    <select id="selectResourcesWithDetails" resultType="com.xiaoyan.vo.ResourcesVO">
+        SELECT
+            r.id,
+            r.head,
+            r.introduce,
+            r.student_id,
+            r.release_date_time,
+            file.original_name AS file_name,
+            file.object_name,
+            file.file_url AS file_url,
+            cover.file_url AS cover_url,
+            s.name AS student_name,
+            avatar.file_url AS avatar
+        FROM resources r
+        LEFT JOIN student_file cover
+            ON cover.id = r.student_file_cover_id
+        LEFT JOIN student_file file
+            ON file.id = r.student_file_file_id
+        LEFT JOIN it_student s
+            ON s.student_id = r.student_id
+            AND s.deleted = 0
+        LEFT JOIN student_file avatar
+            ON avatar.id = s.avatar_id
+    </select>
 
     <select id="selectCountByStudentId" resultType="java.lang.Integer">
         SELECT COUNT(*) FROM resources WHERE resources.student_id=#{studentId}

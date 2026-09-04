@@ -11,6 +11,23 @@
         WHERE article.student_id = #{studentId}
     </delete>
 
+    <select id="selectByStudentIds" resultType="com.xiaoyan.pojo.Article">
+        SELECT *
+        FROM article
+        WHERE student_id IN
+        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
+            #{studentId}
+        </foreach>
+    </select>
+
+    <delete id="deleteByStudentIds">
+        DELETE FROM article
+        WHERE student_id IN
+        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
+            #{studentId}
+        </foreach>
+    </delete>
+
     <select id="selectPage" resultType="com.xiaoyan.vo.ArticleVO">
         SELECT
         a.id,
@@ -40,6 +57,20 @@
         WHERE article.student_id = #{studentId}
         ORDER BY article.updated_date_time DESC, article.id DESC
         LIMIT #{offset},#{size}
+    </select>
+
+    <select id="selectMyPage" resultType="com.xiaoyan.vo.MyArticleVO">
+        SELECT a.id,
+               a.head,
+               a.type,
+               a.updated_date_time
+        FROM article a
+                 LEFT JOIN it_student s
+                           ON s.student_id = a.student_id
+                               AND s.deleted = 0
+        WHERE a.student_id = #{studentId}
+        ORDER BY a.updated_date_time DESC, a.id DESC
+        LIMIT #{offset}, #{size}
     </select>
 
     <select id="countBefore" resultType="int">
@@ -72,8 +103,7 @@
                                AND s.deleted = 0
                  LEFT JOIN student_file f
                            ON f.id = s.avatar_id
-                               AND f.deleted = 0
         WHERE t.row_num &lt;= #{size}
-        ORDER BY t.type ASC, t.updated_date_time DESC, t.id DESC
+        ORDER BY t.type, t.updated_date_time DESC, t.id DESC
     </select>
 </mapper>

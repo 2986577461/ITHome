@@ -4,7 +4,6 @@ package com.xiaoyan.globalException;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.result.Result;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -34,9 +33,8 @@ public class GlobalException {
         return Result.error(message);
     }
 
-    // 兜底，所有未捕获的异常
-    @ExceptionHandler(Exception.class)
-    public Result<Void> handleException(Exception e) {
-        throw new RuntimeException(e);
+    @ExceptionHandler(ParameterException.class)
+    public Result<Void> handleException(ParameterException e) {
+        return Result.error(e.getMessage());
     }
 }

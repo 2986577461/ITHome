@@ -122,7 +122,7 @@ const governStore = useGovernStore();
 
 async function handleApprove(id) {
   const resp = await agree(id);
-  if (resp.data === "200") {
+  if (resp.code === "200") {
     ElMessage.success("已通过申请");
     const s = governStore.newcomers.find((item) => item.id === id);
     if (s) {

@@ -4,6 +4,7 @@ package com.xiaoyan.service.impl;
 import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
+import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.service.PermissionService;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.vo.StudentVO;
@@ -22,7 +23,7 @@ public class PermissionServiceImpl implements PermissionService {
         Integer currentStudentId = BaseContext.getCurrentStudentId();
         StudentVO user = usersService.getUser(currentStudentId);
         if (!JwtClaimsConstant.ADMIN_ID.equals(user.getPosition()) && !currentStudentId.equals(studentId)) {
-            throw new RuntimeException(MessageConstant.PERMISSION_DENIED);
+            throw new ParameterException(MessageConstant.PERMISSION_DENIED);
         }
     }
 }

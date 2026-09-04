@@ -7,6 +7,8 @@ import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.LoginDTO;
+import com.xiaoyan.enumeration.ArticleType;
+import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.interceptor.JwtWhiteList;
 import com.xiaoyan.mapper.ArticleMapper;
 import com.xiaoyan.mapper.ResourcesMapper;
@@ -24,15 +26,19 @@ import com.xiaoyan.utils.JwtUtil;
 import com.xiaoyan.utils.RedisUtil;
 import com.xiaoyan.vo.StudentVO;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.util.CellRangeAddress;
-import org.apache.poi.xssf.usermodel.XSSFRow;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xssf.streaming.SXSSFRow;
+import org.apache.poi.xssf.streaming.SXSSFSheet;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
@@ -41,21 +47,24 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
-import java.util.stream.Collectors;
 
+import static com.xiaoyan.constant.RedisConstant.CACHE_ARTICLES;
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
-import static com.xiaoyan.service.impl.ArticlesServiceImpl.IMAGE_PATTERN;
+import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
+import static com.xiaoyan.constant.RedisConstant.RANKING_ARTICLES;
 
 /**
  * @author yuchao
  */
 @Service
 @AllArgsConstructor
+@Slf4j
 public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         implements UsersService {
 
@@ -76,21 +85,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     }
 
     public StudentVO queryStudentFromDB(Integer studentId) {
-        Student student = userMapper.selectByStudentId(studentId);
-        if (student == null) {
-            return null;
-        }
-        StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
-        Long avatarId = student.getAvatarId();
-        if (avatarId != null) {
-            StudentFile avatar = studentFileMapper.selectById(avatarId);
-            if (avatar != null) {
-                vo.setAvatar(avatar.getFileUrl());
-                vo.setArticleCount(articleMapper.selectCountByStudentId(studentId));
-                vo.setResourceCount(resourcesMapper.selectCountByStudentId(studentId));
-            }
-        }
-        return vo;
+        return userMapper.selectStudentWithStats(studentId);
     }
 
     public void uploadAvatar(MultipartFile avatar) throws IOException {
@@ -106,8 +101,9 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         }
         Long newAvatarId = commonService.upload(avatar).getId();
         student.setAvatarId(newAvatarId);
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentId);
         this.lambdaUpdate().set(Student::getAvatarId, newAvatarId).update();
+        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, String.valueOf(studentId));
+        stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
 
     }
 
@@ -115,47 +111,43 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     public ResponseEntity<byte[]> downloadExcel() throws IOException {
         List<Student> all = userMapper.selectThisYearsStudents();
 
-        XSSFWorkbook xssfWorkbook = new XSSFWorkbook();
-        XSSFSheet sheet = xssfWorkbook.createSheet();
-        for (int i = 0; i <= 6; i++) {
-            sheet.setColumnWidth(i, 4000);
-        }
-
-        XSSFRow row = sheet.createRow(0);
-        //合并单元格
-        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 6));
-        row.createCell(0).setCellValue("IT之家协会花名册");
-
-        XSSFRow row1 = sheet.createRow(1);
-        row1.createCell(0).setCellValue("学号");
-        row1.createCell(1).setCellValue("姓名");
-        row1.createCell(2).setCellValue("性别");
-        row1.createCell(3).setCellValue("专业");
-        row1.createCell(4).setCellValue("班级");
-        row1.createCell(5).setCellValue("学院");
-        row1.createCell(6).setCellValue("职务");
-
-        for (int i = 2, s = 0; s < all.size(); i++, s++) {
-            if (all.get(s).getName().equals("AI协会助手")) {
-                s++;
+        byte[] excelBytes;
+        try (SXSSFWorkbook workbook = new SXSSFWorkbook(100);
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            SXSSFSheet sheet = workbook.createSheet();
+            for (int i = 0; i <= 6; i++) {
+                sheet.setColumnWidth(i, 4000);
             }
-            XSSFRow row2 = sheet.createRow(i);
-            row2.createCell(0).setCellValue(all.get(s).getStudentId());
-            row2.createCell(1).setCellValue(all.get(s).getName());
-            row2.createCell(2).setCellValue(all.get(s).getSex());
-            row2.createCell(3).setCellValue(all.get(s).getMajor());
-            row2.createCell(4).setCellValue(all.get(s).getClassName());
-            row2.createCell(5).setCellValue(all.get(s).getAcademy());
 
-            String position = all.get(s).getPosition();
-            row2.createCell(6).setCellValue("admin".equals(position) ? "会长" : "学员");
+            SXSSFRow titleRow = sheet.createRow(0);
+            sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 6));
+            titleRow.createCell(0).setCellValue("IT之家协会花名册");
+
+            SXSSFRow headerRow = sheet.createRow(1);
+            String[] headers = {"学号", "姓名", "性别", "专业", "班级", "学院", "职务"};
+            for (int i = 0; i < headers.length; i++) {
+                headerRow.createCell(i).setCellValue(headers[i]);
+            }
+
+            int rowIndex = 2;
+            for (Student student : all) {
+                if ("AI协会助手".equals(student.getName())) {
+                    continue;
+                }
+                SXSSFRow dataRow = sheet.createRow(rowIndex++);
+                dataRow.createCell(0).setCellValue(student.getStudentId());
+                dataRow.createCell(1).setCellValue(student.getName());
+                dataRow.createCell(2).setCellValue(student.getSex());
+                dataRow.createCell(3).setCellValue(student.getMajor());
+                dataRow.createCell(4).setCellValue(student.getClassName());
+                dataRow.createCell(5).setCellValue(student.getAcademy());
+                dataRow.createCell(6).setCellValue("admin".equals(student.getPosition()) ? "会长" : "学员");
+            }
+
+            workbook.write(bos);
+            excelBytes = bos.toByteArray();
+            workbook.dispose();
         }
-
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        xssfWorkbook.write(bos);
-        xssfWorkbook.close();
-
-        byte[] excelBytes = bos.toByteArray();
 
         HttpHeaders headers = new HttpHeaders();
         // Content-Type: 告诉浏览器响应的内容类型是 Excel 文件
@@ -223,68 +215,86 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public List<StudentVO> getAll() {
-        return redisUtil.getAllWithHashCache(CACHE_STUDENTS, this::count, this::queryStudentsFromDB, StudentVO.class);
+        return redisUtil.getAllWithHashCache(CACHE_STUDENTS, this::queryStudentsFromDB, StudentVO.class);
     }
 
     public List<StudentVO> queryStudentsFromDB() {
-        List<Student> list = this.list();
-
-        // 收集所有非空 avatarId
-        Set<Long> avatarIds = list.stream()
-                .map(Student::getAvatarId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-
-        // 批量查头像，构建 id -> url 映射
-        Map<Long, String> avatarUrlMap = new HashMap<>();
-        if (!avatarIds.isEmpty()) {
-            studentFileMapper.selectBatchIds(avatarIds)
-                    .forEach(file -> avatarUrlMap.put(file.getId(), file.getFileUrl()));
-        }
-
-        return list.stream().map(student -> {
-            StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
-            Long avatarId = student.getAvatarId();
-            if (avatarId != null) {
-                vo.setAvatar(avatarUrlMap.get(avatarId));
-            }
-            Integer studentId = student.getStudentId();
-            log.error(String.valueOf(studentId));
-            vo.setArticleCount(articleMapper.selectCountByStudentId(studentId));
-            vo.setResourceCount(resourcesMapper.selectCountByStudentId(studentId));
-
-            return vo;
-        }).toList();
+        return userMapper.selectStudentsWithStats();
     }
 
     @Override
+    @Transactional
     public void removeStudents(List<Integer> studentIds) {
-        List<String> list = studentIds.stream().map(String::valueOf).toList();
-        Set<String> position = userMapper.selectPositionByIds(studentIds);
-        if (position.contains(JwtClaimsConstant.ADMIN_ID)) {
-            throw new RuntimeException(MessageConstant.PERMISSION_DENIED);
+        if (studentIds == null || studentIds.isEmpty() || studentIds.stream().anyMatch(Objects::isNull)) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
 
-        jwtWhiteList.deleteToken(list.toArray());
-        userMapper.deletebyStudentIds(list);
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, list.toArray());
+        List<Integer> distinctStudentIds = studentIds.stream().distinct().toList();
+        List<String> studentIdStrings = distinctStudentIds.stream().map(String::valueOf).toList();
+        Set<String> position = userMapper.selectPositionByIds(distinctStudentIds);
+        if (position.contains(JwtClaimsConstant.ADMIN_ID)) {
+            throw new ParameterException(MessageConstant.PERMISSION_DENIED);
+        }
 
-      studentIds.forEach(this::deleteBatch);
+        List<Article> articles = articleMapper.selectByStudentIds(distinctStudentIds);
+        Set<String> objectNames = extractArticleObjectNames(articles);
+
+        articleMapper.deleteByStudentIds(distinctStudentIds);
+        userMapper.deletebyStudentIds(studentIdStrings);
+
+        registerAfterCommit(() -> {
+            jwtWhiteList.deleteToken(studentIdStrings.toArray());
+            stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentIdStrings.toArray());
+            stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
+            clearArticleCache();
+
+            if (!objectNames.isEmpty()) {
+                try {
+                    commonService.delete(objectNames.toArray(String[]::new));
+                } catch (ParameterException e) {
+                    log.error("删除学生文章图片失败，studentIds={}", distinctStudentIds, e);
+                }
+            }
+        });
     }
 
-    public void deleteBatch(Integer studentId){
-        List<Article> articles = articleMapper.selectPageByStudentId(0, studentId, Integer.MAX_VALUE);
-
-        List<String> objectNames = new ArrayList<>();
+    private Set<String> extractArticleObjectNames(List<Article> articles) {
+        Set<String> objectNames = new HashSet<>();
         for (Article article : articles) {
-            Matcher matcher = IMAGE_PATTERN.matcher(article.getContent());
+            if (article == null || article.getContent() == null || article.getContent().isEmpty()) {
+                continue;
+            }
+            Matcher matcher = ArticlesServiceImpl.IMAGE_PATTERN.matcher(article.getContent());
             while (matcher.find()) {
-                String url = matcher.group(1);
-                objectNames.add(url.substring(url.lastIndexOf('/') + 1));
+                String objectName = matcher.group(1);
+                objectNames.add(objectName.substring(objectName.lastIndexOf('/') + 1));
             }
         }
-        commonService.delete(objectNames.toArray(new String[0]));
-        articleMapper.deleteByStudentId(studentId);
+        return objectNames;
+    }
+
+    private void registerAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
+    }
+
+    private void clearArticleCache() {
+        List<String> keys = new ArrayList<>();
+        keys.add(CACHE_ARTICLES);
+        for (ArticleType articleType : ArticleType.values()) {
+            keys.add(RANKING_ARTICLES + ":" + articleType.ordinal());
+        }
+        keys.add(RANKING_ARTICLES + ":ready");
+        stringRedisTemplate.delete(keys);
     }
 
     @Override
@@ -292,12 +302,12 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         if (student == null) {
             return;
         }
-        Integer studentId = student.getStudentId();
-
         StudentVO vo = this.getUser(BaseContext.getCurrentStudentId());
+
+        Integer studentId = student.getStudentId();
         //不是管理员却想修改别人
         if (!JwtClaimsConstant.ADMIN_ID.equals(vo.getPosition()) && !vo.getStudentId().equals(studentId)) {
-            throw new RuntimeException(MessageConstant.PERMISSION_DENIED);
+            throw new ParameterException(MessageConstant.PERMISSION_DENIED);
         }
         String password = student.getPassword();
         if (password != null) {
@@ -305,6 +315,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         }
         userMapper.updateById(student);
         stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, String.valueOf(studentId));
+        stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
     }
 
 }

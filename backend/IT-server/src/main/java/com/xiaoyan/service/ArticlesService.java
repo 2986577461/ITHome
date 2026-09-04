@@ -5,6 +5,7 @@ import com.xiaoyan.dto.ArticleDTO;
 import com.xiaoyan.pojo.Article;
 import com.xiaoyan.vo.ArticleImageVO;
 import com.xiaoyan.vo.ArticleVO;
+import com.xiaoyan.vo.MyArticleVO;
 import jakarta.validation.constraints.Min;
 import lombok.NonNull;
 import org.springframework.stereotype.Service;
@@ -29,5 +30,5 @@ public interface ArticlesService extends IService<Article> {
 
     Integer getArticlePosition(Long articleId);
 
-    List<ArticleVO> getMyPage(@NonNull @Min(1) Integer page, @NonNull Integer size);
+    List<MyArticleVO> getMyPage(@NonNull @Min(1) Integer page, @NonNull Integer size);
 }

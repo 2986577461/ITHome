@@ -2,7 +2,6 @@ package com.xiaoyan.utils;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
-import com.xiaoyan.baseinterface.HashCacheId;
 import lombok.Data;
 import lombok.NonNull;
 import org.springframework.beans.factory.DisposableBean;
@@ -13,7 +12,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -232,29 +230,30 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    public <P extends HashCacheId> List<P> getAllWithHashCache(String cacheKey, Supplier<Long> countSupplier,
-                                                                Supplier<List<P>> dbFallback, Class<P> pojoType) {
-        List<Object> caches = stringRedisTemplate.opsForHash().values(cacheKey);
-        long count = countSupplier.get();
-        if (caches.size() == count) {
-            return toPojoList(caches, pojoType);
+    /**
+     * 缓存完整列表快照，避免使用 Hash 数量和数据库 COUNT(*) 判断缓存是否完整。
+     */
+    public <P> List<P> getAllWithHashCache(String cacheKey, Supplier<List<P>> dbFallback,
+                                           Class<P> pojoType) {
+        String allCacheKey = cacheKey + ":all";
+        String cachedJson = stringRedisTemplate.opsForValue().get(allCacheKey);
+        if (StrUtil.isNotBlank(cachedJson)) {
+            return JSONUtil.toList(cachedJson, pojoType);
         }
 
-        LockHandle lock = acquireLockWithRetry("lock:hash:all:" + cacheKey);
+        LockHandle lock = acquireLockWithRetry("lock:all:" + cacheKey);
         try {
-            List<Object> latestCaches = stringRedisTemplate.opsForHash().values(cacheKey);
-            long latestCount = countSupplier.get();
-            if (latestCaches.size() == latestCount) {
-                return toPojoList(latestCaches, pojoType);
+            String latestJson = stringRedisTemplate.opsForValue().get(allCacheKey);
+            if (StrUtil.isNotBlank(latestJson)) {
+                return JSONUtil.toList(latestJson, pojoType);
             }
 
             List<P> list = dbFallback.get();
-            stringRedisTemplate.delete(cacheKey);
-            if (!list.isEmpty()) {
-                Map<String, String> map = new HashMap<>();
-                list.forEach(item -> map.put(item.getCacheId(), JSONUtil.toJsonStr(item)));
-                stringRedisTemplate.opsForHash().putAll(cacheKey, map);
-            }
+            stringRedisTemplate.opsForValue().set(
+                    allCacheKey,
+                    JSONUtil.toJsonStr(list),
+                    DEFAULT_TTL,
+                    DEFAULT_TIME_UNIT);
             return list;
         } finally {
             unlock(lock);

@@ -59,7 +59,6 @@ public class UsersController {
     @PutMapping
     @Operation(summary = "修改信息")
     public Result<String> updateStudent(@RequestBody @Valid StudentDTO studentDTO) {
-        System.out.println(studentDTO);
         userService.update(BeanUtil.toBean(studentDTO, Student.class));
         return Result.success();
     }

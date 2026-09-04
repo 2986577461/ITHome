@@ -4,6 +4,7 @@ import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.ArticleDTO;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.ArticlesService;
+import com.xiaoyan.vo.MyArticleVO;
 import com.xiaoyan.vo.ArticleImageVO;
 import com.xiaoyan.vo.ArticleVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,7 +44,7 @@ public class ArticlesController {
 
     @GetMapping("my-page")
     @Operation
-    public Result<List<ArticleVO>> getMyPage(@NonNull @Min(1) Integer page, @NonNull Integer size) {
+    public Result<List<MyArticleVO>> getMyPage(@NonNull @Min(1) Integer page, @NonNull Integer size) {
         return Result.success(articlesService.getMyPage(page, size));
     }
 
