@@ -82,13 +82,13 @@ class AgentLogger:
              data: dict | None = None):
         self._log("INFO", step, state, msg, data)
 
-    def warn(self,  step: int, state: str, msg: str,
+    def warn(self, state: str, msg: str,
              data: dict | None = None):
-        self._log("WARN", step, state, msg, data)
+        self._log("WARN",0, state, msg, data)
 
-    def error(self,  step: int, state: str, msg: str,
+    def error(self, step: int, state: str, msg: str,
               data: dict | None = None, exc_info=None):
-        self._log("ERROR",  step, state, msg, data, exc_info)
+        self._log("ERROR", step, state, msg, data, exc_info)
 
 
 _logger: AgentLogger | None = None

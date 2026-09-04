@@ -6,30 +6,104 @@
 
 <mapper namespace="com.xiaoyan.mapper.ArticleMapper">
     <delete id="deleteByStudentId">
-        DELETE FROM article WHERE article.student_id=#{studentId}
+        DELETE
+        FROM article
+        WHERE article.student_id = #{studentId}
     </delete>
 
-    <select id="selectPage" resultType="com.xiaoyan.pojo.Article">
-        SELECT * FROM article
-        <if test="type!=null">
-            WHERE article.type=#{type}
+    <select id="selectByStudentIds" resultType="com.xiaoyan.pojo.Article">
+        SELECT *
+        FROM article
+        WHERE student_id IN
+        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
+            #{studentId}
+        </foreach>
+    </select>
+
+    <delete id="deleteByStudentIds">
+        DELETE FROM article
+        WHERE student_id IN
+        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
+            #{studentId}
+        </foreach>
+    </delete>
+
+    <select id="selectPage" resultType="com.xiaoyan.vo.ArticleVO">
+        SELECT
+        a.id,
+        a.student_id,
+        a.type,
+        a.head,
+        a.content,
+        a.updated_date_time,
+        s.name,
+        f.file_url AS avatar
+        FROM article a
+        LEFT JOIN it_student s
+        ON s.student_id = a.student_id
+        AND s.deleted = 0
+        LEFT JOIN student_file f
+        ON f.id = s.avatar_id
+        <if test="type != null">
+            WHERE a.type = #{type}
         </if>
-        ORDER BY article.updated_date_time DESC
-        LIMIT #{offset},#{size}
+        ORDER BY a.updated_date_time DESC, a.id DESC
+        LIMIT #{offset}, #{size}
     </select>
 
     <select id="selectPageByStudentId" resultType="com.xiaoyan.pojo.Article">
-        SELECT * FROM article
+        SELECT *
+        FROM article
         WHERE article.student_id = #{studentId}
-        ORDER BY article.updated_date_time DESC
+        ORDER BY article.updated_date_time DESC, article.id DESC
         LIMIT #{offset},#{size}
     </select>
 
+    <select id="selectMyPage" resultType="com.xiaoyan.vo.MyArticleVO">
+        SELECT a.id,
+               a.head,
+               a.type,
+               a.updated_date_time
+        FROM article a
+                 LEFT JOIN it_student s
+                           ON s.student_id = a.student_id
+                               AND s.deleted = 0
+        WHERE a.student_id = #{studentId}
+        ORDER BY a.updated_date_time DESC, a.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
     <select id="countBefore" resultType="int">
-        SELECT COUNT(*) FROM article
+        SELECT COUNT(*)
+        FROM article
         WHERE updated_date_time > #{updatedDateTime}
     </select>
     <select id="selectCountByStudentId" resultType="java.lang.Integer">
-        SELECT COUNT(*) FROM article WHERE article.student_id=#{studentId}
+        SELECT COUNT(*)
+        FROM article
+        WHERE article.student_id = #{studentId}
+    </select>
+    <select id="selectWindow" resultType="com.xiaoyan.vo.ArticleVO">
+        SELECT t.id,
+               t.student_id,
+               t.type,
+               t.head,
+               t.content,
+               t.updated_date_time,
+               s.name,
+               f.file_url AS avatar
+        FROM (SELECT a.*,
+                     ROW_NUMBER() OVER (
+                         PARTITION BY a.type
+                         ORDER BY a.updated_date_time DESC, a.id DESC
+                         ) AS row_num
+              FROM article a) t
+                 LEFT JOIN it_student s
+                           ON s.student_id = t.student_id
+                               AND s.deleted = 0
+                 LEFT JOIN student_file f
+                           ON f.id = s.avatar_id
+        WHERE t.row_num &lt;= #{size}
+        ORDER BY t.type, t.updated_date_time DESC, t.id DESC
     </select>
 </mapper>

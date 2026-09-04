@@ -4,17 +4,17 @@ CREATE DATABASE if not exists `ithome` CHARACTER SET utf8mb4 COLLATE utf8mb4_uni
 use ithome;
 CREATE TABLE it_student
 (
-    id             bigint PRIMARY KEY,
-    student_id     int              not null,
-    name           VARCHAR(20)      NOT NULL,
-    sex            ENUM ('男','女') NOT NULL,
-    major          VARCHAR(20)      NOT NULL,
-    class_name     VARCHAR(20)      NOT NULL,
-    academy        VARCHAR(20)      NOT NULL,
-    position       varchar(20)      NOT NULL,
-    avatar_id      bigint           not null,
-    password       VARCHAR(100)     NOT NULL,
-    deleted        boolean          not null default 0
+    id         bigint PRIMARY KEY,
+    student_id int unique       not null,
+    name       VARCHAR(20)      NOT NULL,
+    sex        ENUM ('男','女') NOT NULL,
+    major      VARCHAR(20)      NOT NULL,
+    class_name VARCHAR(20)      NOT NULL,
+    academy    VARCHAR(20)      NOT NULL,
+    position   varchar(20)      NOT NULL,
+    avatar_id  bigint           not null,
+    password   VARCHAR(100)     NOT NULL,
+    deleted    boolean          not null default 0
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
@@ -47,7 +47,7 @@ CREATE TABLE article
     head              varchar(100)   not null,
     content           varchar(10000) not null,
     student_id        int            not null,
-    release_date_time DATETIME       not null ,
+    release_date_time DATETIME       not null,
     updated_date_time datetime       not null
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
@@ -56,7 +56,7 @@ CREATE TABLE article
 CREATE TABLE newcomer
 (
     id                    bigint PRIMARY KEY,
-    student_id            int              NOT NULL,
+    student_id            int unique       NOT NULL,
     name                  varchar(20)      not null,
     sex                   ENUM ('男','女') NOT NULL,
     major                 VARCHAR(20)      NOT NULL,

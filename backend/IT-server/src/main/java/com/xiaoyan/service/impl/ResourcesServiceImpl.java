@@ -3,11 +3,11 @@ package com.xiaoyan.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.xiaoyan.constant.JwtClaimsConstant;
-import com.xiaoyan.constant.MessageConstant;
+
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.service.CommonService;
+import com.xiaoyan.service.PermissionService;
 import com.xiaoyan.service.ResourcesService;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.RedisUtil;
@@ -25,6 +25,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES;
+import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES_ALL;
+import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
 
 
 /**
@@ -35,6 +37,7 @@ import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES;
 public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources>
         implements ResourcesService {
 
+    private final PermissionService permissionService;
     private ResourcesMapper resourcesMapper;
     private StringRedisTemplate stringRedisTemplate;
     private UsersService usersService;
@@ -50,37 +53,12 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
     @Override
     public List<ResourcesVO> getList(Integer studentId) {
-        List<ResourcesVO> list = redisUtil.getAllWithHashCache(CACHE_RESOURCES, this::count, this::queryResourcesByDB,
+        List<ResourcesVO> list = redisUtil.getAllWithHashCache(CACHE_RESOURCES, resourcesMapper::selectResourcesWithDetails,
                 ResourcesVO.class);
         if (studentId != null) {
             list.removeIf(vo->!studentId.equals(vo.getStudentId()));
         }
         return list;
-    }
-
-    private List<ResourcesVO> queryResourcesByDB() {
-        List<Resources> list = this.list();
-
-        return list.stream().map(r -> {
-            ResourcesVO rvo = BeanUtil.toBean(r, ResourcesVO.class);
-            StudentFile cover = studentFileMapper.selectById(r.getStudentFileCoverId());
-            if (cover != null) {
-                rvo.setCoverUrl(cover.getFileUrl());
-            }
-            StudentFile file = studentFileMapper.selectById(r.getStudentFileFileId());
-            if (file != null) {
-                rvo.setFileUrl(file.getFileUrl());
-                rvo.setFileName(file.getOriginalName());
-                rvo.setObjectName(file.getObjectName());
-            }
-            StudentVO vo = usersService.getUser(r.getStudentId());
-            if (vo != null) {
-                rvo.setAvatar(vo.getAvatar());
-                rvo.setStudentName(vo.getName());
-            }
-            return rvo;
-        }).toList();
-
     }
 
     @Override
@@ -97,6 +75,8 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
                 releaseDateTime(LocalDateTime.now()).build();
 
         resourcesMapper.insert(resource);
+        stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
+        stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
         StudentVO author = usersService.getUser(studentId);
 
         ResourcesVO vo = BeanUtil.toBean(resource, ResourcesVO.class);
@@ -114,12 +94,8 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     @Override
     public void deleteById(Long id, Integer studentId) {
         Resources resource = getById(id);
-        StudentVO user = usersService.getUser(studentId);
 
-
-        if (!JwtClaimsConstant.ADMIN_ID.equals(user.getPosition()) && !studentId.equals(resource.getStudentId())) {
-            throw new RuntimeException(MessageConstant.PERMISSION_DENIED);
-        }
+        permissionService.checkOwnerOrAdminPermission(resource.getStudentId());
 
         StudentFile file = studentFileMapper.selectById(resource.getStudentFileFileId());
         commonService.delete(file.getObjectName());
@@ -128,6 +104,8 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
         resourcesMapper.deleteById(id);
         stringRedisTemplate.opsForHash().delete(CACHE_RESOURCES, String.valueOf(id));
+        stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
+        stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
 
     }
 

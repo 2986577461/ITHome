@@ -197,11 +197,3 @@ def get_vector_store() -> VectorStore:
     if _vector_store is None:
         _vector_store = VectorStore()
     return _vector_store
-
-
-def reset_vector_store():
-    """重置单例（仅测试用）"""
-    global _vector_store
-    if _vector_store:
-        _vector_store.close()
-    _vector_store = VectorStore()

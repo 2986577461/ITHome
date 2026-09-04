@@ -41,9 +41,10 @@ async def get_current_user(authorization: str = Header(default=""),
     if not raw:
         raise HTTPException(401, "请先登录")
 
-    result = await business_client.get_user_info(raw)
-    if result.get("code") != "200":
-        raise HTTPException(401, "身份验证失败")
+    try:
+        result = await business_client.get_user_info(raw)
+    except Exception:
+        raise HTTPException(401, "身份验证失败，请重新登录")
 
     user_data = (result.get("data") or {}) if isinstance(result, dict) else {}
     student_id = user_data.get("studentId", "")

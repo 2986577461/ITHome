@@ -22,7 +22,12 @@ def get_user_identity(config: RunnableConfig) -> str:
     async def _fetch():
         return await business_client.get_user_info(token)
 
-    result = asyncio.run(_fetch())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        result = loop.run_until_complete(_fetch())
+    finally:
+        loop.close()
     if result.get("code") == "200":
         return str(result.get("data", {}))
     return f"获取用户信息失败: {result.get('msg', '未知错误')}"
@@ -51,7 +56,12 @@ def publish_article(type: int, head: str, content: str, config: RunnableConfig) 
             token=token,
         )
 
-    result = asyncio.run(_fetch())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        result = loop.run_until_complete(_fetch())
+    finally:
+        loop.close()
     if result.get("code") == "200":
         return f"文章《{head}》发布成功！"
     return f"发布失败: {result.get('msg', '未知错误')}"

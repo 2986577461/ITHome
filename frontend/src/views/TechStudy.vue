@@ -406,7 +406,7 @@ function highlightCode() {
 }
 
 async function fetchPage(p) {
-  const type = activeCat.value === "all" ? null : activeCat.value;
+  const type = activeCat.value === "all" ? "0" : activeCat.value;
   loadingMore.value = true;
   try {
     const resp = await getPage(p, pageSize, type);

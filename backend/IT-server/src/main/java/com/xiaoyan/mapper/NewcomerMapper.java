@@ -9,6 +9,9 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface NewcomerMapper extends BaseMapper<Newcomer> {
 
+    @Select("select * from newcomer where id=#{id} for update")
+    Newcomer selectByIdForUpdate(Long id);
+
     @Select("select * from newcomer where student_id=#{studentId};")
     Newcomer selectByStudentId(Integer studentId);
 }

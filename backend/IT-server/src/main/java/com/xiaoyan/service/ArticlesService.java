@@ -5,6 +5,8 @@ import com.xiaoyan.dto.ArticleDTO;
 import com.xiaoyan.pojo.Article;
 import com.xiaoyan.vo.ArticleImageVO;
 import com.xiaoyan.vo.ArticleVO;
+import com.xiaoyan.vo.MyArticleVO;
+import jakarta.validation.constraints.Min;
 import lombok.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,15 +20,15 @@ public interface ArticlesService extends IService<Article> {
 
     void upload(ArticleDTO articleDTO);
 
-    List<ArticleVO> getPage(@NonNull Integer page, Integer type, @NonNull Integer size, Integer studentId);
+    List<ArticleVO> getPage(@NonNull Integer page, Integer type, @NonNull Integer size);
 
     void delete(Long id);
 
     void update(ArticleDTO article);
 
-    void deleteBatch(List<String> objectNames);
-
     List<ArticleImageVO> batchUploadFiles(List<MultipartFile> files);
 
     Integer getArticlePosition(Long articleId);
+
+    List<MyArticleVO> getMyPage(@NonNull @Min(1) Integer page, @NonNull Integer size);
 }
