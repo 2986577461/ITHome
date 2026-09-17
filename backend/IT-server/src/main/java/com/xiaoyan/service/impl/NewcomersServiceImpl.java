@@ -70,6 +70,8 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
         student.setPassword(newcomer.getPassword());
         student.setPosition(PositionConstant.STUDENT);
         student.setAvatarId(1L);
+        // 入会时间：花名册按它筛「今年入会的成员」，所以必须在这里落库
+        student.setCreateDateTime(LocalDateTime.now());
 
         userMapper.insert(student);
         stringRedisTemplate.delete(CACHE_STUDENTS_ALL);

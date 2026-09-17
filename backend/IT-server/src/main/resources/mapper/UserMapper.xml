@@ -25,6 +25,15 @@
             #{id}
         </foreach>
     </select>
+    <!-- 「今年入会的成员」花名册。
+         原来是从最大学号反推年份、再按学号取两届（p-1 和 p），既不准也不好懂；
+         现在直接按入会时间过滤。
+
+         create_date_time 为 null 的老成员会被自动排除：
+         在 SQL 里 NULL = 任何值的结果是 NULL（不是 true），WHERE 就不会选中它。
+
+         写成 YEAR(x) = YEAR(NOW()) 用不上索引，但这张表就几十行，
+         可读性比那点开销重要。将来真的大了再换成 [年初, 次年初) 的范围写法。 -->
     <select id="selectThisYearsStudents" resultType="com.xiaoyan.pojo.Student">
         SELECT s.student_id,
                s.name,
@@ -34,9 +43,7 @@
                s.academy,
                s.position
         FROM it_student s
-                 CROSS JOIN (SELECT FLOOR(MAX(CAST(student_id AS UNSIGNED)) / 100000) AS p FROM it_student) t
-        WHERE CAST(s.student_id AS UNSIGNED) &gt;= (t.p - 1) * 100000
-          AND CAST(s.student_id AS UNSIGNED) &lt; (t.p + 1) * 100000
+        WHERE YEAR(s.create_date_time) = YEAR(NOW())
           AND s.deleted = 0
         ORDER BY s.student_id
     </select>
