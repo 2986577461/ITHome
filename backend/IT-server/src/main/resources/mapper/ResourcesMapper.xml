@@ -8,4 +8,22 @@
     <select id="selectCountByStudentId" resultType="java.lang.Integer">
         SELECT COUNT(*) FROM resources WHERE resources.student_id=#{studentId}
     </select>
+
+    <select id="selectByStudentIds" resultType="com.xiaoyan.pojo.Resources">
+        SELECT id, head, introduce, student_file_cover_id, student_file_file_id,
+               release_date_time, student_id
+        FROM resources
+        WHERE student_id IN
+        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
+            #{studentId}
+        </foreach>
+    </select>
+
+    <delete id="deleteByStudentIds">
+        DELETE FROM resources
+        WHERE student_id IN
+        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
+            #{studentId}
+        </foreach>
+    </delete>
 </mapper>

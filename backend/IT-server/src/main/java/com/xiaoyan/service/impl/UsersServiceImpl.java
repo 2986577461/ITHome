@@ -15,6 +15,7 @@ import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.mapper.UserMapper;
 import com.xiaoyan.pojo.Article;
+import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.pojo.Student;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.properties.JwtProperties;
@@ -43,6 +44,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -51,6 +53,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 
+import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES_ALL;
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
 
@@ -293,23 +296,56 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             throw new ParameterException(Result.FORBIDDEN, MessageConstant.PERMISSION_DENIED);
         }
 
-        List<Article> articles = articleMapper.selectByStudentIds(distinctStudentIds);
-        Set<String> objectNames = extractArticleObjectNames(articles);
+        // 必须先把要删的 OSS 文件全部收集齐再删库：
+        // 数据库记录一删，就再也查不出这些文件叫什么了，OSS 上会留下永远清不掉的垃圾。
+        Set<String> objectNames = new HashSet<>();
 
+        // 1) 文章正文里内嵌的图片（从 HTML 里正则提取）
+        List<Article> articles = articleMapper.selectByStudentIds(distinctStudentIds);
+        objectNames.addAll(extractArticleObjectNames(articles));
+
+        // 2) 该学生上传过的所有文件：头像、文章里的图片、资料的封面和附件
+        List<StudentFile> files = new ArrayList<>(
+                studentFileMapper.selectByStudentIds(distinctStudentIds));
+
+        // 资料引用的文件归属可能与资料本身不一致（历史数据），按 id 再捞一遍合并，避免漏删
+        Set<Long> resourceFileIds = new HashSet<>();
+        for (Resources resource : resourcesMapper.selectByStudentIds(distinctStudentIds)) {
+            if (resource.getStudentFileCoverId() != null) {
+                resourceFileIds.add(resource.getStudentFileCoverId());
+            }
+            if (resource.getStudentFileFileId() != null) {
+                resourceFileIds.add(resource.getStudentFileFileId());
+            }
+        }
+        if (!resourceFileIds.isEmpty()) {
+            files.addAll(studentFileMapper.selectBatchIds(resourceFileIds));
+        }
+        files.forEach(file -> objectNames.add(file.getObjectName()));
+
+        // 删库。文章、资料、文件记录之前都漏了后面两样，导致删完学生之后
+        // resources / student_file 里全是查不到主人的孤儿行。
         articleMapper.deleteByStudentIds(distinctStudentIds);
+        resourcesMapper.deleteByStudentIds(distinctStudentIds);
+        studentFileMapper.deleteByStudentIds(distinctStudentIds);
         userMapper.deletebyStudentIds(distinctStudentIds);
+
+        List<String> objectNameList = new ArrayList<>(objectNames);
 
         TransactionUtils.afterCommit(() -> {
             jwtWhiteList.deleteToken(distinctStudentIds.toArray());
             stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, distinctStudentIds.toArray());
             stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
+            // 资料列表缓存也要失效，否则页面上他发的资料还会在
+            stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
             articleCacheManager.clear();
 
-            if (!objectNames.isEmpty()) {
+            if (!objectNameList.isEmpty()) {
                 try {
-                    commonService.delete(objectNames.toArray(String[]::new));
-                } catch (ParameterException e) {
-                    log.error("删除学生文章图片失败，studentIds={}", distinctStudentIds, e);
+                    commonService.delete(objectNameList.toArray(String[]::new));
+                } catch (RuntimeException e) {
+                    log.error("删除学生文件失败，studentIds={}, objectNames={}",
+                            distinctStudentIds, objectNameList, e);
                 }
             }
         });
