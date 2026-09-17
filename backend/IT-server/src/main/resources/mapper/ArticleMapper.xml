@@ -28,22 +28,16 @@
         </foreach>
     </delete>
 
-    <select id="selectPage" resultType="com.xiaoyan.vo.ArticleVO">
+    <select id="selectPage" resultType="com.xiaoyan.pojo.Article">
         SELECT
         a.id,
         a.student_id,
         a.type,
         a.head,
         a.content,
-        a.updated_date_time,
-        s.name,
-        f.file_url AS avatar
+        a.release_date_time,
+        a.updated_date_time
         FROM article a
-        LEFT JOIN it_student s
-        ON s.student_id = a.student_id
-        AND s.deleted = 0
-        LEFT JOIN student_file f
-        ON f.id = s.avatar_id
         <if test="type != null">
             WHERE a.type = #{type}
         </if>
@@ -65,9 +59,6 @@
                a.type,
                a.updated_date_time
         FROM article a
-                 LEFT JOIN it_student s
-                           ON s.student_id = a.student_id
-                               AND s.deleted = 0
         WHERE a.student_id = #{studentId}
         ORDER BY a.updated_date_time DESC, a.id DESC
         LIMIT #{offset}, #{size}
@@ -83,26 +74,20 @@
         FROM article
         WHERE article.student_id = #{studentId}
     </select>
-    <select id="selectWindow" resultType="com.xiaoyan.vo.ArticleVO">
+    <select id="selectWindow" resultType="com.xiaoyan.pojo.Article">
         SELECT t.id,
                t.student_id,
                t.type,
                t.head,
                t.content,
-               t.updated_date_time,
-               s.name,
-               f.file_url AS avatar
+               t.release_date_time,
+               t.updated_date_time
         FROM (SELECT a.*,
                      ROW_NUMBER() OVER (
                          PARTITION BY a.type
                          ORDER BY a.updated_date_time DESC, a.id DESC
                          ) AS row_num
               FROM article a) t
-                 LEFT JOIN it_student s
-                           ON s.student_id = t.student_id
-                               AND s.deleted = 0
-                 LEFT JOIN student_file f
-                           ON f.id = s.avatar_id
         WHERE t.row_num &lt;= #{size}
         ORDER BY t.type, t.updated_date_time DESC, t.id DESC
     </select>

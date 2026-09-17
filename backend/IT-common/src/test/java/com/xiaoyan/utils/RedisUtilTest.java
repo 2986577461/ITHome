@@ -1,7 +1,6 @@
 package com.xiaoyan.utils;
 
 import cn.hutool.json.JSONUtil;
-import com.xiaoyan.baseinterface.HashCacheId;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -19,8 +18,6 @@ import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -91,47 +88,89 @@ class RedisUtilTest {
     class QueryStringWithMutex {
         @Test
         void should_return_cached_value_on_hit() {
-            when(stringRedisTemplate.opsForValue().get("k1")).thenReturn("{\"value\":10}");
+            when(valueOps.get("k1")).thenReturn("{\"value\":10}");
 
-            CacheValue result = redisUtil.queryStringWithMutex("k", 1, CacheValue.class, id -> null);
+            CacheValue result = redisUtil.queryStringWithMutex("k1", CacheValue.class, () -> null);
 
             assertEquals(10, result.getValue());
         }
 
         @Test
         void should_return_null_when_cache_empty_string() {
-            when(stringRedisTemplate.opsForValue().get("k1")).thenReturn("");
+            when(valueOps.get("k1")).thenReturn("");
 
-            CacheValue result = redisUtil.queryStringWithMutex("k", 1, CacheValue.class, id -> null);
+            CacheValue result = redisUtil.queryStringWithMutex("k1", CacheValue.class, () -> {
+                throw new RuntimeException("不应该走到DB");
+            });
 
             assertNull(result);
         }
 
         @Test
         void should_fallback_to_db_on_miss_and_cache_result() {
-            when(stringRedisTemplate.opsForValue().get("k1")).thenReturn(null);
+            when(valueOps.get("k1")).thenReturn(null);
             when(valueOps.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
 
-            CacheValue result = redisUtil.queryStringWithMutex("k", 1, CacheValue.class,
-                    id -> new CacheValue(20));
+            CacheValue result = redisUtil.queryStringWithMutex("k1", CacheValue.class,
+                    () -> new CacheValue(20));
 
             assertEquals(20, result.getValue());
             verify(valueOps).set("k1", "{\"value\":20}",
                     RedisUtil.DEFAULT_TTL, RedisUtil.DEFAULT_TIME_UNIT);
-            verify(stringRedisTemplate).delete("lock:k1");
         }
 
         @Test
         void should_cache_void_value_when_db_returns_null() {
-            when(stringRedisTemplate.opsForValue().get("k1")).thenReturn(null);
+            when(valueOps.get("k1")).thenReturn(null);
             when(valueOps.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
 
-            CacheValue result = redisUtil.queryStringWithMutex("k", 1, CacheValue.class, id -> null);
+            CacheValue result = redisUtil.queryStringWithMutex("k1", CacheValue.class, () -> null);
 
             assertNull(result);
             verify(valueOps).set("k1", "",
                     RedisUtil.VOID_VALUE_TTL, RedisUtil.TIME_UNIT);
-            verify(stringRedisTemplate).delete("lock:k1");
+        }
+
+        @Test
+        void should_double_check_and_skip_db_when_another_thread_just_updated_cache() {
+            when(valueOps.get("k1"))
+                    .thenReturn(null)
+                    .thenReturn("{\"value\":50}");
+            when(valueOps.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
+
+            CacheValue result = redisUtil.queryStringWithMutex("k1", CacheValue.class, () -> {
+                throw new RuntimeException("不应该走到DB");
+            });
+
+            assertEquals(50, result.getValue());
+        }
+
+        @Test
+        void should_return_cached_list_on_hit() {
+            when(valueOps.get("p:all")).thenReturn(JSONUtil.toJsonStr(List.of(
+                    new Person("a", 1),
+                    new Person("b", 2))));
+
+            List<Person> result = redisUtil.queryStringWithMutex("p:all", Person.class, () -> {
+                throw new RuntimeException("不应该走到DB");
+            });
+
+            assertEquals(2, result.size());
+            assertEquals("a", result.get(0).getName());
+        }
+
+        @Test
+        void should_load_list_from_db_on_miss_and_cache_result() {
+            when(valueOps.get("p:all")).thenReturn(null);
+            when(valueOps.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
+            List<Person> dbList = List.of(new Person("c", 3));
+
+            List<Person> result = redisUtil.queryStringWithMutex("p:all", Person.class, () -> dbList);
+
+            assertEquals(1, result.size());
+            assertEquals("c", result.get(0).getName());
+            verify(valueOps).set(eq("p:all"), eq(JSONUtil.toJsonStr(dbList)),
+                    eq(RedisUtil.DEFAULT_TTL), eq(RedisUtil.DEFAULT_TIME_UNIT));
         }
     }
 
@@ -153,8 +192,7 @@ class RedisUtilTest {
         @Test
         void should_fallback_to_db_on_miss() {
             when(hashOps.get("hash", "hk")).thenReturn(null);
-            when(valueOps.setIfAbsent("lock:hash", "1", 10L, TimeUnit.SECONDS))
-                    .thenReturn(true);
+            when(valueOps.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
 
             redisUtil.queryHashWithMutex("hash", "hk", CacheValue.class, key -> new CacheValue(40));
 
@@ -166,8 +204,7 @@ class RedisUtilTest {
             when(hashOps.get("hash", "hk"))
                     .thenReturn(null)
                     .thenReturn("{\"value\":50}");
-            when(valueOps.setIfAbsent("lock:hash", "1", 10L, TimeUnit.SECONDS))
-                    .thenReturn(true);
+            when(valueOps.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
 
             CacheValue result = redisUtil.queryHashWithMutex("hash", "hk",
                     CacheValue.class, key -> {
@@ -175,36 +212,6 @@ class RedisUtilTest {
                     });
 
             assertEquals(50, result.getValue());
-        }
-    }
-
-    /* ====================================================
-     * getAllWithHashCache() — Hash 全量缓存
-     * ==================================================== */
-    @Nested
-    class GetAllWithHashCache {
-        @Test
-        void should_return_cached_data_when_size_matches() {
-            when(stringRedisTemplate.opsForHash().values("p"))
-                    .thenReturn(List.of(
-                            JSONUtil.toJsonStr(new Person("a", 1)),
-                            JSONUtil.toJsonStr(new Person("b", 2))));
-
-            List<Person> result = redisUtil.getAllWithHashCache("p",
-                    () -> 2L, () -> { throw new RuntimeException("不应该走到DB"); }, Person.class);
-
-            assertEquals(2, result.size());
-        }
-
-        @Test
-        void should_load_from_db_when_cache_size_mismatch() {
-            when(stringRedisTemplate.opsForHash().values("p")).thenReturn(List.of());
-
-            List<Person> result = redisUtil.getAllWithHashCache("p",
-                    () -> 1L, () -> List.of(new Person("c", 3)), Person.class);
-
-            assertEquals(1, result.size());
-            assertEquals("c", result.get(0).getName());
         }
     }
 
@@ -221,10 +228,8 @@ class RedisUtilTest {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    static class Person implements HashCacheId {
+    static class Person {
         private String name;
         private int age;
-        @Override
-        public String getCacheId() { return name; }
     }
 }

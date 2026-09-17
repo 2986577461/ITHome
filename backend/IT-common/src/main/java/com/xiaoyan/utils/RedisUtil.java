@@ -12,8 +12,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -164,12 +162,12 @@ public class RedisUtil implements DisposableBean {
         return count;
     }
 
-    public <R, ID> R queryStringWithMutex(@NonNull String keyPrefix, @NonNull ID id,
-                                           @NonNull Class<R> rType, @NonNull Function<ID, R> dbFallback) {
-        String key = keyPrefix + id;
+    @SuppressWarnings("unchecked")
+    public <R> R queryStringWithMutex(@NonNull String key, @NonNull Class<?> type,
+                                      @NonNull Supplier<R> dbFallback) {
         String json = stringRedisTemplate.opsForValue().get(key);
         if (StrUtil.isNotBlank(json)) {
-            return JSONUtil.toBean(json, rType);
+            return (R) parse(json, type);
         }
         if (json != null) {
             return null;
@@ -179,15 +177,15 @@ public class RedisUtil implements DisposableBean {
         try {
             String latest = stringRedisTemplate.opsForValue().get(key);
             if (StrUtil.isNotBlank(latest)) {
-                return JSONUtil.toBean(latest, rType);
+                return (R) parse(latest, type);
             }
             if (latest != null) {
                 return null;
             }
 
-            R value = dbFallback.apply(id);
+            R value = dbFallback.get();
             if (value == null) {
-                stringRedisTemplate.opsForValue().set(key, "", VOID_VALUE_TTL, TIME_UNIT);
+                cacheNull(key);
                 return null;
             }
             save(key, value);
@@ -195,6 +193,10 @@ public class RedisUtil implements DisposableBean {
         } finally {
             unlock(lock);
         }
+    }
+
+    private Object parse(String json, Class<?> type) {
+        return json.trim().startsWith("[") ? JSONUtil.toList(json, type) : JSONUtil.toBean(json, type);
     }
 
     public <R> R queryHashWithMutex(@NonNull String key, @NonNull String hashKey,
@@ -225,36 +227,6 @@ public class RedisUtil implements DisposableBean {
             stringRedisTemplate.delete(hashNullKey(key, hashKey));
             stringRedisTemplate.opsForHash().put(key, hashKey, JSONUtil.toJsonStr(value));
             return value;
-        } finally {
-            unlock(lock);
-        }
-    }
-
-    /**
-     * 缓存完整列表快照，避免使用 Hash 数量和数据库 COUNT(*) 判断缓存是否完整。
-     */
-    public <P> List<P> getAllWithHashCache(String cacheKey, Supplier<List<P>> dbFallback,
-                                           Class<P> pojoType) {
-        String allCacheKey = cacheKey + ":all";
-        String cachedJson = stringRedisTemplate.opsForValue().get(allCacheKey);
-        if (StrUtil.isNotBlank(cachedJson)) {
-            return JSONUtil.toList(cachedJson, pojoType);
-        }
-
-        LockHandle lock = acquireLockWithRetry("lock:all:" + cacheKey);
-        try {
-            String latestJson = stringRedisTemplate.opsForValue().get(allCacheKey);
-            if (StrUtil.isNotBlank(latestJson)) {
-                return JSONUtil.toList(latestJson, pojoType);
-            }
-
-            List<P> list = dbFallback.get();
-            stringRedisTemplate.opsForValue().set(
-                    allCacheKey,
-                    JSONUtil.toJsonStr(list),
-                    DEFAULT_TTL,
-                    DEFAULT_TIME_UNIT);
-            return list;
         } finally {
             unlock(lock);
         }
@@ -327,10 +299,6 @@ public class RedisUtil implements DisposableBean {
 
     private void cacheNull(String key) {
         stringRedisTemplate.opsForValue().set(key, "", VOID_VALUE_TTL, TIME_UNIT);
-    }
-
-    private <P> List<P> toPojoList(List<Object> caches, Class<P> pojoType) {
-        return caches.stream().map(value -> JSONUtil.toBean((String) value, pojoType)).toList();
     }
 
     private <R> R toLogicalValue(RedisData data, Class<R> rType) {

@@ -2,7 +2,6 @@ package com.xiaoyan.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.xiaoyan.pojo.Article;
-import com.xiaoyan.vo.ArticleVO;
 import com.xiaoyan.vo.MyArticleVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -14,9 +13,9 @@ import java.util.List;
 @Mapper
 public interface ArticleMapper extends BaseMapper<Article> {
 
-    List<ArticleVO> selectPage(Integer offset, Integer type, Integer size);
+    List<Article> selectPage(Integer offset, Integer type, Integer size);
 
-    List<ArticleVO> selectWindow(Integer size);
+    List<Article> selectWindow(Integer size);
 
     List<Article> selectPageByStudentId(Integer offset, Integer studentId, Integer size);
 

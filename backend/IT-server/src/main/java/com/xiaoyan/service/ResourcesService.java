@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import org.springframework.stereotype.Service;
 import com.xiaoyan.dto.ResourcesDTO;
 import com.xiaoyan.pojo.Resources;
+import com.xiaoyan.vo.MyResourceVO;
 import com.xiaoyan.vo.ResourcesVO;
 
 import java.io.IOException;
@@ -15,7 +16,9 @@ public interface ResourcesService extends IService<Resources> {
 
     Long getCount();
 
-    List<ResourcesVO> getList(Integer studentId);
+    List<ResourcesVO> getList();
+
+    List<MyResourceVO> getMyResources(Integer studentId);
 
     void saveResource(ResourcesDTO resourcesDTO, Integer studentId) throws IOException;
 

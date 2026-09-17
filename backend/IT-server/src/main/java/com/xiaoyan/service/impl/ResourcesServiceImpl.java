@@ -1,7 +1,6 @@
 package com.xiaoyan.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import com.xiaoyan.mapper.ResourcesMapper;
@@ -18,13 +17,13 @@ import org.springframework.stereotype.Service;
 import com.xiaoyan.dto.ResourcesDTO;
 import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.pojo.StudentFile;
+import com.xiaoyan.vo.MyResourceVO;
 import com.xiaoyan.vo.ResourcesVO;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES;
 import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES_ALL;
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
 
@@ -52,13 +51,48 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public List<ResourcesVO> getList(Integer studentId) {
-        List<ResourcesVO> list = redisUtil.getAllWithHashCache(CACHE_RESOURCES, resourcesMapper::selectResourcesWithDetails,
-                ResourcesVO.class);
-        if (studentId != null) {
-            list.removeIf(vo->!studentId.equals(vo.getStudentId()));
+    public List<ResourcesVO> getList() {
+        return loadAll();
+    }
+
+    @Override
+    public List<MyResourceVO> getMyResources(Integer studentId) {
+        List<ResourcesVO> all = loadAll();
+        if (all == null || all.isEmpty()) {
+            return List.of();
         }
-        return list;
+        return all.stream()
+                .filter(vo -> studentId != null && studentId.equals(vo.getStudentId()))
+                .map(vo -> BeanUtil.toBean(vo, MyResourceVO.class))
+                .toList();
+    }
+
+    private List<ResourcesVO> loadAll() {
+        return redisUtil.queryStringWithMutex(CACHE_RESOURCES_ALL, ResourcesVO.class,
+                this::queryResourcesByDB);
+    }
+
+    private List<ResourcesVO> queryResourcesByDB() {
+        List<Resources> list = this.list();
+        return list.stream().map(resource -> {
+            ResourcesVO vo = BeanUtil.toBean(resource, ResourcesVO.class);
+            StudentFile cover = studentFileMapper.selectById(resource.getStudentFileCoverId());
+            if (cover != null) {
+                vo.setCoverUrl(cover.getFileUrl());
+            }
+            StudentFile file = studentFileMapper.selectById(resource.getStudentFileFileId());
+            if (file != null) {
+                vo.setFileUrl(file.getFileUrl());
+                vo.setFileName(file.getOriginalName());
+                vo.setObjectName(file.getObjectName());
+            }
+            StudentVO author = usersService.getUser(resource.getStudentId());
+            if (author != null) {
+                vo.setAvatar(author.getAvatar());
+                vo.setStudentName(author.getName());
+            }
+            return vo;
+        }).toList();
     }
 
     @Override
@@ -77,17 +111,6 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         resourcesMapper.insert(resource);
         stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
         stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
-        StudentVO author = usersService.getUser(studentId);
-
-        ResourcesVO vo = BeanUtil.toBean(resource, ResourcesVO.class);
-        vo.setStudentName(author.getName());
-        vo.setAvatar(author.getAvatar());
-        vo.setFileUrl(file.getFileUrl());
-        vo.setFileName(file.getOriginalName());
-        vo.setCoverUrl(cover.getFileUrl());
-
-        stringRedisTemplate.opsForHash().put(CACHE_RESOURCES, String.valueOf(resource.getId()),
-                JSONUtil.toJsonStr(vo));
 
     }
 
@@ -103,7 +126,6 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         commonService.delete(cover.getObjectName());
 
         resourcesMapper.deleteById(id);
-        stringRedisTemplate.opsForHash().delete(CACHE_RESOURCES, String.valueOf(id));
         stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
         stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
 

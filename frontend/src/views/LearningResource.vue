@@ -30,7 +30,7 @@
           </div>
         </div>
         <div class="resource-grid" v-else-if="pagedResources.length > 0">
-          <div v-for="r in pagedResources" :key="r.id" class="res-card">
+          <div v-for="r in pagedResources" :key="r.id" :id="'resource-' + r.id" class="res-card">
             <div class="res-cover" @click="download(r.objectName)">
               <img v-if="r.coverUrl" :src="r.coverUrl" class="res-cover-img" />
               <div v-else class="res-cover-placeholder">
@@ -207,7 +207,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, nextTick, onMounted, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useUserStore } from "@/stores/user";
 import { useUploadStore } from "@/stores/upload";
 import {
@@ -239,6 +240,7 @@ function fmtDate(d) {
   );
 }
 
+var route = useRoute();
 var userStore = useUserStore();
 var uploadStore = useUploadStore();
 
@@ -315,13 +317,41 @@ async function doDelete() {
   toDelete.value = null;
 }
 
+function focusResource(id) {
+  if (id == null || id === "") return;
+  var idx = resources.value.findIndex(function (item) {
+    return String(item.id) === String(id);
+  });
+  if (idx < 0) return;
+  currentPage.value = Math.floor(idx / pageSize) + 1;
+  nextTick(function () {
+    var el = document.getElementById("resource-" + id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("res-card-focus");
+    setTimeout(function () {
+      el.classList.remove("res-card-focus");
+    }, 1800);
+  });
+}
+
 onMounted(async function () {
   try {
     var res = await getAll();
     if (res && res.data) resources.value = res.data;
   } catch (e) {}
   loading.value = false;
+  focusResource(route.query.id);
 });
+
+watch(
+  function () {
+    return route.query.id;
+  },
+  function (id) {
+    if (!loading.value) focusResource(id);
+  },
+);
 </script>
 
 <style scoped>
@@ -349,13 +379,22 @@ onMounted(async function () {
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--color-border);
+  scroll-margin-top: calc(var(--nav-height) + 20px);
   transition:
     transform 0.35s var(--easing-spring),
-    box-shadow 0.35s var(--easing-spring);
+    box-shadow 0.35s var(--easing-spring),
+    border-color 0.35s var(--easing-spring);
 }
 .res-card:hover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-lg);
+}
+.res-card-focus {
+  border-color: rgba(0, 113, 227, 0.55);
+  box-shadow:
+    0 0 0 4px rgba(0, 113, 227, 0.16),
+    var(--shadow-lg);
+  transform: translateY(-4px);
 }
 .res-cover {
   position: relative;

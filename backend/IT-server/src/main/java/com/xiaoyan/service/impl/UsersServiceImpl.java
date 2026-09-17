@@ -85,7 +85,21 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     }
 
     public StudentVO queryStudentFromDB(Integer studentId) {
-        return userMapper.selectStudentWithStats(studentId);
+        Student student = userMapper.selectByStudentId(studentId);
+        if (student == null) {
+            return null;
+        }
+        StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
+        Long avatarId = student.getAvatarId();
+        if (avatarId != null) {
+            StudentFile avatar = studentFileMapper.selectById(avatarId);
+            if (avatar != null) {
+                vo.setAvatar(avatar.getFileUrl());
+            }
+        }
+        vo.setArticleCount(articleMapper.selectCountByStudentId(studentId));
+        vo.setResourceCount(resourcesMapper.selectCountByStudentId(studentId));
+        return vo;
     }
 
     public void uploadAvatar(MultipartFile avatar) throws IOException {
@@ -215,11 +229,34 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public List<StudentVO> getAll() {
-        return redisUtil.getAllWithHashCache(CACHE_STUDENTS, this::queryStudentsFromDB, StudentVO.class);
+        return redisUtil.queryStringWithMutex(CACHE_STUDENTS_ALL, StudentVO.class, this::queryStudentsFromDB);
     }
 
     public List<StudentVO> queryStudentsFromDB() {
-        return userMapper.selectStudentsWithStats();
+        List<Student> list = this.list();
+        Set<Long> avatarIds = new HashSet<>();
+        for (Student student : list) {
+            if (student.getAvatarId() != null) {
+                avatarIds.add(student.getAvatarId());
+            }
+        }
+
+        Map<Long, String> avatarUrlMap = new HashMap<>();
+        if (!avatarIds.isEmpty()) {
+            studentFileMapper.selectBatchIds(avatarIds)
+                    .forEach(file -> avatarUrlMap.put(file.getId(), file.getFileUrl()));
+        }
+
+        return list.stream().map(student -> {
+            StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
+            if (student.getAvatarId() != null) {
+                vo.setAvatar(avatarUrlMap.get(student.getAvatarId()));
+            }
+            Integer studentId = student.getStudentId();
+            vo.setArticleCount(articleMapper.selectCountByStudentId(studentId));
+            vo.setResourceCount(resourcesMapper.selectCountByStudentId(studentId));
+            return vo;
+        }).toList();
     }
 
     @Override

@@ -227,7 +227,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
      * 这样读请求不会看到只写了一半的缓存。
      */
     private void rebuildLatestCache() {
-        List<ArticleVO> window = articleMapper.selectWindow(MAX_CACHE_SIZE);
+        List<ArticleVO> window = toArticleVOList(articleMapper.selectWindow(MAX_CACHE_SIZE));
 
         String buildId = UUID.randomUUID().toString();
         String temporaryDetailsKey = CACHE_ARTICLES + ":rebuild:" + buildId;
@@ -273,7 +273,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
     private List<ArticleVO> queryPageFromDB(int start, Integer type, int size) {
         Integer databaseType = type == null || type == ArticleType.ALL.ordinal() ? null : type;
-        return articleMapper.selectPage(start, databaseType, size);
+        return toArticleVOList(articleMapper.selectPage(start, databaseType, size));
     }
 
     private String rankingKey(Integer type) {

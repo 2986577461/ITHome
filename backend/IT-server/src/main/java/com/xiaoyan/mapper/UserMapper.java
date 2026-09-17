@@ -4,9 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
 import com.xiaoyan.pojo.Student;
-import com.xiaoyan.vo.StudentVO;
 
 import java.util.List;
 import java.util.Set;
@@ -16,10 +14,6 @@ public interface UserMapper extends BaseMapper<Student> {
 
     @Select("select * from it_student where student_id=#{studentId} and deleted=0")
     Student selectByStudentId(Integer studentId);
-
-    List<StudentVO> selectStudentsWithStats();
-
-    StudentVO selectStudentWithStats(Integer studentId);
 
     List<Student> selectByStudentIds(@Param("studentIds") Set<Integer> studentIds);
 
