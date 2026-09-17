@@ -13,13 +13,13 @@ import java.util.Set;
 public interface UserMapper extends BaseMapper<Student> {
 
     @Select("select * from it_student where student_id=#{studentId} and deleted=0")
-    Student selectByStudentId(Integer studentId);
+    Student selectByStudentId(String studentId);
 
-    List<Student> selectByStudentIds(@Param("studentIds") Set<Integer> studentIds);
+    List<Student> selectByStudentIds(@Param("studentIds") Set<String> studentIds);
 
     void deletebyStudentIds(List<String> studentIds);
 
-    Set<String> selectPositionByIds(List<Integer> studentIds);
+    Set<String> selectPositionByIds(List<String> studentIds);
 
     List<Student> selectThisYearsStudents();
 

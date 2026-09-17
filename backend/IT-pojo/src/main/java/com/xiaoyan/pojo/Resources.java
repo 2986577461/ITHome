@@ -30,6 +30,6 @@ public class Resources implements Serializable {
 
     private LocalDateTime releaseDateTime;
 
-    private Integer studentId;
+    private String studentId;
 
 }

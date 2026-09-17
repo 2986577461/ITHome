@@ -13,7 +13,7 @@ public class Newcomer implements Serializable, HashCacheId {
     @TableId("id")
     private Long id;
 
-    private Integer studentId;
+    private String studentId;
 
     private String name;
 

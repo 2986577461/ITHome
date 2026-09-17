@@ -52,7 +52,7 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
             throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
         }
 
-        Integer studentId = newcomer.getStudentId();
+        String studentId = newcomer.getStudentId();
 
         // 不能使用缓存判断学生是否存在，否则缓存未更新时可能重复创建
         Student oldStudent = userMapper.selectByStudentId(studentId);
@@ -79,7 +79,7 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
     @Override
     @Transactional
     public void applyJoin(@NonNull Newcomer newComer) {
-        Integer studentId = newComer.getStudentId();
+        String studentId = newComer.getStudentId();
 
         Newcomer dbNewComer = newcomerMapper.selectByStudentId(studentId);
         Student dbStudent = userMapper.selectByStudentId(studentId);

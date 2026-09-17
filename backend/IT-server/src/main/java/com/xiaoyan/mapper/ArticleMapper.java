@@ -17,18 +17,18 @@ public interface ArticleMapper extends BaseMapper<Article> {
 
     List<Article> selectWindow(Integer size);
 
-    List<Article> selectPageByStudentId(Integer offset, Integer studentId, Integer size);
+    List<Article> selectPageByStudentId(Integer offset, String studentId, Integer size);
 
-    List<MyArticleVO> selectMyPage(Integer offset, Integer studentId, Integer size);
+    List<MyArticleVO> selectMyPage(Integer offset, String studentId, Integer size);
 
-    List<Article> selectByStudentIds(@Param("studentIds") List<Integer> studentIds);
+    List<Article> selectByStudentIds(@Param("studentIds") List<String> studentIds);
 
-    int deleteByStudentIds(@Param("studentIds") List<Integer> studentIds);
+    int deleteByStudentIds(@Param("studentIds") List<String> studentIds);
 
     /** 统计排在指定文章前面的文章数（updated_date_time DESC, id DESC） */
     int countBefore(LocalDateTime updatedDateTime);
 
-    int selectCountByStudentId(Integer studentId);
+    int selectCountByStudentId(String studentId);
 
-    void deleteByStudentId(Integer studentId);
+    void deleteByStudentId(String studentId);
 }

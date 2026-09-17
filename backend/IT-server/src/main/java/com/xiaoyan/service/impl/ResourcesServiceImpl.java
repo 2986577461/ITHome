@@ -60,7 +60,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public List<MyResourceVO> getMyResources(Integer studentId) {
+    public List<MyResourceVO> getMyResources(String studentId) {
         List<ResourcesVO> all = loadAll();
         if (all == null || all.isEmpty()) {
             return List.of();
@@ -105,7 +105,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public void saveResource(ResourcesDTO resourcesDTO, Integer studentId) throws IOException {
+    public void saveResource(ResourcesDTO resourcesDTO, String studentId) throws IOException {
         CopiedFile coverFile = copyFile(resourcesDTO.getCover());
         CopiedFile resourceFile = copyFile(resourcesDTO.getFile());
         String head = resourcesDTO.getHead();
@@ -139,7 +139,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public void deleteById(Long id, Integer studentId) {
+    public void deleteById(Long id, String studentId) {
         Resources resource = getById(id);
         if (resource == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);

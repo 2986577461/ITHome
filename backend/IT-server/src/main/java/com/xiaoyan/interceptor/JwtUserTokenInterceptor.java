@@ -44,14 +44,14 @@ public class JwtUserTokenInterceptor implements HandlerInterceptor {
 
         try {
             Claims claims = JwtUtil.parseJWT(jwtProperties.getSecretKey(), token);
-            Object object = claims.get(JwtClaimsConstant.USER_ID);
-            Object object1 = claims.get(JwtClaimsConstant.ADMIN_ID);
-            int studentId;
-            if (object != null) {
-                studentId = Integer.parseInt(object.toString());
-            } else {
-                studentId = Integer.parseInt(object1.toString());
+            Object userId = claims.get(JwtClaimsConstant.USER_ID);
+            Object adminId = claims.get(JwtClaimsConstant.ADMIN_ID);
+            Object rawStudentId = userId != null ? userId : adminId;
+            if (rawStudentId == null) {
+                response.setStatus(401);
+                return false;
             }
+            String studentId = rawStudentId.toString();
 
             if (!jwtWhiteList.validation(studentId, token)) {
                 response.setStatus(401);

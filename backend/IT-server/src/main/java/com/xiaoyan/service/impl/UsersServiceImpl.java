@@ -75,15 +75,15 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     private UserMapper userMapper;
 
     @Override
-    public StudentVO getUser(Integer studentId) {
-        return redisUtil.queryHashWithMutex(CACHE_STUDENTS, String.valueOf(studentId),
+    public StudentVO getUser(String studentId) {
+        return redisUtil.queryHashWithMutex(CACHE_STUDENTS, studentId,
                 StudentVO.class, id -> this.queryStudentFromDB(studentId));
     }
 
     @Override
-    public void checkOwnerOrAdmin(Integer ownerStudentId) {
+    public void checkOwnerOrAdmin(String ownerStudentId) {
         // 权限校验：仅作者本人或管理员可修改
-        Integer currentStudentId = BaseContext.getCurrentStudentId();
+        String currentStudentId = BaseContext.getCurrentStudentId();
         if (currentStudentId == null) {
             throw new ParameterException(MessageConstant.USER_NOT_LOGIN);
         }
@@ -99,7 +99,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         }
     }
 
-    public StudentVO queryStudentFromDB(Integer studentId) {
+    public StudentVO queryStudentFromDB(String studentId) {
         Student student = userMapper.selectByStudentId(studentId);
         if (student == null) {
             return null;
@@ -118,7 +118,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     }
 
     public void uploadAvatar(MultipartFile avatar) throws IOException {
-        Integer studentId = BaseContext.getCurrentStudentId();
+        String studentId = BaseContext.getCurrentStudentId();
         Student student = userMapper.selectByStudentId(studentId);
         if (student == null) {
             throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
@@ -134,7 +134,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         Long newAvatarId = commonService.upload(avatar).getId();
         student.setAvatarId(newAvatarId);
         this.lambdaUpdate().set(Student::getAvatarId, newAvatarId).update();
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, String.valueOf(studentId));
+        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentId);
         stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
 
     }
@@ -207,7 +207,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public Result<StudentVO> login(LoginDTO message) {
-        Integer studentId = message.getStudentId();
+        String studentId = message.getStudentId();
         String password = message.getPassword();
         Student student = userMapper.selectByStudentId(studentId);
 
@@ -273,7 +273,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             if (student.getAvatarId() != null) {
                 vo.setAvatar(avatarUrlMap.get(student.getAvatarId()));
             }
-            Integer studentId = student.getStudentId();
+            String studentId = student.getStudentId();
             vo.setArticleCount(articleMapper.selectCountByStudentId(studentId));
             vo.setResourceCount(resourcesMapper.selectCountByStudentId(studentId));
             return vo;
@@ -282,13 +282,12 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     @Transactional
-    public void removeStudents(List<Integer> studentIds) {
+    public void removeStudents(List<String> studentIds) {
         if (studentIds == null || studentIds.isEmpty() || studentIds.stream().anyMatch(Objects::isNull)) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
 
-        List<Integer> distinctStudentIds = studentIds.stream().distinct().toList();
-        List<String> studentIdStrings = distinctStudentIds.stream().map(String::valueOf).toList();
+        List<String> distinctStudentIds = studentIds.stream().distinct().toList();
         Set<String> position = userMapper.selectPositionByIds(distinctStudentIds);
         if (position.contains(JwtClaimsConstant.ADMIN_ID)) {
             throw new ParameterException(MessageConstant.PERMISSION_DENIED);
@@ -298,11 +297,11 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         Set<String> objectNames = extractArticleObjectNames(articles);
 
         articleMapper.deleteByStudentIds(distinctStudentIds);
-        userMapper.deletebyStudentIds(studentIdStrings);
+        userMapper.deletebyStudentIds(distinctStudentIds);
 
         TransactionUtils.afterCommit(() -> {
-            jwtWhiteList.deleteToken(studentIdStrings.toArray());
-            stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentIdStrings.toArray());
+            jwtWhiteList.deleteToken(distinctStudentIds.toArray());
+            stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, distinctStudentIds.toArray());
             stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
             articleCacheManager.clear();
 
@@ -345,7 +344,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
         }
 
-        Integer currentStudentId = BaseContext.getCurrentStudentId();
+        String currentStudentId = BaseContext.getCurrentStudentId();
         StudentVO current = currentStudentId == null ? null : this.getUser(currentStudentId);
         if (current == null) {
             throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
@@ -370,7 +369,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         }
 
         userMapper.updateById(student);
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, String.valueOf(target.getStudentId()));
+        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, target.getStudentId());
         stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
     }
 

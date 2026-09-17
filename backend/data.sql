@@ -5,7 +5,7 @@ use ithome;
 CREATE TABLE it_student
 (
     id         bigint PRIMARY KEY,
-    student_id int unique       not null,
+    student_id varchar(20) unique not null,
     name       VARCHAR(20)      NOT NULL,
     sex        ENUM ('男','女') NOT NULL,
     major      VARCHAR(20)      NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE resources
     id                    bigint primary key,
     head                  varchar(100) not null,
     introduce             varchar(500) NOT NULL,
-    student_id            int          not null,
+    student_id            varchar(20)  not null,
     student_file_cover_id bigint       not null,
     student_file_file_id  bigint       not null,
     release_date_time     datetime     not null,
@@ -46,7 +46,7 @@ CREATE TABLE article
     type              tinyint(1)     not null,
     head              varchar(100)   not null,
     content           varchar(10000) not null,
-    student_id        int            not null,
+    student_id        varchar(20)    not null,
     release_date_time DATETIME       not null,
     updated_date_time datetime       not null
 ) ENGINE = InnoDB
@@ -56,7 +56,7 @@ CREATE TABLE article
 CREATE TABLE newcomer
 (
     id                    bigint PRIMARY KEY,
-    student_id            int unique       NOT NULL,
+    student_id            varchar(20) unique NOT NULL,
     name                  varchar(20)      not null,
     sex                   ENUM ('男','女') NOT NULL,
     major                 VARCHAR(20)      NOT NULL,
@@ -72,7 +72,7 @@ CREATE TABLE newcomer
 create table student_file
 (
     id               bigint primary key,
-    student_id       int                 not null,
+    student_id       varchar(20)         not null,
     original_name    varchar(200)        not null,
     object_name      varchar(200) unique not null,
     file_url         varchar(200)        not null,

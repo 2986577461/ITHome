@@ -16,7 +16,7 @@ public class ArticleVO implements Serializable, ZsetScore {
 
     private String name;
 
-    private Integer studentId;
+    private String studentId;
 
     private Integer type;
 

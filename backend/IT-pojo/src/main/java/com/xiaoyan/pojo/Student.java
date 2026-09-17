@@ -24,7 +24,7 @@ public class Student implements Serializable {
     private Long id;
 
     @TableField(updateStrategy = FieldStrategy.NOT_EMPTY)
-    private Integer studentId;
+    private String studentId;
 
     @TableField(updateStrategy = FieldStrategy.NOT_EMPTY)
     private String name;

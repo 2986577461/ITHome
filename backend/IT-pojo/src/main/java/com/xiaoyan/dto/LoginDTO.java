@@ -11,7 +11,7 @@ import lombok.ToString;
 public class LoginDTO {
 
     @NotNull
-    private Integer studentId;
+    private String studentId;
 
     @NotBlank
     @Size(max= 30,message="编码长度不能超过30")

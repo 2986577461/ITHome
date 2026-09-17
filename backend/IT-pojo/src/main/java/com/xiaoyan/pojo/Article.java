@@ -20,7 +20,7 @@ public class Article implements Serializable, HashCacheId , ZsetScore {
     private Long id;
 
     @TableField(updateStrategy = FieldStrategy.NOT_NULL)
-    private Integer studentId;
+    private String studentId;
 
     @TableField(updateStrategy = FieldStrategy.NOT_NULL)
     private Integer type;

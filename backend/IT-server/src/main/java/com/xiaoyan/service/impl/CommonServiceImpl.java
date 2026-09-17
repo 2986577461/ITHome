@@ -41,7 +41,7 @@ public class CommonServiceImpl implements CommonService {
     }
 
     @Override
-    public StudentFile upload(byte[] bytes, String originalName, String contentType, long size, Integer studentId) {
+    public StudentFile upload(byte[] bytes, String originalName, String contentType, long size, String studentId) {
         if (originalName == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }

@@ -39,7 +39,7 @@ public class UsersController {
 
     @DeleteMapping
     @Operation(summary = "删除学生")
-    public Result<String> removeStudents(@RequestBody List<Integer> studentIds) {
+    public Result<String> removeStudents(@RequestBody List<String> studentIds) {
         usersService.removeStudents(studentIds);
         return Result.success();
     }

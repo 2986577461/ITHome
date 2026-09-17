@@ -68,9 +68,12 @@
           <form @submit.prevent="submitForm" class="form-grid">
             <div class="form-field">
               <label>学号</label>
+              <!-- type 必须是 text：type="number" 时 Vue 的 v-model 会把值转成数字，
+                   前导零会被吃掉、字母也打不进去；inputmode 只是保留移动端数字键盘 -->
               <input
                 v-model="form.studentId"
-                type="number"
+                type="text"
+                inputmode="numeric"
                 required
                 placeholder="请输入学号"
               />

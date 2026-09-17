@@ -18,9 +18,9 @@ public interface ResourcesService extends IService<Resources> {
 
     List<ResourcesVO> getList();
 
-    List<MyResourceVO> getMyResources(Integer studentId);
+    List<MyResourceVO> getMyResources(String studentId);
 
-    void saveResource(ResourcesDTO resourcesDTO, Integer studentId) throws IOException;
+    void saveResource(ResourcesDTO resourcesDTO, String studentId) throws IOException;
 
-    void deleteById(Long id,Integer studentId);
+    void deleteById(Long id,String studentId);
 }

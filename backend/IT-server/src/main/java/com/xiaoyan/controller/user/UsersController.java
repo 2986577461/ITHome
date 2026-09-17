@@ -41,7 +41,7 @@ public class UsersController {
     @GetMapping
     @Operation(summary = "返回当前学生信息")
     public Result<StudentVO> getUser() {
-        Integer studentId = BaseContext.getCurrentStudentId();
+        String studentId = BaseContext.getCurrentStudentId();
         return Result.success(userService.getUser(studentId));
     }
 

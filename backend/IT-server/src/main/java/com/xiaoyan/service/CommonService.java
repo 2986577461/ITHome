@@ -9,7 +9,7 @@ public interface CommonService {
 
     StudentFile upload(MultipartFile file) throws IOException;
 
-    StudentFile upload(byte[] bytes, String originalName, String contentType, long size, Integer studentId);
+    StudentFile upload(byte[] bytes, String originalName, String contentType, long size, String studentId);
 
     /** 删除 OSS 文件 + student_file 记录，可批量 */
     void delete(String... objectNames);

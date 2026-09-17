@@ -10,7 +10,7 @@ public class NewcomerVO implements Serializable {
 
     private Long id;
 
-    private Integer studentId;
+    private String studentId;
 
     private String name;
 

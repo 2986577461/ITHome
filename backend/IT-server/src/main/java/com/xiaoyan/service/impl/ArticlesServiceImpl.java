@@ -94,7 +94,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     @Transactional
     public void upload(ArticleDTO articleDTO) {
         Article article = BeanUtil.toBean(articleDTO, Article.class);
-        Integer studentId = BaseContext.getCurrentStudentId();
+        String studentId = BaseContext.getCurrentStudentId();
         article.setStudentId(studentId);
 
         LocalDateTime now = LocalDateTime.now();
@@ -381,7 +381,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
             return List.of();
         }
 
-        Set<Integer> studentIds = new HashSet<>();
+        Set<String> studentIds = new HashSet<>();
         List<ArticleVO> vos = articles.stream().map(r -> {
             studentIds.add(r.getStudentId());
             return BeanUtil.toBean(r, ArticleVO.class);
@@ -389,8 +389,8 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
         // 批量查姓名
         if (!studentIds.isEmpty()) {
-            Map<Integer, String> nameMap = new HashMap<>();
-            Map<Integer, String> avatarMap = new HashMap<>();
+            Map<String, String> nameMap = new HashMap<>();
+            Map<String, String> avatarMap = new HashMap<>();
 
             List<StudentVO> all = usersService.getAll();
             List<StudentVO> students = all == null ? List.of()

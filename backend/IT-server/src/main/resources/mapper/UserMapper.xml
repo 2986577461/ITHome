@@ -34,9 +34,9 @@
                s.academy,
                s.position
         FROM it_student s
-                 CROSS JOIN (SELECT FLOOR(MAX(student_id) / 100000) AS p FROM it_student) t
-        WHERE s.student_id &gt;= (t.p - 1) * 100000
-          AND s.student_id &lt; (t.p + 1) * 100000
+                 CROSS JOIN (SELECT FLOOR(MAX(CAST(student_id AS UNSIGNED)) / 100000) AS p FROM it_student) t
+        WHERE CAST(s.student_id AS UNSIGNED) &gt;= (t.p - 1) * 100000
+          AND CAST(s.student_id AS UNSIGNED) &lt; (t.p + 1) * 100000
           AND s.deleted = 0
         ORDER BY s.student_id
     </select>

@@ -49,7 +49,7 @@ public class ResourcesController {
     @GetMapping("my")
     @Operation(summary = "返回我的资料")
     public Result<List<MyResourceVO>> getMyResources() {
-        Integer studentId = BaseContext.getCurrentStudentId();
+        String studentId = BaseContext.getCurrentStudentId();
         List<MyResourceVO> list = resourcesService.getMyResources(studentId);
         return Result.success(list);
     }
@@ -57,7 +57,7 @@ public class ResourcesController {
     @DeleteMapping("{id}")
     @Operation(summary = "删除资料")
     public Result<String> deleteByid(@PathVariable Long id) {
-        Integer studentId = BaseContext.getCurrentStudentId();
+        String studentId = BaseContext.getCurrentStudentId();
         resourcesService.deleteById(id, studentId);
         return Result.success();
     }
@@ -65,7 +65,7 @@ public class ResourcesController {
     @PostMapping
     @Operation(summary = "上传资料")
     public Result<String> saveResource(@ModelAttribute @Valid ResourcesDTO resourcesDTO) throws IOException {
-        Integer studentId = BaseContext.getCurrentStudentId();
+        String studentId = BaseContext.getCurrentStudentId();
         resourcesService.saveResource(resourcesDTO, studentId);
         return Result.success();
     }
