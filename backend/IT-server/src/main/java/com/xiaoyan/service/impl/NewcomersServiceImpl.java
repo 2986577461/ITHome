@@ -4,7 +4,6 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.MessageConstant;
-import com.xiaoyan.constant.PasswordConstant;
 import com.xiaoyan.constant.PositionConstant;
 
 import com.xiaoyan.exception.ParameterException;
@@ -52,7 +51,7 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
             throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
         }
 
-        Integer studentId = newcomer.getStudentId();
+        String studentId = newcomer.getStudentId();
 
         // 不能使用缓存判断学生是否存在，否则缓存未更新时可能重复创建
         Student oldStudent = userMapper.selectByStudentId(studentId);
@@ -66,9 +65,13 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
         }
 
         Student student = BeanUtil.toBean(newcomer, Student.class);
-        student.setPassword(BCrypt.hashpw((PasswordConstant.STUDENT_PASSWORD)));
+        // 密码是申请人自己设的，在 applyJoin 里已经 hash 过，直接沿用。
+        // 这里以前用的是全站统一的默认密码 123456，配合可枚举的学号等于没有密码。
+        student.setPassword(newcomer.getPassword());
         student.setPosition(PositionConstant.STUDENT);
         student.setAvatarId(1L);
+        // 入会时间：花名册按它筛「今年入会的成员」，所以必须在这里落库
+        student.setCreateDateTime(LocalDateTime.now());
 
         userMapper.insert(student);
         stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
@@ -79,7 +82,7 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
     @Override
     @Transactional
     public void applyJoin(@NonNull Newcomer newComer) {
-        Integer studentId = newComer.getStudentId();
+        String studentId = newComer.getStudentId();
 
         Newcomer dbNewComer = newcomerMapper.selectByStudentId(studentId);
         Student dbStudent = userMapper.selectByStudentId(studentId);
@@ -88,6 +91,8 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
         }
 
         newComer.setApplicationDateTime(LocalDateTime.now());
+        // 申请时就把密码 hash 存下来，审批通过后直接使用
+        newComer.setPassword(BCrypt.hashpw(newComer.getPassword()));
         try {
             if (!this.save(newComer)) {
                 throw new ParameterException(MessageConstant.PARAMETER_ERROR);

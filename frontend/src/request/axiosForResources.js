@@ -5,6 +5,8 @@ export const getResourcesCount = async () =>
 
 export const getAll = async () => axiosInstance.get("user/resources/all");
 
+export const getMyResources = async () => axiosInstance.get("user/resources/my");
+
 export const uploadResource = async (formData) =>
   axiosInstance.post("user/resources", formData, {
     headers: { "Content-Type": "multipart/form-data" },

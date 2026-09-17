@@ -18,14 +18,14 @@ public class JwtWhiteList {
 
     private static final String HASH_KEY = "jwt:active_sessions";
 
-    public boolean validation(Integer studentId, String token) {
-        String storedtToken = (String) stringRedisTemplate.opsForHash().get(HASH_KEY, String.valueOf(studentId));
+    public boolean validation(String studentId, String token) {
+        String storedtToken = (String) stringRedisTemplate.opsForHash().get(HASH_KEY, studentId);
         return storedtToken != null && storedtToken.equals(token);
     }
 
     public void updateToken(String token) {
-        Integer studentId = BaseContext.getCurrentStudentId();
-        stringRedisTemplate.opsForHash().put(HASH_KEY, String.valueOf(studentId), token);
+        String studentId = BaseContext.getCurrentStudentId();
+        stringRedisTemplate.opsForHash().put(HASH_KEY, studentId, token);
     }
 
     public void deleteToken(Object ... studentIds) {

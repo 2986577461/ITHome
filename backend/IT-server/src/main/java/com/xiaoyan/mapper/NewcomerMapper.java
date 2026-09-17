@@ -13,5 +13,5 @@ public interface NewcomerMapper extends BaseMapper<Newcomer> {
     Newcomer selectByIdForUpdate(Long id);
 
     @Select("select * from newcomer where student_id=#{studentId};")
-    Newcomer selectByStudentId(Integer studentId);
+    Newcomer selectByStudentId(String studentId);
 }

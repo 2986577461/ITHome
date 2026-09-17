@@ -177,12 +177,41 @@
 
             <!-- Resources tab -->
             <div v-if="tab === 'resources'" class="tab-content">
-              <div v-for="r in myResources" :key="r.id" class="item-card">
-                <div class="item-info">
-                  <h4>{{ r.head }}</h4>
-                  <span class="item-type">{{ r.type }}</span>
+              <div
+                v-for="r in myResources"
+                :key="r.id"
+                class="my-res-row"
+                @click="openResource(r)"
+              >
+                <div class="my-res-cover">
+                  <img v-if="r.coverUrl" :src="r.coverUrl" alt="" />
+                  <div v-else class="my-res-cover-fallback">
+                    <svg viewBox="0 0 40 40" fill="none">
+                      <rect
+                        x="6"
+                        y="10"
+                        width="28"
+                        height="20"
+                        rx="3"
+                        stroke="currentColor"
+                        stroke-width="1.4"
+                        opacity=".3"
+                      />
+                      <path
+                        d="M10 26l6-8 5 6 3-3 6 5H10z"
+                        stroke="currentColor"
+                        stroke-width="1.4"
+                        stroke-linejoin="round"
+                        opacity=".3"
+                      />
+                    </svg>
+                  </div>
                 </div>
-                <time>{{ r.releaseDateTime }}</time>
+                <div class="my-res-main">
+                  <h4>{{ r.head }}</h4>
+                  <p>{{ r.introduce }}</p>
+                </div>
+                <time>{{ formatResourceTime(r.releaseDateTime) }}</time>
               </div>
               <div v-if="myResources.length === 0" class="empty-tab">
                 <p>还没有上传过资料</p>
@@ -231,6 +260,24 @@
       </div>
     </section>
 
+    <!-- 注销账号 -->
+    <section class="section">
+      <div class="section-inner">
+        <div class="danger-zone">
+          <div class="danger-text">
+            <h3>注销账号</h3>
+            <p>
+              注销后，你在协会发布的文章、上传的学习资料和图片都会被一并删除，且无法恢复。
+              如果只是暂时不想用，直接退出登录即可。
+            </p>
+          </div>
+          <button class="btn-danger" @click="removeDialog = true">
+            注销账号
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- Avatar dialog -->
     <div
       class="avatar-dialog-overlay"
@@ -266,6 +313,31 @@
         </div>
       </div>
     </div>
+
+    <!-- 注销确认 -->
+    <div
+      class="avatar-dialog-overlay"
+      v-if="removeDialog"
+      @click.self="removeDialog = false"
+    >
+      <div class="avatar-dialog">
+        <div class="dialog-title">确认注销账号</div>
+        <div class="confirm-body">
+          <p>
+            你确定要注销账号吗？你在协会发布的<strong>文章</strong>、上传的<strong>学习资料和图片</strong>都会被一并删除，<strong>删除后无法恢复</strong>。
+          </p>
+          <p v-if="userStore.position === 'admin'" class="confirm-warn">
+            你是会长。如果协会里只有你一位会长，需要先把另一位成员设为会长，才能注销。
+          </p>
+          <div class="confirm-actions">
+            <button class="btn-plain" @click="removeDialog = false">取消</button>
+            <button class="btn-danger" :disabled="removing" @click="doRemoveSelf">
+              {{ removing ? "注销中..." : "确定注销" }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -274,13 +346,10 @@ import { ref, reactive, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useUserStore } from "@/stores/user";
 import { useArticleStore } from "@/stores/updateArticle";
-import {
-  updateProfile,
-  getMyArticlesPage,
-  getMyResources,
-} from "@/request/axiosForProfile.js";
+import { updateProfile, getMyArticlesPage } from "@/request/axiosForProfile.js";
+import { getMyResources } from "@/request/axiosForResources.js";
 import { ElMessage } from "element-plus";
-import { getThis, update, uploadAvatar } from "@/request/axiosForUser";
+import { getThis, update, uploadAvatar, removeSelf } from "@/request/axiosForUser";
 import { getArticlePosition } from "@/request/axiosForArticles";
 
 const router = useRouter();
@@ -291,6 +360,8 @@ const tab = ref("info");
 const fileInput = ref(null);
 const avatarDialog = ref(false);
 const avatarPreview = ref("");
+const removeDialog = ref(false);
+const removing = ref(false);
 
 // dialogAvatar mirrors the current avatar state, updated on upload or random
 const dialogAvatar = ref("");
@@ -318,6 +389,28 @@ const myArticleLoading = ref(false);
 const myArticleHasMore = ref(false);
 const articlePageSize = 5;
 const myResources = ref([]);
+
+function formatResourceTime(d) {
+  if (!d) return "";
+  const t = new Date(d);
+  if (Number.isNaN(t.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  const hm = pad(t.getHours()) + ":" + pad(t.getMinutes());
+  const now = new Date();
+  const startOf = (date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const diffDays = Math.round((startOf(now) - startOf(t)) / 86400000);
+  if (diffDays === 0) return "今天 " + hm;
+  if (diffDays === 1) return "昨天 " + hm;
+  if (t.getFullYear() === now.getFullYear()) {
+    return t.getMonth() + 1 + "月" + t.getDate() + "日 " + hm;
+  }
+  return t.getFullYear() + "年" + (t.getMonth() + 1) + "月" + t.getDate() + "日";
+}
+
+function openResource(r) {
+  router.push({ name: "learning-resource", query: { id: String(r.id) } });
+}
 
 function typeLabel(t) {
   return (
@@ -441,6 +534,27 @@ async function changePassword() {
   }
 }
 
+async function doRemoveSelf() {
+  removing.value = true;
+  try {
+    const resp = await removeSelf();
+    if (resp?.code === "200") {
+      ElMessage.success("账号已注销");
+      // 后端已把 token 从白名单里删掉，这里同步清本地状态并回首页
+      localStorage.removeItem("authorization");
+      userStore.clear();
+      router.push("/home");
+    } else {
+      ElMessage.error(resp?.msg || "注销失败");
+    }
+  } catch {
+    ElMessage.error("注销失败");
+  } finally {
+    removing.value = false;
+    removeDialog.value = false;
+  }
+}
+
 async function fetchMyArticles(page) {
   myArticleLoading.value = true;
   try {
@@ -499,7 +613,13 @@ onMounted(async () => {
   fetchMyArticles(1);
   getMyResources()
     .then((r) => {
-      if (r?.data) myResources.value = r.data;
+      if (r?.data) {
+        myResources.value = r.data.slice().sort((a, b) => {
+          return (
+            new Date(b.releaseDateTime || 0) - new Date(a.releaseDateTime || 0)
+          );
+        });
+      }
     })
     .catch(() => {});
 });
@@ -647,6 +767,78 @@ onMounted(async () => {
   border: 1px solid var(--color-border);
   padding: 24px;
 }
+
+/* 注销账号：用红色边框和浅红底跟上面的普通表单区分开 */
+.danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 20px 24px;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  background: #fff5f5;
+}
+.danger-zone h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: #b91c1c;
+}
+.danger-zone p {
+  margin: 0;
+  max-width: 620px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #991b1b;
+}
+.btn-danger {
+  padding: 10px 20px;
+  border: 1px solid #dc2626;
+  border-radius: 10px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.confirm-body {
+  padding: 0 4px;
+}
+.confirm-body p {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #444;
+}
+.confirm-warn {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412 !important;
+  font-size: 13px !important;
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.btn-plain {
+  padding: 9px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  font-size: 14px;
+  cursor: pointer;
+}
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -721,6 +913,87 @@ onMounted(async () => {
 .item-card time {
   font-size: 12px;
   color: var(--color-text-tertiary);
+}
+
+.my-res-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.my-res-row:hover {
+  background: var(--color-bg);
+  border-color: rgba(0, 113, 227, 0.25);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+.my-res-cover {
+  width: 76px;
+  height: 54px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #e8ecf4, #d5dde8);
+}
+.my-res-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.my-res-cover-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+}
+.my-res-cover-fallback svg {
+  width: 28px;
+  height: 28px;
+}
+.my-res-main {
+  flex: 1;
+  min-width: 0;
+}
+.my-res-main h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.my-res-main p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.my-res-row time {
+  flex-shrink: 0;
+  min-width: 92px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .empty-tab {

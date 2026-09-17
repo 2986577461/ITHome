@@ -12,8 +12,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -164,12 +162,12 @@ public class RedisUtil implements DisposableBean {
         return count;
     }
 
-    public <R, ID> R queryStringWithMutex(@NonNull String keyPrefix, @NonNull ID id,
-                                           @NonNull Class<R> rType, @NonNull Function<ID, R> dbFallback) {
-        String key = keyPrefix + id;
+    @SuppressWarnings("unchecked")
+    public <R> R queryStringWithMutex(@NonNull String key, @NonNull Class<?> type,
+                                      @NonNull Supplier<R> dbFallback) {
         String json = stringRedisTemplate.opsForValue().get(key);
         if (StrUtil.isNotBlank(json)) {
-            return JSONUtil.toBean(json, rType);
+            return (R) parse(json, type);
         }
         if (json != null) {
             return null;
@@ -179,15 +177,15 @@ public class RedisUtil implements DisposableBean {
         try {
             String latest = stringRedisTemplate.opsForValue().get(key);
             if (StrUtil.isNotBlank(latest)) {
-                return JSONUtil.toBean(latest, rType);
+                return (R) parse(latest, type);
             }
             if (latest != null) {
                 return null;
             }
 
-            R value = dbFallback.apply(id);
+            R value = dbFallback.get();
             if (value == null) {
-                stringRedisTemplate.opsForValue().set(key, "", VOID_VALUE_TTL, TIME_UNIT);
+                cacheNull(key);
                 return null;
             }
             save(key, value);
@@ -195,6 +193,10 @@ public class RedisUtil implements DisposableBean {
         } finally {
             unlock(lock);
         }
+    }
+
+    private Object parse(String json, Class<?> type) {
+        return json.trim().startsWith("[") ? JSONUtil.toList(json, type) : JSONUtil.toBean(json, type);
     }
 
     public <R> R queryHashWithMutex(@NonNull String key, @NonNull String hashKey,
@@ -231,30 +233,31 @@ public class RedisUtil implements DisposableBean {
     }
 
     /**
-     * 缓存完整列表快照，避免使用 Hash 数量和数据库 COUNT(*) 判断缓存是否完整。
+     * 在分布式锁内执行一段逻辑，拿不到锁会自旋等待，等待超时后抛出异常。
+     *
+     * <p>用于必须串行执行的缓存写操作。注意锁不可重入，不要在 action 内部再次获取同一把锁。</p>
      */
-    public <P> List<P> getAllWithHashCache(String cacheKey, Supplier<List<P>> dbFallback,
-                                           Class<P> pojoType) {
-        String allCacheKey = cacheKey + ":all";
-        String cachedJson = stringRedisTemplate.opsForValue().get(allCacheKey);
-        if (StrUtil.isNotBlank(cachedJson)) {
-            return JSONUtil.toList(cachedJson, pojoType);
-        }
-
-        LockHandle lock = acquireLockWithRetry("lock:all:" + cacheKey);
+    public void executeWithLock(@NonNull String lockKey, @NonNull Runnable action) {
+        LockHandle lock = acquireLockWithRetry(lockKey);
         try {
-            String latestJson = stringRedisTemplate.opsForValue().get(allCacheKey);
-            if (StrUtil.isNotBlank(latestJson)) {
-                return JSONUtil.toList(latestJson, pojoType);
-            }
+            action.run();
+        } finally {
+            unlock(lock);
+        }
+    }
 
-            List<P> list = dbFallback.get();
-            stringRedisTemplate.opsForValue().set(
-                    allCacheKey,
-                    JSONUtil.toJsonStr(list),
-                    DEFAULT_TTL,
-                    DEFAULT_TIME_UNIT);
-            return list;
+    /**
+     * 尝试获取分布式锁并执行，只尝试一次，拿不到锁直接返回 null（不等待、不抛异常）。
+     *
+     * <p>用于「拿不到锁就退化成别的路径」的场景，例如缓存重建失败时直接查库。</p>
+     */
+    public <T> T executeWithLockOrNull(@NonNull String lockKey, @NonNull Supplier<T> action) {
+        LockHandle lock = tryLock(lockKey);
+        if (lock == null) {
+            return null;
+        }
+        try {
+            return action.get();
         } finally {
             unlock(lock);
         }
@@ -327,10 +330,6 @@ public class RedisUtil implements DisposableBean {
 
     private void cacheNull(String key) {
         stringRedisTemplate.opsForValue().set(key, "", VOID_VALUE_TTL, TIME_UNIT);
-    }
-
-    private <P> List<P> toPojoList(List<Object> caches, Class<P> pojoType) {
-        return caches.stream().map(value -> JSONUtil.toBean((String) value, pojoType)).toList();
     }
 
     private <R> R toLogicalValue(RedisData data, Class<R> rType) {

@@ -24,17 +24,9 @@ spring:
     generator:
       write-numbers-as-strings: true
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,prometheus # 暴露这些端点
-  prometheus:
-    metrics:
-      export:
-        enabled: true
-        pushgateway:
-          enabled: true
+# 注意：这里原先配了 management.endpoints / prometheus，但 pom 里既没有
+# spring-boot-starter-actuator 也没有 micrometer-registry-prometheus，
+# /actuator/** 全都是 404。要做监控先把这两个依赖加上再恢复配置。
 
 mybatis-plus:
   configuration:

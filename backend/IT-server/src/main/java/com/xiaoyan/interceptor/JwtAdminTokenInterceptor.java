@@ -46,7 +46,7 @@ public class JwtAdminTokenInterceptor implements HandlerInterceptor {
         //2、校验令牌
         try {
             Claims claims = JwtUtil.parseJWT(jwtProperties.getSecretKey(), token);
-            Integer studentId = Integer.valueOf(claims.get(JwtClaimsConstant.ADMIN_ID).toString());
+            String studentId = claims.get(JwtClaimsConstant.ADMIN_ID).toString();
 
             if (!jwtWhiteList.validation(studentId, token)) {
                 response.setStatus(401);

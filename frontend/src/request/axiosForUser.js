@@ -13,6 +13,9 @@ export const removeBatch = async (studentIds) =>
 export const update = async (studentMessage) =>
   axiosInstance.put("user/users", studentMessage);
 
+// 注销自己的账号，会连同发布的文章、上传的资料一起删除
+export const removeSelf = async () => axiosInstance.delete("user/users");
+
 // 上传头像
 export const uploadAvatar = async (formData) =>
   axiosInstance.post("user/users/avatar", formData, {

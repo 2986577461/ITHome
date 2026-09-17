@@ -1,6 +1,7 @@
 package com.xiaoyan.pojo;
 
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.xiaoyan.baseinterface.HashCacheId;
 import lombok.Data;
 
@@ -13,7 +14,7 @@ public class Newcomer implements Serializable, HashCacheId {
     @TableId("id")
     private Long id;
 
-    private Integer studentId;
+    private String studentId;
 
     private String name;
 
@@ -26,6 +27,13 @@ public class Newcomer implements Serializable, HashCacheId {
     private String introduce;
 
     private String major;
+
+    /**
+     * 申请时自己设置的密码，存的是 BCrypt 哈希。
+     * 管理员查询申请列表的接口直接返回本实体，用 @JsonIgnore 避免把哈希带出去。
+     */
+    @JsonIgnore
+    private String password;
 
     private LocalDateTime applicationDateTime;
 

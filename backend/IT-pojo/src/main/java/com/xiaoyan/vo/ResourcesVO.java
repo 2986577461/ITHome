@@ -1,13 +1,12 @@
 package com.xiaoyan.vo;
 
-import com.xiaoyan.baseinterface.HashCacheId;
 import lombok.Data;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Data
-public class ResourcesVO implements Serializable, HashCacheId {
+public class ResourcesVO implements Serializable {
 
     private Long id;
 
@@ -15,7 +14,7 @@ public class ResourcesVO implements Serializable, HashCacheId {
 
     private String introduce;
 
-    private Integer studentId;
+    private String studentId;
 
     private LocalDateTime releaseDateTime;
 
@@ -31,8 +30,4 @@ public class ResourcesVO implements Serializable, HashCacheId {
 
     private String studentName;
 
-    @Override
-    public String getCacheId() {
-        return String.valueOf(this.id);
-    }
 }

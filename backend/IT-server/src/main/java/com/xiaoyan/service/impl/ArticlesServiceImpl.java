@@ -5,6 +5,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xiaoyan.cache.ArticleCacheManager;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.ArticleDTO;
@@ -15,8 +16,9 @@ import com.xiaoyan.pojo.Article;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.ArticlesService;
 import com.xiaoyan.service.CommonService;
-import com.xiaoyan.service.PermissionService;
 import com.xiaoyan.service.UsersService;
+import com.xiaoyan.utils.RedisUtil;
+import com.xiaoyan.utils.TransactionUtils;
 import com.xiaoyan.vo.ArticleImageVO;
 import com.xiaoyan.vo.ArticleVO;
 import com.xiaoyan.vo.MyArticleVO;
@@ -24,6 +26,7 @@ import com.xiaoyan.vo.StudentVO;
 import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.DefaultTypedTuple;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -31,8 +34,6 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -52,11 +53,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.xiaoyan.constant.RedisConstant.CACHE_ARTICLES;
+import static com.xiaoyan.constant.RedisConstant.CACHE_ARTICLES_READY;
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
+import static com.xiaoyan.constant.RedisConstant.LOCK_ARTICLE_CACHE;
 import static com.xiaoyan.constant.RedisConstant.RANKING_ARTICLES;
 
 @Service
 @AllArgsConstructor
+@Slf4j
 public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         implements ArticlesService {
 
@@ -65,14 +69,12 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
      */
     public static final int MAX_CACHE_SIZE = 50;
     private static final long CACHE_TTL_HOURS = 2;
-    // 缓存构建完成标记：只有标记不存在时才触发重建
-    private static final String CACHE_READY = RANKING_ARTICLES + ":ready";
     private static final DefaultRedisScript<Long> SWAP_CACHE_SCRIPT = loadScript(
             "lua/swap-article-cache.lua");
 
-    private final Object cacheRebuildLock = new Object();
     private final UsersService usersService;
-    private final PermissionService permissionService;
+    private final ArticleCacheManager articleCacheManager;
+    private final RedisUtil redisUtil;
     private ArticleMapper articleMapper;
     private StringRedisTemplate stringRedisTemplate;
     private CommonService commonService;
@@ -82,16 +84,17 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     @Override
     public Long getCount(Integer type) {
         LambdaQueryWrapper<Article> lqw = new LambdaQueryWrapper<>();
-        if (type != null && type != ArticleType.ALL.ordinal()) {
+        if (type != null && type != ArticleType.ALL.getCode()) {
             lqw.eq(Article::getType, type);
         }
         return this.count(lqw);
     }
 
     @Override
+    @Transactional
     public void upload(ArticleDTO articleDTO) {
         Article article = BeanUtil.toBean(articleDTO, Article.class);
-        Integer studentId = BaseContext.getCurrentStudentId();
+        String studentId = BaseContext.getCurrentStudentId();
         article.setStudentId(studentId);
 
         LocalDateTime now = LocalDateTime.now();
@@ -99,15 +102,21 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         article.setUpdatedDateTime(now);
 
         articleMapper.insert(article);
-        stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
 
-        // 增量更新ZSET：加入新文章，裁剪到50条（末位淘汰）
-        ArticleVO vo = BeanUtil.toBean(article, ArticleVO.class);
-        StudentVO user = usersService.getUser(studentId);
-        vo.setName(user.getName());
-        vo.setAvatar(user.getAvatar());
+        // 缓存必须在事务提交后再写：否则事务一旦回滚，缓存里会留下一条数据库里并不存在的文章
+        TransactionUtils.afterCommit(() -> {
+            stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
 
-        cacheArticle(vo, null);
+            // 增量更新ZSET：加入新文章，裁剪到50条（末位淘汰）
+            ArticleVO vo = BeanUtil.toBean(article, ArticleVO.class);
+            StudentVO user = usersService.getUser(studentId);
+            if (user != null) {
+                vo.setName(user.getName());
+                vo.setAvatar(user.getAvatar());
+            }
+
+            articleCacheManager.runWithLock(() -> cacheArticle(vo, null));
+        });
     }
 
     @Override
@@ -138,37 +147,37 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         int start = (page - 1) * size;
         int end = page * size - 1;
 
-        List<ArticleVO> result;
-
         // Redis 只缓存每个榜单的前50条，超过范围直接查询数据库
         if (end < MAX_CACHE_SIZE) {
-            result = getPageFromCache(start, end, type);
-            if (result != null && result.size() == size) {
-                return result;
-            }
-
-            // 同一实例内只允许一个线程重建缓存
-            synchronized (cacheRebuildLock) {
-                // 等待锁期间可能已经有其他线程完成重建，因此需要再次检查
-                result = getPageFromCache(start, end, type);
-                if (result != null && result.size() == size) {
-                    return result;
-                }
-
-                // 缓存未构建
-                if (!stringRedisTemplate.hasKey(CACHE_READY)) {
-                    buildLatestCache();
-
-                    // 重建完成后再尝试读取一次
-                    result = getPageFromCache(start, end, type);
-                    if (result != null && result.size() == size) {
-                        return result;
-                    }
-                }
+            // 用分布式锁而不是 synchronized：多实例部署时本地锁拦不住别的实例重建缓存。
+            // 拿不到锁说明别的实例正在重建，这里不等待、不阻塞，直接退化为查库。
+            List<ArticleVO> cached = redisUtil.executeWithLockOrNull(LOCK_ARTICLE_CACHE,
+                    () -> loadPageFromCacheOrRebuild(start, end, type, size));
+            if (cached != null && cached.size() == size) {
+                return cached;
             }
         }
         // 不在缓存范围内，或缓存中的文章数量不足一页，查询数据库
-        result = queryPageFromDB(start, type, size);
+        return queryPageFromDB(start, type, size);
+    }
+
+    /**
+     * 在缓存重建锁内读取缓存，缓存不可用时重建一次再读。
+     *
+     * <p>只允许在持有文章缓存锁时调用，锁不可重入。</p>
+     */
+    private List<ArticleVO> loadPageFromCacheOrRebuild(int start, int end, Integer type, int size) {
+        // 取锁期间可能已经有其他实例完成重建，因此先读一次
+        List<ArticleVO> result = getPageFromCache(start, end, type);
+        if (result != null && result.size() == size) {
+            return result;
+        }
+
+        // 缓存还没构建过，重建后再读一次
+        if (!stringRedisTemplate.hasKey(CACHE_ARTICLES_READY)) {
+            rebuildLatestCache();
+            return getPageFromCache(start, end, type);
+        }
         return result;
     }
 
@@ -177,9 +186,6 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
      * ZSET 只保存文章 ID 和排序分数，Hash 保存文章详情。
      */
     private List<ArticleVO> getPageFromCache(int start, int end, Integer type) {
-//        if(true){
-//            return null;
-//        }
         ZSetOperations<String, String> ops = stringRedisTemplate.opsForZSet();
         String rankingKey = rankingKey(type);
         Long cacheSize = ops.size(rankingKey);
@@ -217,9 +223,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     }
 
     public void buildLatestCache() {
-        synchronized (cacheRebuildLock) {
-            rebuildLatestCache();
-        }
+        articleCacheManager.runWithLock(this::rebuildLatestCache);
     }
 
     /**
@@ -236,7 +240,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         temporaryKeys.add(temporaryDetailsKey);
         for (ArticleType articleType : ArticleType.values()) {
             // 临时排名 key 与正式排名 key 一一对应，最后由 Lua 改名
-            String key = rankingKey(articleType.ordinal()) + ":rebuild:" + buildId;
+            String key = rankingKey(articleType.getCode()) + ":rebuild:" + buildId;
             temporaryRankingKeys.add(key);
             temporaryKeys.add(key);
         }
@@ -257,7 +261,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
                             .thenComparing(ArticleVO::getId, Comparator.reverseOrder()))
                     .limit(MAX_CACHE_SIZE)
                     .toList();
-            addToRanking(temporaryRankingKeys.get(ArticleType.ALL.ordinal()), latest);
+            addToRanking(temporaryRankingKeys.get(ArticleType.ALL.getCode()), latest);
 
             articlesByType.forEach((type, articles) ->
                     addToRanking(temporaryRankingKeys.get(type), articles));
@@ -272,12 +276,12 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
 
     private List<ArticleVO> queryPageFromDB(int start, Integer type, int size) {
-        Integer databaseType = type == null || type == ArticleType.ALL.ordinal() ? null : type;
+        Integer databaseType = type == null || type == ArticleType.ALL.getCode() ? null : type;
         return articleMapper.selectPage(start, databaseType, size);
     }
 
     private String rankingKey(Integer type) {
-        int rankingType = type == null ? ArticleType.ALL.ordinal() : type;
+        int rankingType = type == null ? ArticleType.ALL.getCode() : type;
         return RANKING_ARTICLES + ":" + rankingType;
     }
 
@@ -292,22 +296,26 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         stringRedisTemplate.opsForZSet().add(key, tuples);
     }
 
+    /**
+     * 把一篇文章增量写进榜单缓存。
+     *
+     * <p>调用方必须已经持有文章缓存锁（见 {@link ArticleCacheManager#runWithLock}），
+     * 否则会和缓存重建的临时 key 切换互相覆盖。</p>
+     */
     private void cacheArticle(ArticleVO vo, Integer oldType) {
-        synchronized (cacheRebuildLock) {
-            String articleId = String.valueOf(vo.getId());
-            if (oldType != null && !Objects.equals(oldType, vo.getType())) {
-                stringRedisTemplate.opsForZSet().remove(rankingKey(oldType), articleId);
-            }
-
-            stringRedisTemplate.opsForHash().put(CACHE_ARTICLES, articleId, JSONUtil.toJsonStr(vo));
-            stringRedisTemplate.opsForZSet().add(rankingKey(vo.getType()), articleId, vo.getScore());
-            stringRedisTemplate.opsForZSet().add(rankingKey(ArticleType.ALL.ordinal()), articleId, vo.getScore());
-            // 新文章可能挤出榜单末尾文章，记录这些文章以便清理详情
-            Set<String> evictedIds = new HashSet<>();
-            evictedIds.addAll(trimRanking(rankingKey(vo.getType())));
-            evictedIds.addAll(trimRanking(rankingKey(ArticleType.ALL.ordinal())));
-            removeUnreferencedDetails(evictedIds);
+        String articleId = String.valueOf(vo.getId());
+        if (oldType != null && !Objects.equals(oldType, vo.getType())) {
+            stringRedisTemplate.opsForZSet().remove(rankingKey(oldType), articleId);
         }
+
+        stringRedisTemplate.opsForHash().put(CACHE_ARTICLES, articleId, JSONUtil.toJsonStr(vo));
+        stringRedisTemplate.opsForZSet().add(rankingKey(vo.getType()), articleId, vo.getScore());
+        stringRedisTemplate.opsForZSet().add(rankingKey(ArticleType.ALL.getCode()), articleId, vo.getScore());
+        // 新文章可能挤出榜单末尾文章，记录这些文章以便清理详情
+        Set<String> evictedIds = new HashSet<>();
+        evictedIds.addAll(trimRanking(rankingKey(vo.getType())));
+        evictedIds.addAll(trimRanking(rankingKey(ArticleType.ALL.getCode())));
+        removeUnreferencedDetails(evictedIds);
     }
 
     private Set<String> trimRanking(String key) {
@@ -333,7 +341,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         for (String articleId : articleIds) {
             boolean referenced = false;
             for (ArticleType articleType : ArticleType.values()) {
-                if (ops.score(rankingKey(articleType.ordinal()), articleId) != null) {
+                if (ops.score(rankingKey(articleType.getCode()), articleId) != null) {
                     referenced = true;
                     break;
                 }
@@ -353,9 +361,9 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         List<String> keys = new ArrayList<>();
         keys.add(CACHE_ARTICLES);
         for (ArticleType articleType : ArticleType.values()) {
-            keys.add(rankingKey(articleType.ordinal()));
+            keys.add(rankingKey(articleType.getCode()));
         }
-        keys.add(CACHE_READY);
+        keys.add(CACHE_ARTICLES_READY);
         keys.add(temporaryDetailsKey);
         keys.addAll(temporaryRankingKeys);
         stringRedisTemplate.execute(SWAP_CACHE_SCRIPT, keys, String.valueOf(CACHE_TTL_HOURS * 3600));
@@ -368,37 +376,6 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         return script;
     }
 
-    private List<ArticleVO> toArticleVOList(List<Article> articles) {
-        if (articles == null || articles.isEmpty()) {
-            return List.of();
-        }
-
-        Set<Integer> studentIds = new HashSet<>();
-        List<ArticleVO> vos = articles.stream().map(r -> {
-            studentIds.add(r.getStudentId());
-            return BeanUtil.toBean(r, ArticleVO.class);
-        }).toList();
-
-        // 批量查姓名
-        if (!studentIds.isEmpty()) {
-            Map<Integer, String> nameMap = new HashMap<>();
-            Map<Integer, String> avatarMap = new HashMap<>();
-
-            List<StudentVO> students = usersService.getAll().stream()
-                    .filter(vo -> studentIds.contains(vo.getStudentId())).toList();
-
-            students.forEach(vo -> {
-                nameMap.put(vo.getStudentId(), vo.getName());
-                avatarMap.put(vo.getStudentId(), vo.getAvatar());
-            });
-            vos.forEach(vo -> {
-                vo.setName(nameMap.get(vo.getStudentId()));
-                vo.setAvatar(avatarMap.get(vo.getStudentId()));
-            });
-        }
-
-        return vos;
-    }
 
     @Override
     @Transactional
@@ -407,7 +384,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         if (oldArticle == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
-        permissionService.checkOwnerOrAdminPermission(oldArticle.getStudentId());
+        usersService.checkOwnerOrAdmin(oldArticle.getStudentId());
 
         // 先计算需要删除的文件，等数据库事务提交后再删除
         Set<String> oldObjectNames = extractObjectNames(oldArticle.getContent());
@@ -422,39 +399,13 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         articleMapper.updateById(article);
 
         // 更新请求不直接写缓存，事务提交后删除整组缓存，由查询接口负责重建
-        registerAfterCommit(() -> {
-            clearArticleCache();
+        TransactionUtils.afterCommit(() -> {
+            articleCacheManager.clear();
             stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
             if (!toDelete.isEmpty()) {
                 commonService.delete(toDelete.toArray(String[]::new));
             }
         });
-    }
-
-    private void registerAfterCommit(Runnable action) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            action.run();
-            return;
-        }
-
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                action.run();
-            }
-        });
-    }
-
-    private void clearArticleCache() {
-        synchronized (cacheRebuildLock) {
-            List<String> keys = new ArrayList<>();
-            keys.add(CACHE_ARTICLES);
-            for (ArticleType articleType : ArticleType.values()) {
-                keys.add(rankingKey(articleType.ordinal()));
-            }
-            keys.add(CACHE_READY);
-            stringRedisTemplate.delete(keys);
-        }
     }
 
     private Set<String> extractObjectNames(String content) {
@@ -480,39 +431,47 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     }
 
     @Override
+    @Transactional
     public void delete(Long id) {
         Article article = this.getById(id);
         if (article == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
-        permissionService.checkOwnerOrAdminPermission(article.getStudentId());
+        usersService.checkOwnerOrAdmin(article.getStudentId());
 
-        // 提取文章内容中的所有图片 objectName 并删除 OSS 文件
-        deleteImages(article.getContent());
+        // 文章内容里的图片 objectName 先算出来，事务提交后再删 OSS 文件，
+        // 否则事务回滚时图片已经删掉，数据库里却还留着对它的引用
+        Set<String> objectNames = extractObjectNames(article.getContent());
 
         articleMapper.deleteById(id);
-        stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
-        // 从ZSET中精确移除该条
-        removeFromCache(id, article.getType());
+
+        TransactionUtils.afterCommit(() -> {
+            stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
+            // 从ZSET中精确移除该条
+            articleCacheManager.runWithLock(() -> removeFromCache(id, article.getType()));
+            deleteImages(objectNames);
+        });
     }
 
 
-    private void deleteImages(String content) {
-        Set<String> objectNames = extractObjectNames(content);
+    private void deleteImages(Set<String> objectNames) {
         if (!objectNames.isEmpty()) {
             commonService.delete(objectNames.toArray(String[]::new));
         }
     }
 
 
+    /**
+     * 从榜单缓存中精确移除一篇文章。
+     *
+     * <p>调用方必须已经持有文章缓存锁，见 {@link ArticleCacheManager#runWithLock}。</p>
+     */
     private void removeFromCache(Long id, Integer type) {
-        synchronized (cacheRebuildLock) {
-            if (id != null && type != null && type >= 0) {
-                String sId = String.valueOf(id);
-                stringRedisTemplate.opsForZSet().remove(RANKING_ARTICLES + ":" + type, sId);
-                stringRedisTemplate.opsForZSet().remove(RANKING_ARTICLES + ":" + ArticleType.ALL.ordinal(), sId);
-                stringRedisTemplate.opsForHash().delete(CACHE_ARTICLES, sId);
-            }
+        if (id != null && type != null && type >= 0) {
+            String sId = String.valueOf(id);
+            stringRedisTemplate.opsForZSet().remove(rankingKey(type), sId);
+            stringRedisTemplate.opsForZSet().remove(rankingKey(ArticleType.ALL.getCode()), sId);
+            stringRedisTemplate.opsForHash().delete(CACHE_ARTICLES, sId);
         }
     }
 

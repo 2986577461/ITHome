@@ -3,11 +3,11 @@ package com.xiaoyan.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xiaoyan.cache.ArticleCacheManager;
 import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.LoginDTO;
-import com.xiaoyan.enumeration.ArticleType;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.interceptor.JwtWhiteList;
 import com.xiaoyan.mapper.ArticleMapper;
@@ -15,15 +15,17 @@ import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.mapper.UserMapper;
 import com.xiaoyan.pojo.Article;
+import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.pojo.Student;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.properties.JwtProperties;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.CommonService;
-import com.xiaoyan.service.PermissionService;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.JwtUtil;
 import com.xiaoyan.utils.RedisUtil;
+import com.xiaoyan.utils.TransactionUtils;
+import com.xiaoyan.vo.StudentCountVO;
 import com.xiaoyan.vo.StudentVO;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,8 +39,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
@@ -54,10 +54,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 
-import static com.xiaoyan.constant.RedisConstant.CACHE_ARTICLES;
+import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES_ALL;
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
-import static com.xiaoyan.constant.RedisConstant.RANKING_ARTICLES;
 
 /**
  * @author yuchao
@@ -70,6 +69,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     private final ArticleMapper articleMapper;
     private final ResourcesMapper resourcesMapper;
+    private final ArticleCacheManager articleCacheManager;
     private JwtProperties jwtProperties;
     private StringRedisTemplate stringRedisTemplate;
     private StudentFileMapper studentFileMapper;
@@ -79,18 +79,54 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     private UserMapper userMapper;
 
     @Override
-    public StudentVO getUser(Integer studentId) {
-        return redisUtil.queryHashWithMutex(CACHE_STUDENTS, String.valueOf(studentId),
+    public StudentVO getUser(String studentId) {
+        return redisUtil.queryHashWithMutex(CACHE_STUDENTS, studentId,
                 StudentVO.class, id -> this.queryStudentFromDB(studentId));
     }
 
-    public StudentVO queryStudentFromDB(Integer studentId) {
-        return userMapper.selectStudentWithStats(studentId);
+    @Override
+    public void checkOwnerOrAdmin(String ownerStudentId) {
+        // 权限校验：仅作者本人或管理员可修改
+        String currentStudentId = BaseContext.getCurrentStudentId();
+        if (currentStudentId == null) {
+            throw new ParameterException(Result.UNAUTHORIZED, MessageConstant.USER_NOT_LOGIN);
+        }
+
+        StudentVO current = this.getUser(currentStudentId);
+        if (current == null) {
+            throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
+        }
+
+        if (!JwtClaimsConstant.ADMIN_ID.equals(current.getPosition())
+                && !currentStudentId.equals(ownerStudentId)) {
+            throw new ParameterException(Result.FORBIDDEN, MessageConstant.PERMISSION_DENIED);
+        }
+    }
+
+    public StudentVO queryStudentFromDB(String studentId) {
+        Student student = userMapper.selectByStudentId(studentId);
+        if (student == null) {
+            return null;
+        }
+        StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
+        Long avatarId = student.getAvatarId();
+        if (avatarId != null) {
+            StudentFile avatar = studentFileMapper.selectById(avatarId);
+            if (avatar != null) {
+                vo.setAvatar(avatar.getFileUrl());
+            }
+        }
+        vo.setArticleCount(articleMapper.selectCountByStudentId(studentId));
+        vo.setResourceCount(resourcesMapper.selectCountByStudentId(studentId));
+        return vo;
     }
 
     public void uploadAvatar(MultipartFile avatar) throws IOException {
-        Integer studentId = BaseContext.getCurrentStudentId();
+        String studentId = BaseContext.getCurrentStudentId();
         Student student = userMapper.selectByStudentId(studentId);
+        if (student == null) {
+            throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
+        }
 
         Long avatarId = student.getAvatarId();
         if (avatarId != null) {
@@ -102,9 +138,10 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         Long newAvatarId = commonService.upload(avatar).getId();
         student.setAvatarId(newAvatarId);
         this.lambdaUpdate().set(Student::getAvatarId, newAvatarId).update();
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, String.valueOf(studentId));
+        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentId);
         stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
-
+        // 头像会被烤进文章缓存里的 ArticleVO，不一起失效的话文章列表上还是旧头像
+        articleCacheManager.clear();
     }
 
     @Override
@@ -175,7 +212,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public Result<StudentVO> login(LoginDTO message) {
-        Integer studentId = message.getStudentId();
+        String studentId = message.getStudentId();
         String password = message.getPassword();
         Student student = userMapper.selectByStudentId(studentId);
 
@@ -187,14 +224,17 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         }
         StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
 
-        StudentFile avatar = studentFileMapper.selectById(student.getAvatarId());
-        if (avatar != null) {
-            vo.setAvatar(avatar.getFileUrl());
+        // avatarId 允许为空，selectById(null) 会直接抛异常
+        if (student.getAvatarId() != null) {
+            StudentFile avatar = studentFileMapper.selectById(student.getAvatarId());
+            if (avatar != null) {
+                vo.setAvatar(avatar.getFileUrl());
+            }
         }
 
         BaseContext.setCurrentStudentId(vo.getStudentId());
         String tokenName;
-        if (vo.getPosition().equals(JwtClaimsConstant.ADMIN_ID)) {
+        if (JwtClaimsConstant.ADMIN_ID.equals(vo.getPosition())) {
             tokenName = JwtClaimsConstant.ADMIN_ID;
         } else {
             tokenName = JwtClaimsConstant.USER_ID;
@@ -215,44 +255,152 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public List<StudentVO> getAll() {
-        return redisUtil.getAllWithHashCache(CACHE_STUDENTS, this::queryStudentsFromDB, StudentVO.class);
+        return redisUtil.queryStringWithMutex(CACHE_STUDENTS_ALL, StudentVO.class, this::queryStudentsFromDB);
     }
 
     public List<StudentVO> queryStudentsFromDB() {
-        return userMapper.selectStudentsWithStats();
+        List<Student> list = this.list();
+        // 空列表要提前返回：下面的 IN () 是非法 SQL
+        if (list.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> avatarIds = new HashSet<>();
+        List<String> studentIds = new ArrayList<>(list.size());
+        for (Student student : list) {
+            if (student.getAvatarId() != null) {
+                avatarIds.add(student.getAvatarId());
+            }
+            studentIds.add(student.getStudentId());
+        }
+
+        Map<Long, String> avatarUrlMap = new HashMap<>();
+        if (!avatarIds.isEmpty()) {
+            studentFileMapper.selectBatchIds(avatarIds)
+                    .forEach(file -> avatarUrlMap.put(file.getId(), file.getFileUrl()));
+        }
+
+        // 原来是在循环里逐个学生 count，一个成员两次查询，50 个成员就是 100 次。
+        // 改成按 student_id 分组各查一次，总共 2 次。
+        Map<String, Integer> articleCountMap = toCountMap(articleMapper.countByStudentIds(studentIds));
+        Map<String, Integer> resourceCountMap = toCountMap(resourcesMapper.countByStudentIds(studentIds));
+
+        return list.stream().map(student -> {
+            StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
+            if (student.getAvatarId() != null) {
+                vo.setAvatar(avatarUrlMap.get(student.getAvatarId()));
+            }
+            String studentId = student.getStudentId();
+            // GROUP BY 只返回有记录的学生，没有文章/资料的查不到，这里默认 0
+            vo.setArticleCount(articleCountMap.getOrDefault(studentId, 0));
+            vo.setResourceCount(resourceCountMap.getOrDefault(studentId, 0));
+            return vo;
+        }).toList();
+    }
+
+    private static Map<String, Integer> toCountMap(List<StudentCountVO> counts) {
+        Map<String, Integer> map = new HashMap<>();
+        for (StudentCountVO count : counts) {
+            map.put(count.getStudentId(), count.getTotal());
+        }
+        return map;
     }
 
     @Override
     @Transactional
-    public void removeStudents(List<Integer> studentIds) {
+    public void removeStudents(List<String> studentIds) {
         if (studentIds == null || studentIds.isEmpty() || studentIds.stream().anyMatch(Objects::isNull)) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
 
-        List<Integer> distinctStudentIds = studentIds.stream().distinct().toList();
-        List<String> studentIdStrings = distinctStudentIds.stream().map(String::valueOf).toList();
+        List<String> distinctStudentIds = studentIds.stream().distinct().toList();
         Set<String> position = userMapper.selectPositionByIds(distinctStudentIds);
         if (position.contains(JwtClaimsConstant.ADMIN_ID)) {
-            throw new ParameterException(MessageConstant.PERMISSION_DENIED);
+            throw new ParameterException(Result.FORBIDDEN, MessageConstant.PERMISSION_DENIED);
         }
 
+        removeStudentsInternal(distinctStudentIds);
+    }
+
+    @Override
+    @Transactional
+    public void removeSelf() {
+        String currentStudentId = BaseContext.getCurrentStudentId();
+        if (currentStudentId == null) {
+            throw new ParameterException(Result.UNAUTHORIZED, MessageConstant.USER_NOT_LOGIN);
+        }
+
+        StudentVO current = this.getUser(currentStudentId);
+        if (current == null) {
+            throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
+        }
+
+        // 最后一位管理员不能注销：剩下的都是普通成员，没人能审批新成员、
+        // 没人能删人、也没人能改别人的信息，后台会彻底锁死。
+        if (JwtClaimsConstant.ADMIN_ID.equals(current.getPosition())
+                && userMapper.countByPosition(JwtClaimsConstant.ADMIN_ID) <= 1) {
+            throw new ParameterException(MessageConstant.LAST_ADMIN_CANNOT_LEAVE);
+        }
+
+        removeStudentsInternal(List.of(currentStudentId));
+    }
+
+    /**
+     * 真正的删除动作：收集 OSS 文件 → 删库 → 事务提交后清缓存和 OSS。
+     *
+     * <p>不做权限判断，由调用方负责。注意这是类内部调用、走不到 Spring 代理，
+     * 所以 {@code @Transactional} 标在它身上不会生效，必须由带注解的入口方法调用。</p>
+     */
+    private void removeStudentsInternal(List<String> distinctStudentIds) {
+        // 必须先把要删的 OSS 文件全部收集齐再删库：
+        // 数据库记录一删，就再也查不出这些文件叫什么了，OSS 上会留下永远清不掉的垃圾。
+
+        // 1) 文章正文里内嵌的图片（从 HTML 里正则提取）
         List<Article> articles = articleMapper.selectByStudentIds(distinctStudentIds);
-        Set<String> objectNames = extractArticleObjectNames(articles);
+        Set<String> objectNames = new HashSet<>(extractArticleObjectNames(articles));
 
+        // 2) 该学生上传过的所有文件：头像、文章里的图片、资料的封面和附件
+        List<StudentFile> files = new ArrayList<>(
+                studentFileMapper.selectByStudentIds(distinctStudentIds));
+
+        // 资料引用的文件归属可能与资料本身不一致（历史数据），按 id 再捞一遍合并，避免漏删
+        Set<Long> resourceFileIds = new HashSet<>();
+        for (Resources resource : resourcesMapper.selectByStudentIds(distinctStudentIds)) {
+            if (resource.getStudentFileCoverId() != null) {
+                resourceFileIds.add(resource.getStudentFileCoverId());
+            }
+            if (resource.getStudentFileFileId() != null) {
+                resourceFileIds.add(resource.getStudentFileFileId());
+            }
+        }
+        if (!resourceFileIds.isEmpty()) {
+            files.addAll(studentFileMapper.selectBatchIds(resourceFileIds));
+        }
+        files.forEach(file -> objectNames.add(file.getObjectName()));
+
+        // 删库。文章、资料、文件记录之前都漏了后面两样，导致删完学生之后
+        // resources / student_file 里全是查不到主人的孤儿行。
         articleMapper.deleteByStudentIds(distinctStudentIds);
-        userMapper.deletebyStudentIds(studentIdStrings);
+        resourcesMapper.deleteByStudentIds(distinctStudentIds);
+        studentFileMapper.deleteByStudentIds(distinctStudentIds);
+        userMapper.deletebyStudentIds(distinctStudentIds);
 
-        registerAfterCommit(() -> {
-            jwtWhiteList.deleteToken(studentIdStrings.toArray());
-            stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentIdStrings.toArray());
+        List<String> objectNameList = new ArrayList<>(objectNames);
+
+        TransactionUtils.afterCommit(() -> {
+            jwtWhiteList.deleteToken(distinctStudentIds.toArray());
+            stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, distinctStudentIds.toArray());
             stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
-            clearArticleCache();
+            // 资料列表缓存也要失效，否则页面上他发的资料还会在
+            stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
+            articleCacheManager.clear();
 
-            if (!objectNames.isEmpty()) {
+            if (!objectNameList.isEmpty()) {
                 try {
-                    commonService.delete(objectNames.toArray(String[]::new));
-                } catch (ParameterException e) {
-                    log.error("删除学生文章图片失败，studentIds={}", distinctStudentIds, e);
+                    commonService.delete(objectNameList.toArray(String[]::new));
+                } catch (RuntimeException e) {
+                    log.error("删除学生文件失败，studentIds={}, objectNames={}",
+                            distinctStudentIds, objectNameList, e);
                 }
             }
         });
@@ -273,49 +421,51 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         return objectNames;
     }
 
-    private void registerAfterCommit(Runnable action) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            action.run();
-            return;
-        }
-
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                action.run();
-            }
-        });
-    }
-
-    private void clearArticleCache() {
-        List<String> keys = new ArrayList<>();
-        keys.add(CACHE_ARTICLES);
-        for (ArticleType articleType : ArticleType.values()) {
-            keys.add(RANKING_ARTICLES + ":" + articleType.ordinal());
-        }
-        keys.add(RANKING_ARTICLES + ":ready");
-        stringRedisTemplate.delete(keys);
-    }
-
     @Override
     public void update(Student student) {
-        if (student == null) {
-            return;
+        if (student == null || student.getId() == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
-        StudentVO vo = this.getUser(BaseContext.getCurrentStudentId());
 
-        Integer studentId = student.getStudentId();
-        //不是管理员却想修改别人
-        if (!JwtClaimsConstant.ADMIN_ID.equals(vo.getPosition()) && !vo.getStudentId().equals(studentId)) {
-            throw new ParameterException(MessageConstant.PERMISSION_DENIED);
+        // 归属必须以主键查出来的真实记录为准。
+        // 请求里同时带着 id(主键) 和 studentId(学号)：若拿请求传来的 studentId 做校验，
+        // 攻击者填上自己的学号 + 别人的主键，校验通过、updateById 却按主键改掉了别人的记录。
+        Student target = this.getById(student.getId());
+        if (target == null) {
+            throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
         }
+
+        String currentStudentId = BaseContext.getCurrentStudentId();
+        StudentVO current = currentStudentId == null ? null : this.getUser(currentStudentId);
+        if (current == null) {
+            throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
+        }
+
+        boolean isAdmin = JwtClaimsConstant.ADMIN_ID.equals(current.getPosition());
+        if (!isAdmin && !currentStudentId.equals(target.getStudentId())) {
+            throw new ParameterException(Result.FORBIDDEN, MessageConstant.PERMISSION_DENIED);
+        }
+
+        // 学号是身份标识，不允许通过这个接口修改
+        student.setStudentId(null);
+        // 职位只允许管理员改。普通用户传了也置空，updateStrategy=NOT_EMPTY 会把它排除在 UPDATE 之外，
+        // 否则任何人都能把自己改成 admin，重新登录就是管理员。
+        if (!isAdmin) {
+            student.setPosition(null);
+        }
+
         String password = student.getPassword();
         if (password != null) {
             student.setPassword(BCrypt.hashpw(password));
         }
+
         userMapper.updateById(student);
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, String.valueOf(studentId));
+        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, target.getStudentId());
         stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
+        // 文章缓存里的 ArticleVO 带着作者姓名和头像（见 ArticleMapper.xml 的 selectPage），
+        // 改了名字不失效的话，列表页会一直显示旧名字直到缓存两小时后过期。
+        // 这里不做「有没有真的改」的判断：判空反而更绕，而改资料本来就是低频操作。
+        articleCacheManager.clear();
     }
 
 }

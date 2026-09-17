@@ -17,3 +17,5 @@ ai-backend/__pycache__/
 /ai-backend/.env
 /ai-backend/common/logs/
 /ai-backend/**/__pycache__/
+/picture
+/.claude

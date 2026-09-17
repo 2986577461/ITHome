@@ -10,7 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -27,7 +27,6 @@ import java.io.IOException;
 
 @RestController("userUser")
 @RequestMapping("user/users")
-@Slf4j
 @AllArgsConstructor
 @Tag(name = "自身信息维护以及登录操作")
 public class UsersController {
@@ -36,7 +35,6 @@ public class UsersController {
 
     @PostMapping("avatar")
     public Result<String> uploadAvatar(MultipartFile avatar) throws IOException {
-        log.info("头像上传");
         userService.uploadAvatar(avatar);
         return Result.success();
     }
@@ -44,15 +42,13 @@ public class UsersController {
     @GetMapping
     @Operation(summary = "返回当前学生信息")
     public Result<StudentVO> getUser() {
-        Integer studentId = BaseContext.getCurrentStudentId();
-        log.info("用户信息回显:{}", studentId);
+        String studentId = BaseContext.getCurrentStudentId();
         return Result.success(userService.getUser(studentId));
     }
 
     @PostMapping("login")
     @Operation(summary = "账号密码登录")
     public Result<StudentVO> login(@RequestBody @Valid LoginDTO message) {
-        log.info("用户登录{}", message);
         return userService.login(message);
     }
 
@@ -60,6 +56,13 @@ public class UsersController {
     @Operation(summary = "修改信息")
     public Result<String> updateStudent(@RequestBody @Valid StudentDTO studentDTO) {
         userService.update(BeanUtil.toBean(studentDTO, Student.class));
+        return Result.success();
+    }
+
+    @DeleteMapping
+    @Operation(summary = "注销当前账号（连同发布的文章和上传的资料一起删除）")
+    public Result<String> removeSelf() {
+        userService.removeSelf();
         return Result.success();
     }
 }

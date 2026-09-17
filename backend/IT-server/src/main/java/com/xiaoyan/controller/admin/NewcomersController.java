@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,7 +20,6 @@ import java.util.List;
 @RequestMapping("admin/newcomers")
 @AllArgsConstructor
 @Tag(name = "新学员管理")
-@Slf4j
 public class NewcomersController {
 
     private NewcomersService memberService;
@@ -29,7 +27,6 @@ public class NewcomersController {
     @DeleteMapping("{id}")
     @Operation(summary = "拒绝申请")
     public Result<String> refuseNewcomer(@PathVariable @NotNull Long id) {
-        log.info("拒绝新学员{}的申请",id);
         memberService.refuseNewcomer(id);
         return Result.success();
     }
@@ -37,7 +34,6 @@ public class NewcomersController {
     @PutMapping("{id}")
     @Operation(summary = "同意申请")
     public Result<String> agreeNewcomer(@PathVariable @NotNull Long id) {
-        log.info("同意新学员{}的申请",id);
         memberService.agreeNewcomer(id);
         return Result.success();
     }
@@ -45,7 +41,6 @@ public class NewcomersController {
     @GetMapping
     @Operation(summary = "获取所有申请")
     public Result<List<Newcomer>> getnewcomers() {
-        log.info("获取所有申请");
         List<Newcomer> list = memberService.getAll();
         return Result.success(list);
     }

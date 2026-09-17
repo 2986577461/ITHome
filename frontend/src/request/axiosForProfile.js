@@ -10,9 +10,3 @@ export function getMyArticlesPage(page, size) {
   return request.get("/user/articles/my-page", { params: { page, size } });
 }
 
-// 获取我的资料列表
-export function getMyResources() {
-  return request.get("/user/resources/all", {
-    params: { my: true },
-  });
-}

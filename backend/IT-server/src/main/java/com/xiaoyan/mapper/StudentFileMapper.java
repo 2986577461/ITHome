@@ -14,6 +14,10 @@ public interface StudentFileMapper extends BaseMapper<StudentFile> {
 
     void deleteByObjectNames(@Param("objectNames") List<String> objectNames);
 
+    List<StudentFile> selectByStudentIds(@Param("studentIds") List<String> studentIds);
+
+    int deleteByStudentIds(@Param("studentIds") List<String> studentIds);
+
     @Select("select * from student_file where object_name=#{objectName};")
     StudentFile selectbyObjectName(String objectName);
 }

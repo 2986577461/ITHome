@@ -13,7 +13,7 @@ public class StudentVO implements Serializable, HashCacheId {
 
     private Long id;
 
-    private Integer studentId;
+    private String studentId;
 
     private String name;
 

@@ -19,7 +19,7 @@ public class StudentFile {
     @TableId(value = "id")
     private Long id;
 
-    private Integer studentId;
+    private String studentId;
 
     private String originalName;
 

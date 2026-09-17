@@ -4,9 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
 import com.xiaoyan.pojo.Student;
-import com.xiaoyan.vo.StudentVO;
 
 import java.util.List;
 import java.util.Set;
@@ -15,17 +13,17 @@ import java.util.Set;
 public interface UserMapper extends BaseMapper<Student> {
 
     @Select("select * from it_student where student_id=#{studentId} and deleted=0")
-    Student selectByStudentId(Integer studentId);
+    Student selectByStudentId(String studentId);
 
-    List<StudentVO> selectStudentsWithStats();
+    /** 统计某个职位的学生数，用于判断「最后一个管理员」 */
+    @Select("select count(*) from it_student where position=#{position} and deleted=0")
+    int countByPosition(@Param("position") String position);
 
-    StudentVO selectStudentWithStats(Integer studentId);
-
-    List<Student> selectByStudentIds(@Param("studentIds") Set<Integer> studentIds);
+    List<Student> selectByStudentIds(@Param("studentIds") Set<String> studentIds);
 
     void deletebyStudentIds(List<String> studentIds);
 
-    Set<String> selectPositionByIds(List<Integer> studentIds);
+    Set<String> selectPositionByIds(List<String> studentIds);
 
     List<Student> selectThisYearsStudents();
 

@@ -15,7 +15,7 @@ public class StudentDTO {
     private Long id;
 
     @NotNull
-    private Integer studentId;
+    private String studentId;
 
     @Size(max= 20,message="编码长度不能超过20")
     private String name;

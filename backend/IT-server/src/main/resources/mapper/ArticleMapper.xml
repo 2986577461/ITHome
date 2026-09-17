@@ -28,22 +28,21 @@
         </foreach>
     </delete>
 
+    <!-- 作者姓名和头像直接 JOIN 出来：student_id 在 it_student 上是 unique、
+         student_file.id 是主键，两个 LEFT JOIN 都不会放大行数 -->
     <select id="selectPage" resultType="com.xiaoyan.vo.ArticleVO">
-        SELECT
-        a.id,
-        a.student_id,
-        a.type,
-        a.head,
-        a.content,
-        a.updated_date_time,
-        s.name,
-        f.file_url AS avatar
+        SELECT a.id,
+               a.student_id,
+               a.type,
+               a.head,
+               a.content,
+               a.release_date_time,
+               a.updated_date_time,
+               s.name     AS name,
+               f.file_url AS avatar
         FROM article a
-        LEFT JOIN it_student s
-        ON s.student_id = a.student_id
-        AND s.deleted = 0
-        LEFT JOIN student_file f
-        ON f.id = s.avatar_id
+                 LEFT JOIN it_student s ON s.student_id = a.student_id AND s.deleted = 0
+                 LEFT JOIN student_file f ON f.id = s.avatar_id
         <if test="type != null">
             WHERE a.type = #{type}
         </if>
@@ -65,9 +64,6 @@
                a.type,
                a.updated_date_time
         FROM article a
-                 LEFT JOIN it_student s
-                           ON s.student_id = a.student_id
-                               AND s.deleted = 0
         WHERE a.student_id = #{studentId}
         ORDER BY a.updated_date_time DESC, a.id DESC
         LIMIT #{offset}, #{size}
@@ -83,26 +79,40 @@
         FROM article
         WHERE article.student_id = #{studentId}
     </select>
+
+    <!-- 注意 GROUP BY 只会返回「有文章」的学生，没有文章的学生不会出现在结果里，
+         调用方取不到时要按 0 处理 -->
+    <select id="countByStudentIds" resultType="com.xiaoyan.vo.StudentCountVO">
+        SELECT student_id, COUNT(*) AS total
+        FROM article
+        WHERE student_id IN
+        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
+            #{studentId}
+        </foreach>
+        GROUP BY student_id
+    </select>
+    <!-- row_num 按 type 分区，所以是「每种类型各 size 条」，最多返回类型数 × size 行。
+         两个 JOIN 都命中唯一键，不会让某个分区多出行数而算错排名 -->
     <select id="selectWindow" resultType="com.xiaoyan.vo.ArticleVO">
         SELECT t.id,
                t.student_id,
                t.type,
                t.head,
                t.content,
+               t.release_date_time,
                t.updated_date_time,
-               s.name,
-               f.file_url AS avatar
+               t.name,
+               t.avatar
         FROM (SELECT a.*,
+                     s.name     AS name,
+                     f.file_url AS avatar,
                      ROW_NUMBER() OVER (
                          PARTITION BY a.type
                          ORDER BY a.updated_date_time DESC, a.id DESC
                          ) AS row_num
-              FROM article a) t
-                 LEFT JOIN it_student s
-                           ON s.student_id = t.student_id
-                               AND s.deleted = 0
-                 LEFT JOIN student_file f
-                           ON f.id = s.avatar_id
+              FROM article a
+                       LEFT JOIN it_student s ON s.student_id = a.student_id AND s.deleted = 0
+                       LEFT JOIN student_file f ON f.id = s.avatar_id) t
         WHERE t.row_num &lt;= #{size}
         ORDER BY t.type, t.updated_date_time DESC, t.id DESC
     </select>

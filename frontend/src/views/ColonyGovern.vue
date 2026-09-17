@@ -276,8 +276,11 @@ function openUpdate() {
 
 function openRemove() {
   if (selected.value.length === 0) return ElMessage.error("请先选择学生");
+  // 说清楚删的到底是什么：文章、资料、头像和图片都会被一并删掉，且 OSS 上的文件找不回来
   removeMsg.value =
-    "确定要删除选中的 " + selected.value.length + " 名学生吗？此操作不可撤销。";
+    "确定要删除选中的 " +
+    selected.value.length +
+    " 名学生吗？他们在协会发布的文章、上传的学习资料和图片都会一并删除，删除后无法恢复。";
   removeDialog.value = true;
 }
 

@@ -77,13 +77,12 @@ public class AliOssUtil {
             // 创建PutObject请求。
             ossClient.putObject(bucketName, objectName, new ByteArrayInputStream(bytes));
         } catch (OSSException oe) {
-            System.out.println("Caught an OSSException, which means your request made it to OSS, "
-                    + "but was rejected with an error response for some reason.");
-            System.out.println("Error Message:" + oe.getErrorMessage());
-            System.out.println("Error Code:" + oe.getErrorCode());
-            System.out.println("Request ID:" + oe.getRequestId());
-            System.out.println("Host ID:" + oe.getHostId());
+            // 不能吞掉异常：否则文件根本没传上去，这里还是会拼出一个「看起来成功」的 URL 返回给前端
+            log.error("上传文件失败. Error Message: {}, Error Code: {}, Request ID: {}, Host ID: {}",
+                    oe.getErrorMessage(), oe.getErrorCode(), oe.getRequestId(), oe.getHostId());
+            throw new RuntimeException("上传文件失败: " + oe.getErrorMessage(), oe);
         } catch (ClientException ce) {
+            log.error("上传文件失败. Error Message: {}", ce.getMessage());
             throw new RuntimeException("上传文件失败: 客户端网络或内部问题", ce);
         }
 

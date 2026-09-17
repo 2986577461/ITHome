@@ -36,17 +36,24 @@ public class CommonServiceImpl implements CommonService {
         if (originalName == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
+        return upload(file.getBytes(), originalName, file.getContentType(), file.getSize(),
+                BaseContext.getCurrentStudentId());
+    }
 
-        String suffix = originalName.substring(originalName.lastIndexOf("."));
+    @Override
+    public StudentFile upload(byte[] bytes, String originalName, String contentType, long size, String studentId) {
+        if (originalName == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
 
+        // 文件名可能没有后缀，lastIndexOf 返回 -1 时 substring 会越界
+        int dotIndex = originalName.lastIndexOf(".");
+        String suffix = dotIndex < 0 ? "" : originalName.substring(dotIndex);
         String objectName = UUID.randomUUID() + suffix;
-        String fileUrl = aliOssUtil.upload(file.getBytes(), objectName);
-
-        long size = file.getSize();
-        String contentType = file.getContentType();
+        String fileUrl = aliOssUtil.upload(bytes, objectName);
 
         StudentFile record = StudentFile.builder().
-                studentId(BaseContext.getCurrentStudentId()).
+                studentId(studentId).
                 fileSize(size).
                 originalName(originalName).
                 objectName(objectName).
@@ -55,7 +62,6 @@ public class CommonServiceImpl implements CommonService {
                 fileUrl(fileUrl).build();
 
         studentFileMapper.insert(record);
-
         return record;
     }
 
@@ -79,7 +85,10 @@ public class CommonServiceImpl implements CommonService {
     @Override
     public String generatePresignedDownloadUrl(String objectName, long expirationMillis) {
         StudentFile studentFile = studentFileMapper.selectbyObjectName(objectName);
-        log.info("下载文件:{}",studentFile.getOriginalName());
+        if (studentFile == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
+        log.info("下载文件:{}", studentFile.getOriginalName());
         return aliOssUtil.getDownloadUrl(objectName,
                 studentFile.getOriginalName(), expirationMillis);
     }

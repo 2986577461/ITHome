@@ -96,13 +96,7 @@
           ></textarea>
         </div>
 
-        <button
-          type="submit"
-          class="btn-primary submit-btn"
-          :disabled="uploading"
-        >
-          {{ uploading ? "上传中..." : "提交" }}
-        </button>
+        <button type="submit" class="btn-primary submit-btn">提交</button>
       </form>
     </div>
   </div>
@@ -121,8 +115,6 @@ const coverPreview = ref("");
 const fileName = ref("");
 const coverFile = ref(null);
 const uploadFile = ref(null);
-const uploading = ref(false);
-
 const resource = reactive({ head: "", introduce: "" });
 
 function onCoverChange(e) {
@@ -138,7 +130,18 @@ function onFileChange(e) {
   fileName.value = file.name;
 }
 
-async function submitUpload() {
+function resetForm() {
+  resource.head = "";
+  resource.introduce = "";
+  coverFile.value = null;
+  uploadFile.value = null;
+  coverPreview.value = "";
+  fileName.value = "";
+  if (coverInput.value) coverInput.value.value = "";
+  if (fileInput.value) fileInput.value.value = "";
+}
+
+function submitUpload() {
   if (!coverFile.value || !uploadFile.value) {
     ElMessage.error("请上传封面和文件");
     return;
@@ -148,20 +151,16 @@ async function submitUpload() {
     return;
   }
 
-  uploading.value = true;
   const fd = new FormData();
   fd.append("file", uploadFile.value);
   fd.append("cover", coverFile.value);
   fd.append("head", resource.head);
   fd.append("introduce", resource.introduce);
 
-  if ((await uploadResource(fd)).code === "200") {
-    ElMessage.success("上传成功");
-  }
+  uploadResource(fd);
+  ElMessage.success("上传成功，请稍后刷新页面查看");
   uploadStore.loadFileVisible = false;
-  setTimeout(() => location.reload(), 700);
-
-  uploading.value = false;
+  resetForm();
 }
 </script>
 

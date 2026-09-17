@@ -1,30 +1,33 @@
 package com.xiaoyan.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
+import com.xiaoyan.constant.MessageConstant;
+import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.service.CommonService;
-import com.xiaoyan.service.PermissionService;
 import com.xiaoyan.service.ResourcesService;
 import com.xiaoyan.service.UsersService;
+import com.xiaoyan.utils.AsyncExecutors;
 import com.xiaoyan.utils.RedisUtil;
 import com.xiaoyan.vo.StudentVO;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import com.xiaoyan.dto.ResourcesDTO;
 import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.pojo.StudentFile;
+import com.xiaoyan.vo.MyResourceVO;
 import com.xiaoyan.vo.ResourcesVO;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES;
 import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES_ALL;
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
 
@@ -32,12 +35,12 @@ import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
 /**
  * @author yuchao
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources>
         implements ResourcesService {
 
-    private final PermissionService permissionService;
     private ResourcesMapper resourcesMapper;
     private StringRedisTemplate stringRedisTemplate;
     private UsersService usersService;
@@ -52,62 +55,121 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public List<ResourcesVO> getList(Integer studentId) {
-        List<ResourcesVO> list = redisUtil.getAllWithHashCache(CACHE_RESOURCES, resourcesMapper::selectResourcesWithDetails,
-                ResourcesVO.class);
-        if (studentId != null) {
-            list.removeIf(vo->!studentId.equals(vo.getStudentId()));
+    public List<ResourcesVO> getList() {
+        return loadAll();
+    }
+
+    @Override
+    public List<MyResourceVO> getMyResources(String studentId) {
+        List<ResourcesVO> all = loadAll();
+        if (all == null || all.isEmpty()) {
+            return List.of();
         }
-        return list;
+        return all.stream()
+                .filter(vo -> studentId != null && studentId.equals(vo.getStudentId()))
+                .map(vo -> BeanUtil.toBean(vo, MyResourceVO.class))
+                .toList();
+    }
+
+    private List<ResourcesVO> loadAll() {
+        return redisUtil.queryStringWithMutex(CACHE_RESOURCES_ALL, ResourcesVO.class,
+                this::queryResourcesByDB);
+    }
+
+    private List<ResourcesVO> queryResourcesByDB() {
+        List<Resources> list = this.lambdaQuery()
+                .orderByDesc(Resources::getReleaseDateTime)
+                .list();
+        return list.stream().map(resource -> {
+            ResourcesVO vo = BeanUtil.toBean(resource, ResourcesVO.class);
+            // selectById(null) 会抛异常，id 为空时直接跳过
+            StudentFile cover = resource.getStudentFileCoverId() == null ? null
+                    : studentFileMapper.selectById(resource.getStudentFileCoverId());
+            if (cover != null) {
+                vo.setCoverUrl(cover.getFileUrl());
+            }
+            StudentFile file = resource.getStudentFileFileId() == null ? null
+                    : studentFileMapper.selectById(resource.getStudentFileFileId());
+            if (file != null) {
+                vo.setFileUrl(file.getFileUrl());
+                vo.setFileName(file.getOriginalName());
+                vo.setObjectName(file.getObjectName());
+            }
+            StudentVO author = usersService.getUser(resource.getStudentId());
+            if (author != null) {
+                vo.setAvatar(author.getAvatar());
+                vo.setStudentName(author.getName());
+            }
+            return vo;
+        }).toList();
     }
 
     @Override
-    public void saveResource(ResourcesDTO resourcesDTO, Integer studentId) throws IOException {
-        StudentFile cover = commonService.upload(resourcesDTO.getCover());
-        StudentFile file = commonService.upload(resourcesDTO.getFile());
+    public void saveResource(ResourcesDTO resourcesDTO, String studentId) throws IOException {
+        CopiedFile coverFile = copyFile(resourcesDTO.getCover());
+        CopiedFile resourceFile = copyFile(resourcesDTO.getFile());
+        String head = resourcesDTO.getHead();
+        String introduce = resourcesDTO.getIntroduce();
+        LocalDateTime releaseDateTime = LocalDateTime.now();
 
-        Resources resource = Resources.builder().
-                head(resourcesDTO.getHead()).
-                introduce(resourcesDTO.getIntroduce()).
-                studentId(studentId).
-                studentFileCoverId(cover.getId()).
-                studentFileFileId(file.getId()).
-                releaseDateTime(LocalDateTime.now()).build();
+        // 走全局共享线程池，不再每次上传裸起一个 Thread。
+        // 池内队列满时 CallerRunsPolicy 会让任务退回调用线程执行，宁可拖慢这次请求也不丢任务。
+        AsyncExecutors.uploadExecutor().execute(() -> {
+            try {
+                StudentFile cover = commonService.upload(coverFile.bytes(), coverFile.originalName(),
+                        coverFile.contentType(), coverFile.size(), studentId);
+                StudentFile file = commonService.upload(resourceFile.bytes(), resourceFile.originalName(),
+                        resourceFile.contentType(), resourceFile.size(), studentId);
 
-        resourcesMapper.insert(resource);
-        stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
-        stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
-        StudentVO author = usersService.getUser(studentId);
+                Resources resource = Resources.builder().
+                        head(head).
+                        introduce(introduce).
+                        studentId(studentId).
+                        studentFileCoverId(cover.getId()).
+                        studentFileFileId(file.getId()).
+                        releaseDateTime(releaseDateTime).build();
 
-        ResourcesVO vo = BeanUtil.toBean(resource, ResourcesVO.class);
-        vo.setStudentName(author.getName());
-        vo.setAvatar(author.getAvatar());
-        vo.setFileUrl(file.getFileUrl());
-        vo.setFileName(file.getOriginalName());
-        vo.setCoverUrl(cover.getFileUrl());
-
-        stringRedisTemplate.opsForHash().put(CACHE_RESOURCES, String.valueOf(resource.getId()),
-                JSONUtil.toJsonStr(vo));
-
+                resourcesMapper.insert(resource);
+                stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
+                stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
+            } catch (Exception e) {
+                log.error("异步上传资料失败, studentId={}", studentId, e);
+            }
+        });
     }
 
     @Override
-    public void deleteById(Long id, Integer studentId) {
+    public void deleteById(Long id, String studentId) {
         Resources resource = getById(id);
+        if (resource == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
 
-        permissionService.checkOwnerOrAdminPermission(resource.getStudentId());
+        usersService.checkOwnerOrAdmin(resource.getStudentId());
 
         StudentFile file = studentFileMapper.selectById(resource.getStudentFileFileId());
-        commonService.delete(file.getObjectName());
+        if (file != null) {
+            commonService.delete(file.getObjectName());
+        }
         StudentFile cover = studentFileMapper.selectById(resource.getStudentFileCoverId());
-        commonService.delete(cover.getObjectName());
+        if (cover != null) {
+            commonService.delete(cover.getObjectName());
+        }
 
         resourcesMapper.deleteById(id);
-        stringRedisTemplate.opsForHash().delete(CACHE_RESOURCES, String.valueOf(id));
         stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
         stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
 
     }
 
+    private CopiedFile copyFile(MultipartFile file) throws IOException {
+        if (file == null || file.getOriginalFilename() == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
+        return new CopiedFile(file.getBytes(), file.getOriginalFilename(), file.getContentType(), file.getSize());
+    }
+
+    private record CopiedFile(byte[] bytes, String originalName, String contentType, long size) {
+    }
 
 }
