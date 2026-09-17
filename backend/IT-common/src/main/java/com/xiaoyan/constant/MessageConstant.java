@@ -30,6 +30,8 @@ public class MessageConstant {
     public static final String DATA_DUPLICATE = "数据已存在，请勿重复提交";
     public static final String SERVER_ERROR = "服务器开小差了，请稍后重试";
 
+    public static final String LAST_ADMIN_CANNOT_LEAVE = "你是最后一位会长，请先设置另一位成员为会长，再注销账号";
+
 
 
 }

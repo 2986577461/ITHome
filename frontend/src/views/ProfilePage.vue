@@ -260,6 +260,24 @@
       </div>
     </section>
 
+    <!-- 注销账号 -->
+    <section class="section">
+      <div class="section-inner">
+        <div class="danger-zone">
+          <div class="danger-text">
+            <h3>注销账号</h3>
+            <p>
+              注销后，你在协会发布的文章、上传的学习资料和图片都会被一并删除，且无法恢复。
+              如果只是暂时不想用，直接退出登录即可。
+            </p>
+          </div>
+          <button class="btn-danger" @click="removeDialog = true">
+            注销账号
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- Avatar dialog -->
     <div
       class="avatar-dialog-overlay"
@@ -295,6 +313,31 @@
         </div>
       </div>
     </div>
+
+    <!-- 注销确认 -->
+    <div
+      class="avatar-dialog-overlay"
+      v-if="removeDialog"
+      @click.self="removeDialog = false"
+    >
+      <div class="avatar-dialog">
+        <div class="dialog-title">确认注销账号</div>
+        <div class="confirm-body">
+          <p>
+            你确定要注销账号吗？你在协会发布的<strong>文章</strong>、上传的<strong>学习资料和图片</strong>都会被一并删除，<strong>删除后无法恢复</strong>。
+          </p>
+          <p v-if="userStore.position === 'admin'" class="confirm-warn">
+            你是会长。如果协会里只有你一位会长，需要先把另一位成员设为会长，才能注销。
+          </p>
+          <div class="confirm-actions">
+            <button class="btn-plain" @click="removeDialog = false">取消</button>
+            <button class="btn-danger" :disabled="removing" @click="doRemoveSelf">
+              {{ removing ? "注销中..." : "确定注销" }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -306,7 +349,7 @@ import { useArticleStore } from "@/stores/updateArticle";
 import { updateProfile, getMyArticlesPage } from "@/request/axiosForProfile.js";
 import { getMyResources } from "@/request/axiosForResources.js";
 import { ElMessage } from "element-plus";
-import { getThis, update, uploadAvatar } from "@/request/axiosForUser";
+import { getThis, update, uploadAvatar, removeSelf } from "@/request/axiosForUser";
 import { getArticlePosition } from "@/request/axiosForArticles";
 
 const router = useRouter();
@@ -317,6 +360,8 @@ const tab = ref("info");
 const fileInput = ref(null);
 const avatarDialog = ref(false);
 const avatarPreview = ref("");
+const removeDialog = ref(false);
+const removing = ref(false);
 
 // dialogAvatar mirrors the current avatar state, updated on upload or random
 const dialogAvatar = ref("");
@@ -486,6 +531,27 @@ async function changePassword() {
     }
   } catch {
     ElMessage.error("修改失败");
+  }
+}
+
+async function doRemoveSelf() {
+  removing.value = true;
+  try {
+    const resp = await removeSelf();
+    if (resp?.code === "200") {
+      ElMessage.success("账号已注销");
+      // 后端已把 token 从白名单里删掉，这里同步清本地状态并回首页
+      localStorage.removeItem("authorization");
+      userStore.clear();
+      router.push("/home");
+    } else {
+      ElMessage.error(resp?.msg || "注销失败");
+    }
+  } catch {
+    ElMessage.error("注销失败");
+  } finally {
+    removing.value = false;
+    removeDialog.value = false;
   }
 }
 
@@ -700,6 +766,78 @@ onMounted(async () => {
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 24px;
+}
+
+/* 注销账号：用红色边框和浅红底跟上面的普通表单区分开 */
+.danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 20px 24px;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  background: #fff5f5;
+}
+.danger-zone h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: #b91c1c;
+}
+.danger-zone p {
+  margin: 0;
+  max-width: 620px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #991b1b;
+}
+.btn-danger {
+  padding: 10px 20px;
+  border: 1px solid #dc2626;
+  border-radius: 10px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.confirm-body {
+  padding: 0 4px;
+}
+.confirm-body p {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #444;
+}
+.confirm-warn {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412 !important;
+  font-size: 13px !important;
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.btn-plain {
+  padding: 9px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  font-size: 14px;
+  cursor: pointer;
 }
 .form-grid {
   display: grid;

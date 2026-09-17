@@ -27,6 +27,14 @@ public interface UsersService extends IService<Student> {
 
     void removeStudents(List<String> studentIds);
 
+    /**
+     * 注销当前登录账号，连同他发布的文章、上传的资料和文件一起删除。
+     *
+     * <p>无需权限校验（删的是自己），但最后一位管理员不能注销，
+     * 否则协会后台会没人能审批新成员。</p>
+     */
+    void removeSelf();
+
     List<StudentVO> getAll();
 
     void update(Student student);

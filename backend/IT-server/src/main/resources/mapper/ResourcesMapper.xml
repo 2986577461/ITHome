@@ -9,6 +9,18 @@
         SELECT COUNT(*) FROM resources WHERE resources.student_id=#{studentId}
     </select>
 
+    <!-- 注意 GROUP BY 只会返回「有资料」的学生，没有资料的学生不会出现在结果里，
+         调用方取不到时要按 0 处理 -->
+    <select id="countByStudentIds" resultType="com.xiaoyan.vo.StudentCountVO">
+        SELECT student_id, COUNT(*) AS total
+        FROM resources
+        WHERE student_id IN
+        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
+            #{studentId}
+        </foreach>
+        GROUP BY student_id
+    </select>
+
     <select id="selectByStudentIds" resultType="com.xiaoyan.pojo.Resources">
         SELECT id, head, introduce, student_file_cover_id, student_file_file_id,
                release_date_time, student_id

@@ -231,7 +231,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
      * 这样读请求不会看到只写了一半的缓存。
      */
     private void rebuildLatestCache() {
-        List<ArticleVO> window = toArticleVOList(articleMapper.selectWindow(MAX_CACHE_SIZE));
+        List<ArticleVO> window = articleMapper.selectWindow(MAX_CACHE_SIZE);
 
         String buildId = UUID.randomUUID().toString();
         String temporaryDetailsKey = CACHE_ARTICLES + ":rebuild:" + buildId;
@@ -277,7 +277,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
     private List<ArticleVO> queryPageFromDB(int start, Integer type, int size) {
         Integer databaseType = type == null || type == ArticleType.ALL.getCode() ? null : type;
-        return toArticleVOList(articleMapper.selectPage(start, databaseType, size));
+        return articleMapper.selectPage(start, databaseType, size);
     }
 
     private String rankingKey(Integer type) {
@@ -376,38 +376,6 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         return script;
     }
 
-    private List<ArticleVO> toArticleVOList(List<Article> articles) {
-        if (articles == null || articles.isEmpty()) {
-            return List.of();
-        }
-
-        Set<String> studentIds = new HashSet<>();
-        List<ArticleVO> vos = articles.stream().map(r -> {
-            studentIds.add(r.getStudentId());
-            return BeanUtil.toBean(r, ArticleVO.class);
-        }).toList();
-
-        // 批量查姓名
-        if (!studentIds.isEmpty()) {
-            Map<String, String> nameMap = new HashMap<>();
-            Map<String, String> avatarMap = new HashMap<>();
-
-            List<StudentVO> all = usersService.getAll();
-            List<StudentVO> students = all == null ? List.of()
-                    : all.stream().filter(vo -> studentIds.contains(vo.getStudentId())).toList();
-
-            students.forEach(vo -> {
-                nameMap.put(vo.getStudentId(), vo.getName());
-                avatarMap.put(vo.getStudentId(), vo.getAvatar());
-            });
-            vos.forEach(vo -> {
-                vo.setName(nameMap.get(vo.getStudentId()));
-                vo.setAvatar(avatarMap.get(vo.getStudentId()));
-            });
-        }
-
-        return vos;
-    }
 
     @Override
     @Transactional

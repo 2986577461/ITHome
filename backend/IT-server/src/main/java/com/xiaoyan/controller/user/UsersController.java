@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -55,6 +56,13 @@ public class UsersController {
     @Operation(summary = "修改信息")
     public Result<String> updateStudent(@RequestBody @Valid StudentDTO studentDTO) {
         userService.update(BeanUtil.toBean(studentDTO, Student.class));
+        return Result.success();
+    }
+
+    @DeleteMapping
+    @Operation(summary = "注销当前账号（连同发布的文章和上传的资料一起删除）")
+    public Result<String> removeSelf() {
+        userService.removeSelf();
         return Result.success();
     }
 }

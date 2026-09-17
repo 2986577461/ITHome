@@ -25,6 +25,7 @@ import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.JwtUtil;
 import com.xiaoyan.utils.RedisUtil;
 import com.xiaoyan.utils.TransactionUtils;
+import com.xiaoyan.vo.StudentCountVO;
 import com.xiaoyan.vo.StudentVO;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -139,7 +140,8 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         this.lambdaUpdate().set(Student::getAvatarId, newAvatarId).update();
         stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentId);
         stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
-
+        // 头像会被烤进文章缓存里的 ArticleVO，不一起失效的话文章列表上还是旧头像
+        articleCacheManager.clear();
     }
 
     @Override
@@ -258,11 +260,18 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     public List<StudentVO> queryStudentsFromDB() {
         List<Student> list = this.list();
+        // 空列表要提前返回：下面的 IN () 是非法 SQL
+        if (list.isEmpty()) {
+            return List.of();
+        }
+
         Set<Long> avatarIds = new HashSet<>();
+        List<String> studentIds = new ArrayList<>(list.size());
         for (Student student : list) {
             if (student.getAvatarId() != null) {
                 avatarIds.add(student.getAvatarId());
             }
+            studentIds.add(student.getStudentId());
         }
 
         Map<Long, String> avatarUrlMap = new HashMap<>();
@@ -271,16 +280,30 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
                     .forEach(file -> avatarUrlMap.put(file.getId(), file.getFileUrl()));
         }
 
+        // 原来是在循环里逐个学生 count，一个成员两次查询，50 个成员就是 100 次。
+        // 改成按 student_id 分组各查一次，总共 2 次。
+        Map<String, Integer> articleCountMap = toCountMap(articleMapper.countByStudentIds(studentIds));
+        Map<String, Integer> resourceCountMap = toCountMap(resourcesMapper.countByStudentIds(studentIds));
+
         return list.stream().map(student -> {
             StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
             if (student.getAvatarId() != null) {
                 vo.setAvatar(avatarUrlMap.get(student.getAvatarId()));
             }
             String studentId = student.getStudentId();
-            vo.setArticleCount(articleMapper.selectCountByStudentId(studentId));
-            vo.setResourceCount(resourcesMapper.selectCountByStudentId(studentId));
+            // GROUP BY 只返回有记录的学生，没有文章/资料的查不到，这里默认 0
+            vo.setArticleCount(articleCountMap.getOrDefault(studentId, 0));
+            vo.setResourceCount(resourceCountMap.getOrDefault(studentId, 0));
             return vo;
         }).toList();
+    }
+
+    private static Map<String, Integer> toCountMap(List<StudentCountVO> counts) {
+        Map<String, Integer> map = new HashMap<>();
+        for (StudentCountVO count : counts) {
+            map.put(count.getStudentId(), count.getTotal());
+        }
+        return map;
     }
 
     @Override
@@ -296,13 +319,45 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             throw new ParameterException(Result.FORBIDDEN, MessageConstant.PERMISSION_DENIED);
         }
 
+        removeStudentsInternal(distinctStudentIds);
+    }
+
+    @Override
+    @Transactional
+    public void removeSelf() {
+        String currentStudentId = BaseContext.getCurrentStudentId();
+        if (currentStudentId == null) {
+            throw new ParameterException(Result.UNAUTHORIZED, MessageConstant.USER_NOT_LOGIN);
+        }
+
+        StudentVO current = this.getUser(currentStudentId);
+        if (current == null) {
+            throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
+        }
+
+        // 最后一位管理员不能注销：剩下的都是普通成员，没人能审批新成员、
+        // 没人能删人、也没人能改别人的信息，后台会彻底锁死。
+        if (JwtClaimsConstant.ADMIN_ID.equals(current.getPosition())
+                && userMapper.countByPosition(JwtClaimsConstant.ADMIN_ID) <= 1) {
+            throw new ParameterException(MessageConstant.LAST_ADMIN_CANNOT_LEAVE);
+        }
+
+        removeStudentsInternal(List.of(currentStudentId));
+    }
+
+    /**
+     * 真正的删除动作：收集 OSS 文件 → 删库 → 事务提交后清缓存和 OSS。
+     *
+     * <p>不做权限判断，由调用方负责。注意这是类内部调用、走不到 Spring 代理，
+     * 所以 {@code @Transactional} 标在它身上不会生效，必须由带注解的入口方法调用。</p>
+     */
+    private void removeStudentsInternal(List<String> distinctStudentIds) {
         // 必须先把要删的 OSS 文件全部收集齐再删库：
         // 数据库记录一删，就再也查不出这些文件叫什么了，OSS 上会留下永远清不掉的垃圾。
-        Set<String> objectNames = new HashSet<>();
 
         // 1) 文章正文里内嵌的图片（从 HTML 里正则提取）
         List<Article> articles = articleMapper.selectByStudentIds(distinctStudentIds);
-        objectNames.addAll(extractArticleObjectNames(articles));
+        Set<String> objectNames = new HashSet<>(extractArticleObjectNames(articles));
 
         // 2) 该学生上传过的所有文件：头像、文章里的图片、资料的封面和附件
         List<StudentFile> files = new ArrayList<>(
@@ -407,6 +462,10 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         userMapper.updateById(student);
         stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, target.getStudentId());
         stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
+        // 文章缓存里的 ArticleVO 带着作者姓名和头像（见 ArticleMapper.xml 的 selectPage），
+        // 改了名字不失效的话，列表页会一直显示旧名字直到缓存两小时后过期。
+        // 这里不做「有没有真的改」的判断：判空反而更绕，而改资料本来就是低频操作。
+        articleCacheManager.clear();
     }
 
 }
