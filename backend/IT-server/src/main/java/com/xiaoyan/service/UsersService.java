@@ -16,6 +16,13 @@ public interface UsersService extends IService<Student> {
 
     StudentVO getUser(Integer studentId);
 
+    /**
+     * 校验当前登录用户是否有权限操作归属于 ownerStudentId 的资源：仅作者本人或管理员可以。
+     *
+     * @param ownerStudentId 资源归属的学生 id
+     */
+    void checkOwnerOrAdmin(Integer ownerStudentId);
+
     Result<StudentVO> login(LoginDTO message);
 
     void removeStudents(List<Integer > studentIds);

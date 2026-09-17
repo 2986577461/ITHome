@@ -46,7 +46,9 @@ public class CommonServiceImpl implements CommonService {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
 
-        String suffix = originalName.substring(originalName.lastIndexOf("."));
+        // 文件名可能没有后缀，lastIndexOf 返回 -1 时 substring 会越界
+        int dotIndex = originalName.lastIndexOf(".");
+        String suffix = dotIndex < 0 ? "" : originalName.substring(dotIndex);
         String objectName = UUID.randomUUID() + suffix;
         String fileUrl = aliOssUtil.upload(bytes, objectName);
 
@@ -83,7 +85,10 @@ public class CommonServiceImpl implements CommonService {
     @Override
     public String generatePresignedDownloadUrl(String objectName, long expirationMillis) {
         StudentFile studentFile = studentFileMapper.selectbyObjectName(objectName);
-        log.info("下载文件:{}",studentFile.getOriginalName());
+        if (studentFile == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
+        log.info("下载文件:{}", studentFile.getOriginalName());
         return aliOssUtil.getDownloadUrl(objectName,
                 studentFile.getOriginalName(), expirationMillis);
     }

@@ -8,9 +8,9 @@ import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.service.CommonService;
-import com.xiaoyan.service.PermissionService;
 import com.xiaoyan.service.ResourcesService;
 import com.xiaoyan.service.UsersService;
+import com.xiaoyan.utils.AsyncExecutors;
 import com.xiaoyan.utils.RedisUtil;
 import com.xiaoyan.vo.StudentVO;
 import lombok.AllArgsConstructor;
@@ -41,7 +41,6 @@ import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
 public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources>
         implements ResourcesService {
 
-    private final PermissionService permissionService;
     private ResourcesMapper resourcesMapper;
     private StringRedisTemplate stringRedisTemplate;
     private UsersService usersService;
@@ -83,11 +82,14 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
                 .list();
         return list.stream().map(resource -> {
             ResourcesVO vo = BeanUtil.toBean(resource, ResourcesVO.class);
-            StudentFile cover = studentFileMapper.selectById(resource.getStudentFileCoverId());
+            // selectById(null) 会抛异常，id 为空时直接跳过
+            StudentFile cover = resource.getStudentFileCoverId() == null ? null
+                    : studentFileMapper.selectById(resource.getStudentFileCoverId());
             if (cover != null) {
                 vo.setCoverUrl(cover.getFileUrl());
             }
-            StudentFile file = studentFileMapper.selectById(resource.getStudentFileFileId());
+            StudentFile file = resource.getStudentFileFileId() == null ? null
+                    : studentFileMapper.selectById(resource.getStudentFileFileId());
             if (file != null) {
                 vo.setFileUrl(file.getFileUrl());
                 vo.setFileName(file.getOriginalName());
@@ -110,7 +112,9 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         String introduce = resourcesDTO.getIntroduce();
         LocalDateTime releaseDateTime = LocalDateTime.now();
 
-        Thread uploadThread = new Thread(() -> {
+        // 走全局共享线程池，不再每次上传裸起一个 Thread。
+        // 池内队列满时 CallerRunsPolicy 会让任务退回调用线程执行，宁可拖慢这次请求也不丢任务。
+        AsyncExecutors.uploadExecutor().execute(() -> {
             try {
                 StudentFile cover = commonService.upload(coverFile.bytes(), coverFile.originalName(),
                         coverFile.contentType(), coverFile.size(), studentId);
@@ -131,21 +135,26 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
             } catch (Exception e) {
                 log.error("异步上传资料失败, studentId={}", studentId, e);
             }
-        }, "resource-oss-upload");
-        uploadThread.setDaemon(true);
-        uploadThread.start();
+        });
     }
 
     @Override
     public void deleteById(Long id, Integer studentId) {
         Resources resource = getById(id);
+        if (resource == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
 
-        permissionService.checkOwnerOrAdminPermission(resource.getStudentId());
+        usersService.checkOwnerOrAdmin(resource.getStudentId());
 
         StudentFile file = studentFileMapper.selectById(resource.getStudentFileFileId());
-        commonService.delete(file.getObjectName());
+        if (file != null) {
+            commonService.delete(file.getObjectName());
+        }
         StudentFile cover = studentFileMapper.selectById(resource.getStudentFileCoverId());
-        commonService.delete(cover.getObjectName());
+        if (cover != null) {
+            commonService.delete(cover.getObjectName());
+        }
 
         resourcesMapper.deleteById(id);
         stringRedisTemplate.delete(CACHE_RESOURCES_ALL);

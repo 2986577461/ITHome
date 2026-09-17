@@ -232,6 +232,37 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
+    /**
+     * 在分布式锁内执行一段逻辑，拿不到锁会自旋等待，等待超时后抛出异常。
+     *
+     * <p>用于必须串行执行的缓存写操作。注意锁不可重入，不要在 action 内部再次获取同一把锁。</p>
+     */
+    public void executeWithLock(@NonNull String lockKey, @NonNull Runnable action) {
+        LockHandle lock = acquireLockWithRetry(lockKey);
+        try {
+            action.run();
+        } finally {
+            unlock(lock);
+        }
+    }
+
+    /**
+     * 尝试获取分布式锁并执行，只尝试一次，拿不到锁直接返回 null（不等待、不抛异常）。
+     *
+     * <p>用于「拿不到锁就退化成别的路径」的场景，例如缓存重建失败时直接查库。</p>
+     */
+    public <T> T executeWithLockOrNull(@NonNull String lockKey, @NonNull Supplier<T> action) {
+        LockHandle lock = tryLock(lockKey);
+        if (lock == null) {
+            return null;
+        }
+        try {
+            return action.get();
+        } finally {
+            unlock(lock);
+        }
+    }
+
     private <R> R loadLogicalCacheOnMiss(String key, String nullKey, Class<R> rType, Supplier<R> dbFallback) {
         if (isNegativeCached(nullKey)) {
             return null;

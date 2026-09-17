@@ -20,11 +20,11 @@ CREATE TABLE it_student
   COLLATE = utf8mb4_unicode_ci;
 INSERT INTO it_student(id, student_id, name, sex, major, class_name, academy, position, avatar_id,
                        password)
-values (1, '202402059', '龚胜利', '1', '软件技术', '242班', '人工智能', '会长',
+values (1, '202402059', '龚胜利', '男', '软件技术', '242班', '人工智能', 'admin',
         0, '$2a$10$mdjdwZXRLhqaMgk7mBBQ/.7JpD5kvCUCAsrhdJaprlr/7BVZ.fLq.');
 INSERT INTO it_student(id, student_id, name, sex, major, class_name, academy, position, avatar_id,
                        password)
-    VALUE (2, '202300573', '超超', '1', '软件技术', '232班', '人工智能', '会长',
+    VALUE (2, '202300573', '超超', '男', '软件技术', '232班', '人工智能', 'admin',
            1, '$2a$10$mdjdwZXRLhqaMgk7mBBQ/.7JpD5kvCUCAsrhdJaprlr/7BVZ.fLq.');
 
 CREATE TABLE resources

@@ -1,5 +1,6 @@
 package com.xiaoyan.webConfig;
 
+import com.xiaoyan.interceptor.BaseContextCleanInterceptor;
 import com.xiaoyan.interceptor.JwtAdminTokenInterceptor;
 import com.xiaoyan.interceptor.JwtUserTokenInterceptor;
 import com.xiaoyan.properties.AdmitUrlProperties;
@@ -26,6 +27,9 @@ public class InterceptorConfig implements WebMvcConfigurer {
     @Resource
     private JwtUserTokenInterceptor jwtUserTokenInterceptor;
 
+    @Resource
+    private BaseContextCleanInterceptor baseContextCleanInterceptor;
+
     @Value("${front-location.request-url}")
     private String[] location;
 
@@ -40,6 +44,10 @@ public class InterceptorConfig implements WebMvcConfigurer {
 
         registry.addInterceptor(jwtAdminTokenInterceptor)
                 .addPathPatterns("/admin/**");
+
+        // 放在最后注册，保证所有请求（含免登录白名单）结束后都会清理 ThreadLocal
+        registry.addInterceptor(baseContextCleanInterceptor)
+                .addPathPatterns("/**");
     }
 
     @Override
