@@ -287,6 +287,10 @@ var paginationButtons = computed(function () {
   return result;
 });
 
+function byReleaseTimeDesc(a, b) {
+  return new Date(b.releaseDateTime || 0) - new Date(a.releaseDateTime || 0);
+}
+
 async function download(objectName) {
   try {
     var resp = await getDownloadUrl(objectName);
@@ -338,7 +342,9 @@ function focusResource(id) {
 onMounted(async function () {
   try {
     var res = await getAll();
-    if (res && res.data) resources.value = res.data;
+    if (res && res.data) {
+      resources.value = res.data.slice().sort(byReleaseTimeDesc);
+    }
   } catch (e) {}
   loading.value = false;
   focusResource(route.query.id);

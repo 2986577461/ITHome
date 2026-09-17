@@ -3,6 +3,8 @@ package com.xiaoyan.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
+import com.xiaoyan.constant.MessageConstant;
+import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.service.CommonService;
@@ -12,8 +14,10 @@ import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.RedisUtil;
 import com.xiaoyan.vo.StudentVO;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import com.xiaoyan.dto.ResourcesDTO;
 import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.pojo.StudentFile;
@@ -31,6 +35,7 @@ import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
 /**
  * @author yuchao
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources>
@@ -73,7 +78,9 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     private List<ResourcesVO> queryResourcesByDB() {
-        List<Resources> list = this.list();
+        List<Resources> list = this.lambdaQuery()
+                .orderByDesc(Resources::getReleaseDateTime)
+                .list();
         return list.stream().map(resource -> {
             ResourcesVO vo = BeanUtil.toBean(resource, ResourcesVO.class);
             StudentFile cover = studentFileMapper.selectById(resource.getStudentFileCoverId());
@@ -97,21 +104,36 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
     @Override
     public void saveResource(ResourcesDTO resourcesDTO, Integer studentId) throws IOException {
-        StudentFile cover = commonService.upload(resourcesDTO.getCover());
-        StudentFile file = commonService.upload(resourcesDTO.getFile());
+        CopiedFile coverFile = copyFile(resourcesDTO.getCover());
+        CopiedFile resourceFile = copyFile(resourcesDTO.getFile());
+        String head = resourcesDTO.getHead();
+        String introduce = resourcesDTO.getIntroduce();
+        LocalDateTime releaseDateTime = LocalDateTime.now();
 
-        Resources resource = Resources.builder().
-                head(resourcesDTO.getHead()).
-                introduce(resourcesDTO.getIntroduce()).
-                studentId(studentId).
-                studentFileCoverId(cover.getId()).
-                studentFileFileId(file.getId()).
-                releaseDateTime(LocalDateTime.now()).build();
+        Thread uploadThread = new Thread(() -> {
+            try {
+                StudentFile cover = commonService.upload(coverFile.bytes(), coverFile.originalName(),
+                        coverFile.contentType(), coverFile.size(), studentId);
+                StudentFile file = commonService.upload(resourceFile.bytes(), resourceFile.originalName(),
+                        resourceFile.contentType(), resourceFile.size(), studentId);
 
-        resourcesMapper.insert(resource);
-        stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
-        stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
+                Resources resource = Resources.builder().
+                        head(head).
+                        introduce(introduce).
+                        studentId(studentId).
+                        studentFileCoverId(cover.getId()).
+                        studentFileFileId(file.getId()).
+                        releaseDateTime(releaseDateTime).build();
 
+                resourcesMapper.insert(resource);
+                stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
+                stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
+            } catch (Exception e) {
+                log.error("异步上传资料失败, studentId={}", studentId, e);
+            }
+        }, "resource-oss-upload");
+        uploadThread.setDaemon(true);
+        uploadThread.start();
     }
 
     @Override
@@ -131,5 +153,14 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
     }
 
+    private CopiedFile copyFile(MultipartFile file) throws IOException {
+        if (file == null || file.getOriginalFilename() == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
+        return new CopiedFile(file.getBytes(), file.getOriginalFilename(), file.getContentType(), file.getSize());
+    }
+
+    private record CopiedFile(byte[] bytes, String originalName, String contentType, long size) {
+    }
 
 }

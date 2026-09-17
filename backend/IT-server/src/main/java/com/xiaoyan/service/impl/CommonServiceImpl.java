@@ -36,17 +36,22 @@ public class CommonServiceImpl implements CommonService {
         if (originalName == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
+        return upload(file.getBytes(), originalName, file.getContentType(), file.getSize(),
+                BaseContext.getCurrentStudentId());
+    }
+
+    @Override
+    public StudentFile upload(byte[] bytes, String originalName, String contentType, long size, Integer studentId) {
+        if (originalName == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        }
 
         String suffix = originalName.substring(originalName.lastIndexOf("."));
-
         String objectName = UUID.randomUUID() + suffix;
-        String fileUrl = aliOssUtil.upload(file.getBytes(), objectName);
-
-        long size = file.getSize();
-        String contentType = file.getContentType();
+        String fileUrl = aliOssUtil.upload(bytes, objectName);
 
         StudentFile record = StudentFile.builder().
-                studentId(BaseContext.getCurrentStudentId()).
+                studentId(studentId).
                 fileSize(size).
                 originalName(originalName).
                 objectName(objectName).
@@ -55,7 +60,6 @@ public class CommonServiceImpl implements CommonService {
                 fileUrl(fileUrl).build();
 
         studentFileMapper.insert(record);
-
         return record;
     }
 

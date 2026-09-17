@@ -547,7 +547,13 @@ onMounted(async () => {
   fetchMyArticles(1);
   getMyResources()
     .then((r) => {
-      if (r?.data) myResources.value = r.data;
+      if (r?.data) {
+        myResources.value = r.data.slice().sort((a, b) => {
+          return (
+            new Date(b.releaseDateTime || 0) - new Date(a.releaseDateTime || 0)
+          );
+        });
+      }
     })
     .catch(() => {});
 });
