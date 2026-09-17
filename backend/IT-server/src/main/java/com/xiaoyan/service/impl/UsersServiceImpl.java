@@ -85,7 +85,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         // 权限校验：仅作者本人或管理员可修改
         String currentStudentId = BaseContext.getCurrentStudentId();
         if (currentStudentId == null) {
-            throw new ParameterException(MessageConstant.USER_NOT_LOGIN);
+            throw new ParameterException(Result.UNAUTHORIZED, MessageConstant.USER_NOT_LOGIN);
         }
 
         StudentVO current = this.getUser(currentStudentId);
@@ -95,7 +95,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
         if (!JwtClaimsConstant.ADMIN_ID.equals(current.getPosition())
                 && !currentStudentId.equals(ownerStudentId)) {
-            throw new ParameterException(MessageConstant.PERMISSION_DENIED);
+            throw new ParameterException(Result.FORBIDDEN, MessageConstant.PERMISSION_DENIED);
         }
     }
 
@@ -290,7 +290,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         List<String> distinctStudentIds = studentIds.stream().distinct().toList();
         Set<String> position = userMapper.selectPositionByIds(distinctStudentIds);
         if (position.contains(JwtClaimsConstant.ADMIN_ID)) {
-            throw new ParameterException(MessageConstant.PERMISSION_DENIED);
+            throw new ParameterException(Result.FORBIDDEN, MessageConstant.PERMISSION_DENIED);
         }
 
         List<Article> articles = articleMapper.selectByStudentIds(distinctStudentIds);
@@ -352,7 +352,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
         boolean isAdmin = JwtClaimsConstant.ADMIN_ID.equals(current.getPosition());
         if (!isAdmin && !currentStudentId.equals(target.getStudentId())) {
-            throw new ParameterException(MessageConstant.PERMISSION_DENIED);
+            throw new ParameterException(Result.FORBIDDEN, MessageConstant.PERMISSION_DENIED);
         }
 
         // 学号是身份标识，不允许通过这个接口修改

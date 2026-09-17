@@ -35,4 +35,8 @@ public class NewComerDTO {
     @Size(max= 20,message="编码长度不能超过20")
     @NotBlank(message="[]不能为空")
     private String major;
+
+    @NotBlank(message = "密码不能为空")
+    @Size(min = 6, max = 30, message = "密码长度需为6~30位")
+    private String password;
 }

@@ -62,6 +62,7 @@ CREATE TABLE newcomer
     major                 VARCHAR(20)      NOT NULL,
     class_name            VARCHAR(20)      NOT NULL,
     academy               VARCHAR(20)      NOT NULL,
+    password              varchar(100)     NOT NULL,
     introduce             VARCHAR(2000)    NOT NULL,
     application_date_time datetime         not null
 

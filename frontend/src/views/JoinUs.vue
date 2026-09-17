@@ -122,6 +122,31 @@
                 </option>
               </select>
             </div>
+            <div class="form-field">
+              <label>密码</label>
+              <!-- 审批通过后这就是登录密码。type=password 同时避免浏览器把学号当用户名记住 -->
+              <input
+                v-model="form.password"
+                type="password"
+                autocomplete="new-password"
+                minlength="6"
+                maxlength="30"
+                required
+                placeholder="6-30位，登录时使用"
+              />
+            </div>
+            <div class="form-field">
+              <label>确认密码</label>
+              <input
+                v-model="form.confirmPassword"
+                type="password"
+                autocomplete="new-password"
+                minlength="6"
+                maxlength="30"
+                required
+                placeholder="请再次输入密码"
+              />
+            </div>
             <div class="form-field full">
               <label>简介 <span class="req">(50-1000字)</span></label>
               <textarea
@@ -242,10 +267,21 @@ const form = reactive({
   major: "",
   className: "",
   academy: "",
+  password: "",
+  confirmPassword: "",
   introduce: "",
 });
 
 async function submitForm() {
+  if (form.password.length < 6 || form.password.length > 30) {
+    ElMessage.error("密码长度需为6~30位");
+    return;
+  }
+  if (form.password !== form.confirmPassword) {
+    ElMessage.error("两次输入的密码不一致");
+    return;
+  }
+
   const l = form.introduce.length;
   if (l > 1000) {
     ElMessage.error("简介太长了");
@@ -256,7 +292,9 @@ async function submitForm() {
     return;
   }
   submitting.value = true;
-  const resp = await sendApply({ ...form });
+  // confirmPassword 只是前端校验用，不发给后端
+  const { confirmPassword, ...payload } = form;
+  const resp = await sendApply({ ...payload });
   if (resp) {
     ElMessage.success("申请成功！");
     setTimeout(() => router.push("/home"), 1200);
