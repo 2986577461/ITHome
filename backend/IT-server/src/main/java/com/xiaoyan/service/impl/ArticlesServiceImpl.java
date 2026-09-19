@@ -16,7 +16,7 @@ import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.ArticlesService;
 import com.xiaoyan.service.CommonService;
 import com.xiaoyan.service.UsersService;
-import com.xiaoyan.utils.TransactionUtils;
+import com.xiaoyan.utils.RedisUtil;
 import com.xiaoyan.vo.ArticleImageVO;
 import com.xiaoyan.vo.ArticleVO;
 import com.xiaoyan.vo.MyArticleVO;
@@ -24,7 +24,6 @@ import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -59,7 +58,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
     private final UsersService usersService;
     private ArticleMapper articleMapper;
-    private StringRedisTemplate stringRedisTemplate;
+    private RedisUtil redisUtil;
     private CommonService commonService;
 
     public static final Pattern IMAGE_PATTERN = Pattern.compile("https?://[^/]+\\.aliyuncs\\.com/([^\"'\\s]+)");
@@ -86,7 +85,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
         articleMapper.insert(article);
 
-        stringRedisTemplate.delete(CACHE_ARTICLE_PAGES);
+        redisUtil.evict(CACHE_ARTICLE_PAGES);
     }
 
     @Override
@@ -111,17 +110,16 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         if (page < 1 || size < 1) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
-
         int start = (page - 1) * size;
         // 缓存只覆盖每个榜单的前 MAX_CACHE_SIZE 条
         boolean cacheable = page * size - 1 < MAX_CACHE_SIZE;
         String field = cacheType(type) + ":" + size + ":" + page;
 
         if (cacheable) {
-            Object cached = stringRedisTemplate.opsForHash().get(CACHE_ARTICLE_PAGES, field);
+            String cached = redisUtil.getHashField(CACHE_ARTICLE_PAGES, field);
             if (cached != null) {
                 // 空数组也是有效值：说明这一页确实没有文章，不用再查库
-                return JSONUtil.toList((String) cached, ArticleVO.class);
+                return JSONUtil.toList(cached, ArticleVO.class);
             }
         }
 
@@ -130,8 +128,8 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         // 缓存这一页。不加锁也不需要加：整页一次性 HSET，value 是完整的一页，
         // 重复写同一个值没有副作用，并发未命中最多是几个线程各查一次库、写进同一份结果。
         if (cacheable) {
-            stringRedisTemplate.opsForHash().put(CACHE_ARTICLE_PAGES, field, JSONUtil.toJsonStr(result));
-            stringRedisTemplate.expire(CACHE_ARTICLE_PAGES, CACHE_TTL_HOURS, TimeUnit.HOURS);
+            redisUtil.putHashField(CACHE_ARTICLE_PAGES, field, JSONUtil.toJsonStr(result),
+                    CACHE_TTL_HOURS, TimeUnit.HOURS);
         }
         return result;
     }
@@ -168,15 +166,12 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         // 更新文章
         Article article = BeanUtil.toBean(articleDTO, Article.class);
         article.setUpdatedDateTime(LocalDateTime.now());
-        articleMapper.updateById(article);
-
-        // 更新时间变了，文章在榜单里的位置也会跟着变，所以不增量改缓存，整组失效最省事
-        TransactionUtils.afterCommit(() -> {
-            stringRedisTemplate.delete(CACHE_ARTICLE_PAGES);
+        if (articleMapper.updateById(article) == 1) {
+            redisUtil.evict(CACHE_ARTICLE_PAGES);
             if (!toDelete.isEmpty()) {
                 commonService.delete(toDelete.toArray(String[]::new));
             }
-        });
+        }
     }
 
     private Set<String> extractObjectNames(String content) {
@@ -215,7 +210,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         Set<String> objectNames = extractObjectNames(article.getContent());
 
         if (articleMapper.deleteById(id) == 1) {
-            stringRedisTemplate.delete(CACHE_ARTICLE_PAGES);
+            redisUtil.evict(CACHE_ARTICLE_PAGES);
             if (!objectNames.isEmpty()) {
                 commonService.delete(objectNames.toArray(String[]::new));
             }
