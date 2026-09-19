@@ -25,7 +25,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.xiaoyan.constant.RedisConstant.CACHE_NEWCOMERS;
-import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
 
 /**
  * @author yuchao
@@ -74,7 +73,6 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
         student.setCreateDateTime(LocalDateTime.now());
 
         userMapper.insert(student);
-        stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
         // 事务提交成功后再删除缓存，避免数据库回滚但缓存已失效
         stringRedisTemplate.opsForHash().delete(CACHE_NEWCOMERS, String.valueOf(id));
     }

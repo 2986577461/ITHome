@@ -1,6 +1,5 @@
 package com.xiaoyan.controller.user;
 
-import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.dto.ArticleDTO;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.ArticlesService;

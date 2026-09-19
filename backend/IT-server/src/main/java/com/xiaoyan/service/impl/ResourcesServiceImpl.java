@@ -1,6 +1,5 @@
 package com.xiaoyan.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import com.xiaoyan.constant.MessageConstant;
@@ -12,7 +11,6 @@ import com.xiaoyan.service.ResourcesService;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.AsyncExecutors;
 import com.xiaoyan.utils.RedisUtil;
-import com.xiaoyan.vo.StudentVO;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -29,7 +27,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES_ALL;
-import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
 
 
 /**
@@ -56,52 +53,13 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
     @Override
     public List<ResourcesVO> getList() {
-        return loadAll();
+        return redisUtil.queryStringWithMutex(CACHE_RESOURCES_ALL, ResourcesVO.class,
+                resourcesMapper::selectAllWithDetail);
     }
 
     @Override
     public List<MyResourceVO> getMyResources(String studentId) {
-        List<ResourcesVO> all = loadAll();
-        if (all == null || all.isEmpty()) {
-            return List.of();
-        }
-        return all.stream()
-                .filter(vo -> studentId != null && studentId.equals(vo.getStudentId()))
-                .map(vo -> BeanUtil.toBean(vo, MyResourceVO.class))
-                .toList();
-    }
-
-    private List<ResourcesVO> loadAll() {
-        return redisUtil.queryStringWithMutex(CACHE_RESOURCES_ALL, ResourcesVO.class,
-                this::queryResourcesByDB);
-    }
-
-    private List<ResourcesVO> queryResourcesByDB() {
-        List<Resources> list = this.lambdaQuery()
-                .orderByDesc(Resources::getReleaseDateTime)
-                .list();
-        return list.stream().map(resource -> {
-            ResourcesVO vo = BeanUtil.toBean(resource, ResourcesVO.class);
-            // selectById(null) 会抛异常，id 为空时直接跳过
-            StudentFile cover = resource.getStudentFileCoverId() == null ? null
-                    : studentFileMapper.selectById(resource.getStudentFileCoverId());
-            if (cover != null) {
-                vo.setCoverUrl(cover.getFileUrl());
-            }
-            StudentFile file = resource.getStudentFileFileId() == null ? null
-                    : studentFileMapper.selectById(resource.getStudentFileFileId());
-            if (file != null) {
-                vo.setFileUrl(file.getFileUrl());
-                vo.setFileName(file.getOriginalName());
-                vo.setObjectName(file.getObjectName());
-            }
-            StudentVO author = usersService.getUser(resource.getStudentId());
-            if (author != null) {
-                vo.setAvatar(author.getAvatar());
-                vo.setStudentName(author.getName());
-            }
-            return vo;
-        }).toList();
+        return resourcesMapper.selectMyResources(studentId);
     }
 
     @Override
@@ -131,7 +89,6 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
                 resourcesMapper.insert(resource);
                 stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
-                stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
             } catch (Exception e) {
                 log.error("异步上传资料失败, studentId={}", studentId, e);
             }
@@ -158,7 +115,6 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
         resourcesMapper.deleteById(id);
         stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
-        stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
 
     }
 

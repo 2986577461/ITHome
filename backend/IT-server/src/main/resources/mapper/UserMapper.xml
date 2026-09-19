@@ -12,13 +12,6 @@
     </delete>
 
 
-    <select id="selectByStudentIds" resultType="com.xiaoyan.pojo.Student">
-        SELECT * FROM it_student WHERE student_id IN
-        <foreach collection="studentIds" item="id" open="(" separator="," close=")">
-            #{id}
-        </foreach>
-    </select>
-
     <select id="selectPositionByIds" resultType="java.lang.String">
         SELECT position FROM it_student where student_id IN
         <foreach collection="studentIds" item="id" open="(" separator="," close=")">

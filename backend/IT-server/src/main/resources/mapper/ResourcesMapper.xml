@@ -5,12 +5,51 @@
 
 <mapper namespace="com.xiaoyan.mapper.ResourcesMapper">
 
-    <select id="selectCountByStudentId" resultType="java.lang.Integer">
-        SELECT COUNT(*) FROM resources WHERE resources.student_id=#{studentId}
+    <!-- 资料列表。三条 student_file 的 join key 都是主键、it_student.student_id 是 unique，
+         所以 LEFT JOIN 不会放大行数。
+         过滤条件刻意和原来逐条回查时保持一致：
+         - it_student 带 deleted = 0，因为原来走的是 selectByStudentId，它带这个条件；
+         - 三个 student_file 都不带 deleted = 0，因为原来走的是 selectById，
+           而 StudentFile 实体没有 @TableLogic 字段，本来就不过滤；
+         - resources 也不带，因为原来走的是 lambdaQuery，而 Resources 实体同样没有 deleted 字段。
+         改这些条件会改变返回的数据，不要顺手「补全」。 -->
+    <select id="selectAllWithDetail" resultType="com.xiaoyan.vo.ResourcesVO">
+        SELECT r.id,
+               r.head,
+               r.introduce,
+               r.student_id,
+               r.release_date_time,
+               cover.file_url  AS cover_url,
+               f.file_url      AS file_url,
+               f.original_name AS file_name,
+               f.object_name   AS object_name,
+               s.name          AS student_name,
+               avatar.file_url AS avatar
+        FROM resources r
+                 LEFT JOIN student_file cover ON cover.id = r.student_file_cover_id
+                 LEFT JOIN student_file f ON f.id = r.student_file_file_id
+                 LEFT JOIN it_student s ON s.student_id = r.student_id AND s.deleted = 0
+                 LEFT JOIN student_file avatar ON avatar.id = s.avatar_id
+        ORDER BY r.release_date_time DESC
+    </select>
+
+    <!-- 某个人的资料。排序和 selectAllWithDetail 保持一致，
+         过滤条件也和它对齐：resources 不带 deleted，因为 Resources 实体没有 deleted 字段。 -->
+    <select id="selectMyResources" resultType="com.xiaoyan.vo.MyResourceVO">
+        SELECT r.id,
+               r.head,
+               r.introduce,
+               r.release_date_time,
+               cover.file_url AS cover_url
+        FROM resources r
+                 LEFT JOIN student_file cover ON cover.id = r.student_file_cover_id
+        WHERE r.student_id = #{studentId}
+        ORDER BY r.release_date_time DESC
     </select>
 
     <!-- 注意 GROUP BY 只会返回「有资料」的学生，没有资料的学生不会出现在结果里，
-         调用方取不到时要按 0 处理 -->
+         调用方取不到时要按 0 处理。resources 表虽然有 deleted 列，但 Resources 实体没有
+         对应字段，所以查询不过滤它，这里保持一致。 -->
     <select id="countByStudentIds" resultType="com.xiaoyan.vo.StudentCountVO">
         SELECT student_id, COUNT(*) AS total
         FROM resources
@@ -20,22 +59,4 @@
         </foreach>
         GROUP BY student_id
     </select>
-
-    <select id="selectByStudentIds" resultType="com.xiaoyan.pojo.Resources">
-        SELECT id, head, introduce, student_file_cover_id, student_file_file_id,
-               release_date_time, student_id
-        FROM resources
-        WHERE student_id IN
-        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
-            #{studentId}
-        </foreach>
-    </select>
-
-    <delete id="deleteByStudentIds">
-        DELETE FROM resources
-        WHERE student_id IN
-        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
-            #{studentId}
-        </foreach>
-    </delete>
 </mapper>

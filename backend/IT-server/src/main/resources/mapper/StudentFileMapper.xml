@@ -15,21 +15,5 @@
         </foreach>
     </delete>
 
-    <select id="selectByStudentIds" resultType="com.xiaoyan.pojo.StudentFile">
-        SELECT id, student_id, original_name, object_name, file_url, file_size,
-               file_type, create_date_time
-        FROM student_file
-        WHERE student_id IN
-        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
-            #{studentId}
-        </foreach>
-    </select>
 
-    <delete id="deleteByStudentIds">
-        DELETE FROM student_file
-        WHERE student_id IN
-        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
-            #{studentId}
-        </foreach>
-    </delete>
 </mapper>

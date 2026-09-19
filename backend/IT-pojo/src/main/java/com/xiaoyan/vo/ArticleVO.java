@@ -1,16 +1,14 @@
 package com.xiaoyan.vo;
 
-import com.xiaoyan.baseinterface.ZsetScore;
 import lombok.Data;
 import lombok.ToString;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 @ToString
 @Data
-public class ArticleVO implements Serializable, ZsetScore {
+public class ArticleVO implements Serializable {
 
     private Long id;
 
@@ -27,9 +25,4 @@ public class ArticleVO implements Serializable, ZsetScore {
     private String content;
 
     private LocalDateTime updatedDateTime;
-
-    @Override
-    public double getScore() {
-        return updatedDateTime.toInstant(ZoneOffset.of("+8")).toEpochMilli();
-    }
 }

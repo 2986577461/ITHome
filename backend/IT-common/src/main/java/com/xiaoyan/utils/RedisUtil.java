@@ -2,7 +2,6 @@ package com.xiaoyan.utils;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
-import lombok.Data;
 import lombok.NonNull;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.core.io.ClassPathResource;
@@ -10,7 +9,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -51,22 +49,7 @@ public class RedisUtil implements DisposableBean {
 
     private final ScheduledExecutorService lockRenewalExecutor = new ScheduledThreadPoolExecutor(1);
 
-    @Data
-    public static class RedisData {
-        private LocalDateTime expireTime;
-        private Object data;
-    }
-
-    private static final class LockHandle {
-        private final String key;
-        private final String token;
-        private final ScheduledFuture<?> renewalTask;
-
-        private LockHandle(String key, String token, ScheduledFuture<?> renewalTask) {
-            this.key = key;
-            this.token = token;
-            this.renewalTask = renewalTask;
-        }
+    private record LockHandle(String key, String token, ScheduledFuture<?> renewalTask) {
     }
 
     public RedisUtil(StringRedisTemplate stringRedisTemplate) {
@@ -76,92 +59,6 @@ public class RedisUtil implements DisposableBean {
     public void save(@NonNull String key, @NonNull Object value) {
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value), DEFAULT_TTL, DEFAULT_TIME_UNIT);
     }
-
-    public void saveWithLogicalExpire(@NonNull String key, @NonNull Object value) {
-        RedisData redisData = new RedisData();
-        redisData.setData(value);
-        redisData.setExpireTime(LocalDateTime.now().plusSeconds(DEFAULT_TIME_UNIT.toSeconds(DEFAULT_TTL)));
-        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
-    }
-
-    private RedisData getCache(String key) {
-        String json = stringRedisTemplate.opsForValue().get(key);
-        if (StrUtil.isBlank(json)) {
-            return null;
-        }
-        return JSONUtil.toBean(json, RedisData.class);
-    }
-
-    private boolean verifyExpire(RedisData data) {
-        return data.getExpireTime().isAfter(LocalDateTime.now());
-    }
-
-    public <R, ID> R queryCountWithLogicalExpire(@NonNull String keyPrefix, @NonNull ID id,
-                                                  @NonNull Class<R> rType, @NonNull Function<ID, R> dbFallback) {
-        String key = keyPrefix + ":" + id;
-        String nullKey = logicalNullKey(key);
-        RedisData data = getCache(key);
-        if (data == null) {
-            return loadLogicalCacheOnMiss(key, nullKey, rType, () -> dbFallback.apply(id));
-        }
-
-        R value = toLogicalValue(data, rType);
-        if (verifyExpire(data)) {
-            return value;
-        }
-
-        LockHandle lock = tryLock(logicalLockKey(key));
-        if (lock == null) {
-            return value;
-        }
-
-        RedisData latest = getCache(key);
-        if (latest == null) {
-            unlock(lock);
-            return loadLogicalCacheOnMiss(key, nullKey, rType, () -> dbFallback.apply(id));
-        }
-        R latestValue = toLogicalValue(latest, rType);
-        if (verifyExpire(latest)) {
-            unlock(lock);
-            return latestValue;
-        }
-
-        submitLogicalRebuild(lock, key, nullKey, () -> dbFallback.apply(id));
-        return value;
-    }
-
-    public Long queryCountWithLogicalExpire(@NonNull String key, @NonNull Supplier<Long> dbFallback) {
-        String nullKey = logicalNullKey(key);
-        RedisData data = getCache(key);
-        if (data == null) {
-            return loadLogicalCacheOnMiss(key, nullKey, Long.class, dbFallback);
-        }
-
-        Long count = Long.valueOf(String.valueOf(data.getData()));
-        if (verifyExpire(data)) {
-            return count;
-        }
-
-        LockHandle lock = tryLock(logicalLockKey(key));
-        if (lock == null) {
-            return count;
-        }
-
-        RedisData latest = getCache(key);
-        if (latest == null) {
-            unlock(lock);
-            return loadLogicalCacheOnMiss(key, nullKey, Long.class, dbFallback);
-        }
-        Long latestCount = Long.valueOf(String.valueOf(latest.getData()));
-        if (verifyExpire(latest)) {
-            unlock(lock);
-            return latestCount;
-        }
-
-        submitLogicalRebuild(lock, key, nullKey, dbFallback);
-        return count;
-    }
-
     @SuppressWarnings("unchecked")
     public <R> R queryStringWithMutex(@NonNull String key, @NonNull Class<?> type,
                                       @NonNull Supplier<R> dbFallback) {
@@ -232,97 +129,10 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    /**
-     * 在分布式锁内执行一段逻辑，拿不到锁会自旋等待，等待超时后抛出异常。
-     *
-     * <p>用于必须串行执行的缓存写操作。注意锁不可重入，不要在 action 内部再次获取同一把锁。</p>
-     */
-    public void executeWithLock(@NonNull String lockKey, @NonNull Runnable action) {
-        LockHandle lock = acquireLockWithRetry(lockKey);
-        try {
-            action.run();
-        } finally {
-            unlock(lock);
-        }
-    }
-
-    /**
-     * 尝试获取分布式锁并执行，只尝试一次，拿不到锁直接返回 null（不等待、不抛异常）。
-     *
-     * <p>用于「拿不到锁就退化成别的路径」的场景，例如缓存重建失败时直接查库。</p>
-     */
-    public <T> T executeWithLockOrNull(@NonNull String lockKey, @NonNull Supplier<T> action) {
-        LockHandle lock = tryLock(lockKey);
-        if (lock == null) {
-            return null;
-        }
-        try {
-            return action.get();
-        } finally {
-            unlock(lock);
-        }
-    }
-
-    private <R> R loadLogicalCacheOnMiss(String key, String nullKey, Class<R> rType, Supplier<R> dbFallback) {
-        if (isNegativeCached(nullKey)) {
-            return null;
-        }
-
-        LockHandle lock = acquireLockWithRetry(logicalLockKey(key));
-        try {
-            RedisData latest = getCache(key);
-            if (latest != null) {
-                return toLogicalValue(latest, rType);
-            }
-            if (isNegativeCached(nullKey)) {
-                return null;
-            }
-
-            R value = dbFallback.get();
-            if (value == null) {
-                cacheNull(nullKey);
-                return null;
-            }
-            stringRedisTemplate.delete(nullKey);
-            saveWithLogicalExpire(key, value);
-            return value;
-        } finally {
-            unlock(lock);
-        }
-    }
-
-    private <R> void submitLogicalRebuild(LockHandle lock, String key, String nullKey, Supplier<R> dbFallback) {
-        try {
-            cacheRebuildExecutor.execute(() -> {
-                try {
-                    R value = dbFallback.get();
-                    if (value == null) {
-                        stringRedisTemplate.delete(key);
-                        cacheNull(nullKey);
-                    } else {
-                        stringRedisTemplate.delete(nullKey);
-                        saveWithLogicalExpire(key, value);
-                    }
-                } finally {
-                    unlock(lock);
-                }
-            });
-        } catch (RejectedExecutionException e) {
-            unlock(lock);
-        }
-    }
-
-    private String logicalNullKey(String key) {
-        return NEGATIVE_CACHE_PREFIX + "logical:" + key;
-    }
-
     private String hashNullKey(String key, String hashKey) {
         return NEGATIVE_CACHE_PREFIX + "hash:" + key + ":" + hashKey;
     }
 
-    private String logicalLockKey(String key) {
-        return "lock:logical:" + key;
-    }
 
     private boolean isNegativeCached(String key) {
         return stringRedisTemplate.opsForValue().get(key) != null;
@@ -332,13 +142,6 @@ public class RedisUtil implements DisposableBean {
         stringRedisTemplate.opsForValue().set(key, "", VOID_VALUE_TTL, TIME_UNIT);
     }
 
-    private <R> R toLogicalValue(RedisData data, Class<R> rType) {
-        Object value = data.getData();
-        if (value instanceof String json) {
-            return JSONUtil.toBean(json, rType);
-        }
-        return JSONUtil.toBean(JSONUtil.toJsonStr(value), rType);
-    }
 
     private LockHandle acquireLockWithRetry(String key) {
         LockHandle lock;
