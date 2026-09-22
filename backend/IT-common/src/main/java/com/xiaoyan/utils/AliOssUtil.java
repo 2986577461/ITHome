@@ -72,6 +72,25 @@ public class AliOssUtil {
         }
     }
 
+    /**
+     * 探测 OSS 是否可用。
+     *
+     * <p>给补传任务用：一轮要补传 N 个文件，先探一次就够了，比让 N 次上传各自失败一遍省得多。</p>
+     *
+     * <p>不抛异常——「探测失败」和「OSS 不可用」是同一件事，调用方不该再写 try-catch。
+     * SDK 的 {@code doesBucketExist} 本身对网络异常就是吞掉返回 false，正好是这里要的语义。</p>
+     *
+     * @return true 表示可以开始补传
+     */
+    public boolean isAvailable() {
+        try {
+            return ossClient.doesBucketExist(bucketName);
+        } catch (Exception e) {
+            log.warn("OSS 探测失败: {}", e.getMessage());
+            return false;
+        }
+    }
+
     public String upload(byte[] bytes, String objectName) {
         try {
             // 创建PutObject请求。

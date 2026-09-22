@@ -2,8 +2,8 @@ package com.xiaoyan.interceptor;
 
 
 import com.xiaoyan.context.BaseContext;
+import com.xiaoyan.utils.RedisUtil;
 import lombok.AllArgsConstructor;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 
@@ -14,21 +14,20 @@ import org.springframework.stereotype.Component;
 @AllArgsConstructor
 public class JwtWhiteList {
 
-    private StringRedisTemplate stringRedisTemplate;
-
     private static final String HASH_KEY = "jwt:active_sessions";
 
+    private RedisUtil redisUtil;
+
+    /** Redis 不可用时放行，理由见 {@link RedisUtil#isTokenValid} */
     public boolean validation(String studentId, String token) {
-        String storedtToken = (String) stringRedisTemplate.opsForHash().get(HASH_KEY, studentId);
-        return storedtToken != null && storedtToken.equals(token);
+        return redisUtil.isTokenValid(HASH_KEY, studentId, token);
     }
 
     public void updateToken(String token) {
-        String studentId = BaseContext.getCurrentStudentId();
-        stringRedisTemplate.opsForHash().put(HASH_KEY, studentId, token);
+        redisUtil.putHashField(HASH_KEY, BaseContext.getCurrentStudentId(), token);
     }
 
-    public void deleteToken(Object ... studentIds) {
-        stringRedisTemplate.opsForHash().delete(HASH_KEY, studentIds);
+    public void deleteToken(Object... studentIds) {
+        redisUtil.evictHashFields(HASH_KEY, studentIds);
     }
 }

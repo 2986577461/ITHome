@@ -2,8 +2,8 @@ package com.xiaoyan.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.crypto.digest.BCrypt;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.xiaoyan.cache.ArticleCacheManager;
 import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.context.BaseContext;
@@ -24,7 +24,6 @@ import com.xiaoyan.service.CommonService;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.JwtUtil;
 import com.xiaoyan.utils.RedisUtil;
-import com.xiaoyan.utils.TransactionUtils;
 import com.xiaoyan.vo.StudentCountVO;
 import com.xiaoyan.vo.StudentVO;
 import lombok.AllArgsConstructor;
@@ -33,7 +32,6 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.streaming.SXSSFRow;
 import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -52,11 +50,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.regex.Matcher;
 
-import static com.xiaoyan.constant.RedisConstant.CACHE_RESOURCES_ALL;
+import static com.xiaoyan.constant.RedisConstant.CACHE_ARTICLE_PAGES;
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
-import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
 
 /**
  * @author yuchao
@@ -67,11 +63,11 @@ import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS_ALL;
 public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         implements UsersService {
 
+    // 这里直接用 mapper，不注入 ArticlesService / ResourcesService：
+    // 那两个 Service 都注入了 UsersService，构造器注入成环会导致启动失败。
     private final ArticleMapper articleMapper;
     private final ResourcesMapper resourcesMapper;
-    private final ArticleCacheManager articleCacheManager;
     private JwtProperties jwtProperties;
-    private StringRedisTemplate stringRedisTemplate;
     private StudentFileMapper studentFileMapper;
     private CommonService commonService;
     private JwtWhiteList jwtWhiteList;
@@ -116,11 +112,14 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
                 vo.setAvatar(avatar.getFileUrl());
             }
         }
-        vo.setArticleCount(articleMapper.selectCountByStudentId(studentId));
-        vo.setResourceCount(resourcesMapper.selectCountByStudentId(studentId));
+        vo.setArticleCount(articleMapper.selectCount(new LambdaQueryWrapper<Article>()
+                .eq(Article::getStudentId, studentId)));
+        vo.setResourceCount(resourcesMapper.selectCount(new LambdaQueryWrapper<Resources>()
+                .eq(Resources::getStudentId, studentId)));
         return vo;
     }
 
+    @Transactional
     public void uploadAvatar(MultipartFile avatar) throws IOException {
         String studentId = BaseContext.getCurrentStudentId();
         Student student = userMapper.selectByStudentId(studentId);
@@ -128,20 +127,22 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
         }
 
-        Long avatarId = student.getAvatarId();
-        if (avatarId != null) {
-            StudentFile oldAvatar = studentFileMapper.selectById(avatarId);
+        // 老头像最后才删：先删的话，上传或下面那次 update 任何一步失败，
+        // student.avatar_id 都还指着一条已经删掉的记录，用户头像直接坏掉
+        Long oldAvatarId = student.getAvatarId();
+        Long newAvatarId = commonService.upload(avatar).getId();
+        student.setAvatarId(newAvatarId);
+        this.lambdaUpdate().set(Student::getAvatarId, newAvatarId).update();
+        redisUtil.evictHashFields(CACHE_STUDENTS, studentId);
+        // 头像会被烤进文章缓存里的 ArticleVO，不一起失效的话文章列表上还是旧头像
+        redisUtil.evict(CACHE_ARTICLE_PAGES);
+
+        if (oldAvatarId != null) {
+            StudentFile oldAvatar = studentFileMapper.selectById(oldAvatarId);
             if (oldAvatar != null) {
                 commonService.delete(oldAvatar.getObjectName());
             }
         }
-        Long newAvatarId = commonService.upload(avatar).getId();
-        student.setAvatarId(newAvatarId);
-        this.lambdaUpdate().set(Student::getAvatarId, newAvatarId).update();
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentId);
-        stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
-        // 头像会被烤进文章缓存里的 ArticleVO，不一起失效的话文章列表上还是旧头像
-        articleCacheManager.clear();
     }
 
     @Override
@@ -255,10 +256,6 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
     @Override
     public List<StudentVO> getAll() {
-        return redisUtil.queryStringWithMutex(CACHE_STUDENTS_ALL, StudentVO.class, this::queryStudentsFromDB);
-    }
-
-    public List<StudentVO> queryStudentsFromDB() {
         List<Student> list = this.list();
         // 空列表要提前返回：下面的 IN () 是非法 SQL
         if (list.isEmpty()) {
@@ -280,10 +277,10 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
                     .forEach(file -> avatarUrlMap.put(file.getId(), file.getFileUrl()));
         }
 
-        // 原来是在循环里逐个学生 count，一个成员两次查询，50 个成员就是 100 次。
-        // 改成按 student_id 分组各查一次，总共 2 次。
-        Map<String, Integer> articleCountMap = toCountMap(articleMapper.countByStudentIds(studentIds));
-        Map<String, Integer> resourceCountMap = toCountMap(resourcesMapper.countByStudentIds(studentIds));
+        // 逐个学生 count 的话，一个成员两次查询，50 个成员就是 100 次。
+        // 按 student_id 分组各查一次，两个计数总共 2 次。
+        Map<String, Long> articleCountMap = toCountMap(articleMapper.countByStudentIds(studentIds));
+        Map<String, Long> resourceCountMap = toCountMap(resourcesMapper.countByStudentIds(studentIds));
 
         return list.stream().map(student -> {
             StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
@@ -292,19 +289,20 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             }
             String studentId = student.getStudentId();
             // GROUP BY 只返回有记录的学生，没有文章/资料的查不到，这里默认 0
-            vo.setArticleCount(articleCountMap.getOrDefault(studentId, 0));
-            vo.setResourceCount(resourceCountMap.getOrDefault(studentId, 0));
+            vo.setArticleCount(articleCountMap.getOrDefault(studentId, 0L));
+            vo.setResourceCount(resourceCountMap.getOrDefault(studentId, 0L));
             return vo;
         }).toList();
     }
 
-    private static Map<String, Integer> toCountMap(List<StudentCountVO> counts) {
-        Map<String, Integer> map = new HashMap<>();
+    private static Map<String, Long> toCountMap(List<StudentCountVO> counts) {
+        Map<String, Long> map = new HashMap<>();
         for (StudentCountVO count : counts) {
             map.put(count.getStudentId(), count.getTotal());
         }
         return map;
     }
+
 
     @Override
     @Transactional
@@ -319,18 +317,18 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             throw new ParameterException(Result.FORBIDDEN, MessageConstant.PERMISSION_DENIED);
         }
 
-        removeStudentsInternal(distinctStudentIds);
+        userMapper.deletebyStudentIds(distinctStudentIds);
+        redisUtil.evictHashFields(CACHE_STUDENTS, distinctStudentIds.toArray());
     }
 
     @Override
     @Transactional
-    public void removeSelf() {
-        String currentStudentId = BaseContext.getCurrentStudentId();
-        if (currentStudentId == null) {
+    public void removeSelf(String studentId) {
+        if (studentId == null) {
             throw new ParameterException(Result.UNAUTHORIZED, MessageConstant.USER_NOT_LOGIN);
         }
 
-        StudentVO current = this.getUser(currentStudentId);
+        StudentVO current = this.getUser(studentId);
         if (current == null) {
             throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
         }
@@ -342,83 +340,9 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             throw new ParameterException(MessageConstant.LAST_ADMIN_CANNOT_LEAVE);
         }
 
-        removeStudentsInternal(List.of(currentStudentId));
-    }
-
-    /**
-     * 真正的删除动作：收集 OSS 文件 → 删库 → 事务提交后清缓存和 OSS。
-     *
-     * <p>不做权限判断，由调用方负责。注意这是类内部调用、走不到 Spring 代理，
-     * 所以 {@code @Transactional} 标在它身上不会生效，必须由带注解的入口方法调用。</p>
-     */
-    private void removeStudentsInternal(List<String> distinctStudentIds) {
-        // 必须先把要删的 OSS 文件全部收集齐再删库：
-        // 数据库记录一删，就再也查不出这些文件叫什么了，OSS 上会留下永远清不掉的垃圾。
-
-        // 1) 文章正文里内嵌的图片（从 HTML 里正则提取）
-        List<Article> articles = articleMapper.selectByStudentIds(distinctStudentIds);
-        Set<String> objectNames = new HashSet<>(extractArticleObjectNames(articles));
-
-        // 2) 该学生上传过的所有文件：头像、文章里的图片、资料的封面和附件
-        List<StudentFile> files = new ArrayList<>(
-                studentFileMapper.selectByStudentIds(distinctStudentIds));
-
-        // 资料引用的文件归属可能与资料本身不一致（历史数据），按 id 再捞一遍合并，避免漏删
-        Set<Long> resourceFileIds = new HashSet<>();
-        for (Resources resource : resourcesMapper.selectByStudentIds(distinctStudentIds)) {
-            if (resource.getStudentFileCoverId() != null) {
-                resourceFileIds.add(resource.getStudentFileCoverId());
-            }
-            if (resource.getStudentFileFileId() != null) {
-                resourceFileIds.add(resource.getStudentFileFileId());
-            }
-        }
-        if (!resourceFileIds.isEmpty()) {
-            files.addAll(studentFileMapper.selectBatchIds(resourceFileIds));
-        }
-        files.forEach(file -> objectNames.add(file.getObjectName()));
-
-        // 删库。文章、资料、文件记录之前都漏了后面两样，导致删完学生之后
-        // resources / student_file 里全是查不到主人的孤儿行。
-        articleMapper.deleteByStudentIds(distinctStudentIds);
-        resourcesMapper.deleteByStudentIds(distinctStudentIds);
-        studentFileMapper.deleteByStudentIds(distinctStudentIds);
-        userMapper.deletebyStudentIds(distinctStudentIds);
-
-        List<String> objectNameList = new ArrayList<>(objectNames);
-
-        TransactionUtils.afterCommit(() -> {
-            jwtWhiteList.deleteToken(distinctStudentIds.toArray());
-            stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, distinctStudentIds.toArray());
-            stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
-            // 资料列表缓存也要失效，否则页面上他发的资料还会在
-            stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
-            articleCacheManager.clear();
-
-            if (!objectNameList.isEmpty()) {
-                try {
-                    commonService.delete(objectNameList.toArray(String[]::new));
-                } catch (RuntimeException e) {
-                    log.error("删除学生文件失败，studentIds={}, objectNames={}",
-                            distinctStudentIds, objectNameList, e);
-                }
-            }
-        });
-    }
-
-    private Set<String> extractArticleObjectNames(List<Article> articles) {
-        Set<String> objectNames = new HashSet<>();
-        for (Article article : articles) {
-            if (article == null || article.getContent() == null || article.getContent().isEmpty()) {
-                continue;
-            }
-            Matcher matcher = ArticlesServiceImpl.IMAGE_PATTERN.matcher(article.getContent());
-            while (matcher.find()) {
-                String objectName = matcher.group(1);
-                objectNames.add(objectName.substring(objectName.lastIndexOf('/') + 1));
-            }
-        }
-        return objectNames;
+        List<String> studentId1 = List.of(studentId);
+        userMapper.deletebyStudentIds(studentId1);
+        redisUtil.evictHashFields(CACHE_STUDENTS, studentId1.toArray());
     }
 
     @Override
@@ -460,12 +384,11 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         }
 
         userMapper.updateById(student);
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, target.getStudentId());
-        stringRedisTemplate.delete(CACHE_STUDENTS_ALL);
+        redisUtil.evictHashFields(CACHE_STUDENTS, target.getStudentId());
         // 文章缓存里的 ArticleVO 带着作者姓名和头像（见 ArticleMapper.xml 的 selectPage），
         // 改了名字不失效的话，列表页会一直显示旧名字直到缓存两小时后过期。
         // 这里不做「有没有真的改」的判断：判空反而更绕，而改资料本来就是低频操作。
-        articleCacheManager.clear();
+        redisUtil.evict(CACHE_ARTICLE_PAGES);
     }
 
 }

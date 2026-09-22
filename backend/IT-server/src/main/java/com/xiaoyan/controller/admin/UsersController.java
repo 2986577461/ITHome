@@ -1,7 +1,9 @@
 package com.xiaoyan.controller.admin;
 
+import com.xiaoyan.pojo.Student;
 import com.xiaoyan.result.Result;
 import com.xiaoyan.service.UsersService;
+import com.xiaoyan.vo.StudentVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
@@ -11,7 +13,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.xiaoyan.vo.StudentVO;
 
 import java.io.IOException;
 import java.util.List;

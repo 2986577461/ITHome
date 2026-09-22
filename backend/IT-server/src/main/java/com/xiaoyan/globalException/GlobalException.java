@@ -7,6 +7,7 @@ import com.xiaoyan.result.Result;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSourceResolvable;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
@@ -154,5 +155,18 @@ public class GlobalException {
                 ? MessageConstant.PARAMETER_VALIDATE_FAILED : message;
         log.warn("参数校验失败 {} {} -> {}", request.getMethod(), request.getRequestURI(), reason);
         return Result.error(Result.BAD_REQUEST, reason);
+    }
+
+    /**
+     * 数据访问异常：SQL 语法错误、死锁、连接池耗尽等 MyBatis / MySQL 的问题。
+     *
+     * <p>注意这里接不到 Redis 的异常——{@code RedisUtil} 已经在内部按用途分别消化掉了
+     * （缓存读降级查库、缓存失效记日志、登录态放行），不会有 Redis 异常冒到 Controller。
+     * 所以日志文案不能写成「Redis 连接失败」，否则 MySQL 出问题时会被误导着去查 Redis。</p>
+     */
+    @ExceptionHandler(DataAccessException.class)
+    public Result<Void> handleDataAccess(DataAccessException e, HttpServletRequest request) {
+        log.error("数据访问异常 {} {}", request.getMethod(), request.getRequestURI(), e);
+        return Result.error(Result.SERVER_ERROR, MessageConstant.SERVER_ERROR);
     }
 }

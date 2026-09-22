@@ -2,6 +2,7 @@
 /backend/*/target/
 /*/.claude/
 /frontend/node_modules/
+/backend/local-files/
 /*/CLAUDE.md
 /*/Dockerfile
 /backend/IT-server/src/main/resources/application-dev.yml
@@ -19,3 +20,7 @@ ai-backend/__pycache__/
 /ai-backend/**/__pycache__/
 /picture
 /.claude
+/Claude.md
+/ITHome-项目时序图.md
+/backend/未优化项.txt
+/perf

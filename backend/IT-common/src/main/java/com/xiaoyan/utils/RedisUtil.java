@@ -2,15 +2,17 @@ package com.xiaoyan.utils;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
-import lombok.Data;
 import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -24,7 +26,25 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+/**
+ * 全项目唯一直接持有 StringRedisTemplate 的类。
+ *
+ * <p>每个方法自己处理 Redis 异常，调用方不用再写 try-catch。失败时的行为按用途分三类：</p>
+ * <ul>
+ *   <li><b>缓存读</b>（{@link #queryStringWithMutex} / {@link #queryHashWithMutex}）——
+ *       降级查库。缓存只是「可选加速」，Redis 挂了系统应该只是变慢，不是不可用</li>
+ *   <li><b>缓存写与失效</b>（{@link #putHashField} / {@link #evict} / {@link #evictHashFields}）——
+ *       记日志后吞掉。最坏结果是脏数据多留到 TTL 过期</li>
+ *   <li><b>登录态</b>（{@link #isTokenValid}）—— 放行。见该方法的注释</li>
+ * </ul>
+ *
+ * <p>捕获的是 {@link DataAccessException}：Redis 连接失败、命令超时都是它的子类，
+ * 而「抢锁重试耗尽」抛的 IllegalStateException 不属于它——那是主动的限流背压，应该继续往上抛。</p>
+ *
+ * @author yuchao
+ */
 @Component
+@Slf4j
 public class RedisUtil implements DisposableBean {
 
     private static final long WAITING_MILL = 50;
@@ -51,120 +71,40 @@ public class RedisUtil implements DisposableBean {
 
     private final ScheduledExecutorService lockRenewalExecutor = new ScheduledThreadPoolExecutor(1);
 
-    @Data
-    public static class RedisData {
-        private LocalDateTime expireTime;
-        private Object data;
-    }
-
-    private static final class LockHandle {
-        private final String key;
-        private final String token;
-        private final ScheduledFuture<?> renewalTask;
-
-        private LockHandle(String key, String token, ScheduledFuture<?> renewalTask) {
-            this.key = key;
-            this.token = token;
-            this.renewalTask = renewalTask;
-        }
+    private record LockHandle(String key, String token, ScheduledFuture<?> renewalTask) {
     }
 
     public RedisUtil(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
     }
 
+    /* ============================================================
+     * 缓存读：Redis 不可用时降级查库
+     * ============================================================ */
+
+    /** 写缓存。失败只记日志：没写进去最坏是下次再查一次库，不该让业务失败 */
     public void save(@NonNull String key, @NonNull Object value) {
-        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value), DEFAULT_TTL, DEFAULT_TIME_UNIT);
-    }
-
-    public void saveWithLogicalExpire(@NonNull String key, @NonNull Object value) {
-        RedisData redisData = new RedisData();
-        redisData.setData(value);
-        redisData.setExpireTime(LocalDateTime.now().plusSeconds(DEFAULT_TIME_UNIT.toSeconds(DEFAULT_TTL)));
-        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
-    }
-
-    private RedisData getCache(String key) {
-        String json = stringRedisTemplate.opsForValue().get(key);
-        if (StrUtil.isBlank(json)) {
-            return null;
+        try {
+            stringRedisTemplate.opsForValue()
+                    .set(key, JSONUtil.toJsonStr(value), DEFAULT_TTL, DEFAULT_TIME_UNIT);
+        } catch (DataAccessException e) {
+            logDegraded("跳过写缓存", "key=" + key, e);
         }
-        return JSONUtil.toBean(json, RedisData.class);
-    }
-
-    private boolean verifyExpire(RedisData data) {
-        return data.getExpireTime().isAfter(LocalDateTime.now());
-    }
-
-    public <R, ID> R queryCountWithLogicalExpire(@NonNull String keyPrefix, @NonNull ID id,
-                                                  @NonNull Class<R> rType, @NonNull Function<ID, R> dbFallback) {
-        String key = keyPrefix + ":" + id;
-        String nullKey = logicalNullKey(key);
-        RedisData data = getCache(key);
-        if (data == null) {
-            return loadLogicalCacheOnMiss(key, nullKey, rType, () -> dbFallback.apply(id));
-        }
-
-        R value = toLogicalValue(data, rType);
-        if (verifyExpire(data)) {
-            return value;
-        }
-
-        LockHandle lock = tryLock(logicalLockKey(key));
-        if (lock == null) {
-            return value;
-        }
-
-        RedisData latest = getCache(key);
-        if (latest == null) {
-            unlock(lock);
-            return loadLogicalCacheOnMiss(key, nullKey, rType, () -> dbFallback.apply(id));
-        }
-        R latestValue = toLogicalValue(latest, rType);
-        if (verifyExpire(latest)) {
-            unlock(lock);
-            return latestValue;
-        }
-
-        submitLogicalRebuild(lock, key, nullKey, () -> dbFallback.apply(id));
-        return value;
-    }
-
-    public Long queryCountWithLogicalExpire(@NonNull String key, @NonNull Supplier<Long> dbFallback) {
-        String nullKey = logicalNullKey(key);
-        RedisData data = getCache(key);
-        if (data == null) {
-            return loadLogicalCacheOnMiss(key, nullKey, Long.class, dbFallback);
-        }
-
-        Long count = Long.valueOf(String.valueOf(data.getData()));
-        if (verifyExpire(data)) {
-            return count;
-        }
-
-        LockHandle lock = tryLock(logicalLockKey(key));
-        if (lock == null) {
-            return count;
-        }
-
-        RedisData latest = getCache(key);
-        if (latest == null) {
-            unlock(lock);
-            return loadLogicalCacheOnMiss(key, nullKey, Long.class, dbFallback);
-        }
-        Long latestCount = Long.valueOf(String.valueOf(latest.getData()));
-        if (verifyExpire(latest)) {
-            unlock(lock);
-            return latestCount;
-        }
-
-        submitLogicalRebuild(lock, key, nullKey, dbFallback);
-        return count;
     }
 
     @SuppressWarnings("unchecked")
     public <R> R queryStringWithMutex(@NonNull String key, @NonNull Class<?> type,
                                       @NonNull Supplier<R> dbFallback) {
+        try {
+            return doQueryStringWithMutex(key, type, dbFallback);
+        } catch (DataAccessException e) {
+            logDegraded("降级查库", "key=" + key, e);
+            return dbFallback.get();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <R> R doQueryStringWithMutex(String key, Class<?> type, Supplier<R> dbFallback) {
         String json = stringRedisTemplate.opsForValue().get(key);
         if (StrUtil.isNotBlank(json)) {
             return (R) parse(json, type);
@@ -201,6 +141,16 @@ public class RedisUtil implements DisposableBean {
 
     public <R> R queryHashWithMutex(@NonNull String key, @NonNull String hashKey,
                                     @NonNull Class<R> rType, @NonNull Function<String, R> dbFallback) {
+        try {
+            return doQueryHashWithMutex(key, hashKey, rType, dbFallback);
+        } catch (DataAccessException e) {
+            logDegraded("降级查库", "key=" + key + " field=" + hashKey, e);
+            return dbFallback.apply(hashKey);
+        }
+    }
+
+    private <R> R doQueryHashWithMutex(String key, String hashKey,
+                                       Class<R> rType, Function<String, R> dbFallback) {
         Object cached = stringRedisTemplate.opsForHash().get(key, hashKey);
         if (StrUtil.isNotBlank((String) cached)) {
             return JSONUtil.toBean((String) cached, rType);
@@ -224,104 +174,102 @@ public class RedisUtil implements DisposableBean {
                 cacheNull(hashNullKey(key, hashKey));
                 return null;
             }
-            stringRedisTemplate.delete(hashNullKey(key, hashKey));
-            stringRedisTemplate.opsForHash().put(key, hashKey, JSONUtil.toJsonStr(value));
+            evict(hashNullKey(key, hashKey));
+            putHashField(key, hashKey, JSONUtil.toJsonStr(value));
             return value;
         } finally {
             unlock(lock);
         }
     }
 
-    /**
-     * 在分布式锁内执行一段逻辑，拿不到锁会自旋等待，等待超时后抛出异常。
-     *
-     * <p>用于必须串行执行的缓存写操作。注意锁不可重入，不要在 action 内部再次获取同一把锁。</p>
-     */
-    public void executeWithLock(@NonNull String lockKey, @NonNull Runnable action) {
-        LockHandle lock = acquireLockWithRetry(lockKey);
-        try {
-            action.run();
-        } finally {
-            unlock(lock);
-        }
-    }
+    /* ============================================================
+     * 缓存读写与失效：失败只记日志，等 TTL 自然过期
+     * ============================================================ */
 
-    /**
-     * 尝试获取分布式锁并执行，只尝试一次，拿不到锁直接返回 null（不等待、不抛异常）。
-     *
-     * <p>用于「拿不到锁就退化成别的路径」的场景，例如缓存重建失败时直接查库。</p>
-     */
-    public <T> T executeWithLockOrNull(@NonNull String lockKey, @NonNull Supplier<T> action) {
-        LockHandle lock = tryLock(lockKey);
-        if (lock == null) {
+    /** 读 Hash field。Redis 不可用和字段不存在都返回 null，调用方一律按「未命中」处理 */
+    public String getHashField(@NonNull String key, @NonNull String field) {
+        try {
+            return (String) stringRedisTemplate.opsForHash().get(key, field);
+        } catch (DataAccessException e) {
+            logDegraded("按未命中处理", "key=" + key + " field=" + field, e);
             return null;
         }
+    }
+
+    /** 写 Hash field，不设过期。用于整组失效的缓存（如按 id 存的学员信息） */
+    public void putHashField(@NonNull String key, @NonNull String field, @NonNull String value) {
         try {
-            return action.get();
-        } finally {
-            unlock(lock);
+            stringRedisTemplate.opsForHash().put(key, field, value);
+        } catch (DataAccessException e) {
+            logDegraded("跳过写缓存", "key=" + key + " field=" + field, e);
         }
     }
 
-    private <R> R loadLogicalCacheOnMiss(String key, String nullKey, Class<R> rType, Supplier<R> dbFallback) {
-        if (isNegativeCached(nullKey)) {
-            return null;
-        }
-
-        LockHandle lock = acquireLockWithRetry(logicalLockKey(key));
+    /** 写 Hash field 并刷新整个 key 的 TTL。用于分页缓存这类整组共享一个过期时间的场景 */
+    public void putHashField(@NonNull String key, @NonNull String field, @NonNull String value,
+                             long ttl, @NonNull TimeUnit unit) {
         try {
-            RedisData latest = getCache(key);
-            if (latest != null) {
-                return toLogicalValue(latest, rType);
-            }
-            if (isNegativeCached(nullKey)) {
-                return null;
-            }
-
-            R value = dbFallback.get();
-            if (value == null) {
-                cacheNull(nullKey);
-                return null;
-            }
-            stringRedisTemplate.delete(nullKey);
-            saveWithLogicalExpire(key, value);
-            return value;
-        } finally {
-            unlock(lock);
+            stringRedisTemplate.opsForHash().put(key, field, value);
+            stringRedisTemplate.expire(key, ttl, unit);
+        } catch (DataAccessException e) {
+            logDegraded("跳过写缓存", "key=" + key + " field=" + field, e);
         }
     }
 
-    private <R> void submitLogicalRebuild(LockHandle lock, String key, String nullKey, Supplier<R> dbFallback) {
+    /** 删除缓存 key。失败只记日志：最坏是脏数据多留到 TTL 过期，远好于让接口报错 */
+    public void evict(String... keys) {
+        if (keys == null || keys.length == 0) {
+            return;
+        }
         try {
-            cacheRebuildExecutor.execute(() -> {
-                try {
-                    R value = dbFallback.get();
-                    if (value == null) {
-                        stringRedisTemplate.delete(key);
-                        cacheNull(nullKey);
-                    } else {
-                        stringRedisTemplate.delete(nullKey);
-                        saveWithLogicalExpire(key, value);
-                    }
-                } finally {
-                    unlock(lock);
-                }
-            });
-        } catch (RejectedExecutionException e) {
-            unlock(lock);
+            stringRedisTemplate.delete(Arrays.asList(keys));
+        } catch (DataAccessException e) {
+            logDegraded("缓存失效失败，等 TTL 过期", "keys=" + Arrays.toString(keys), e);
         }
     }
 
-    private String logicalNullKey(String key) {
-        return NEGATIVE_CACHE_PREFIX + "logical:" + key;
+    /** 删除 Hash 里的若干 field */
+    public void evictHashFields(@NonNull String key, Object... fields) {
+        if (fields == null || fields.length == 0) {
+            return;
+        }
+        try {
+            stringRedisTemplate.opsForHash().delete(key, fields);
+        } catch (DataAccessException e) {
+            logDegraded("缓存字段失效失败", "key=" + key + " fields=" + Arrays.toString(fields), e);
+        }
     }
+
+    /* ============================================================
+     * 登录态白名单：不可降级
+     *
+     * 这里没有「降级查库」这个选项——白名单的意义就是「注销即失效」，
+     * 数据库里根本没有这个状态。只能二选一：
+     *   fail-open  —— 放行。服务可用，代价是已注销的 token 在 Redis 恢复前仍然有效
+     *   fail-close —— 拒绝。安全，代价是所有人被判为未登录，等于全站不可用
+     *
+     * 取 fail-open：JWT 签名本身已能证明身份，白名单只是「让旧 token 提前失效」的增强，
+     * 拿「注销延迟生效」换「全站可用」是划算的。
+     * ============================================================ */
+
+    /** 校验 token 是否为该学员当前有效的登录态。Redis 不可用时返回 true（放行） */
+    public boolean isTokenValid(@NonNull String key, @NonNull String studentId, @NonNull String token) {
+        String stored;
+        try {
+            stored = (String) stringRedisTemplate.opsForHash().get(key, studentId);
+        } catch (DataAccessException e) {
+            logDegraded("登录态校验失败，放行", "key=" + key + " studentId=" + studentId, e);
+            return true;
+        }
+        return stored != null && stored.equals(token);
+    }
+
+    /* ============================================================
+     * 分布式锁：内部使用
+     * ============================================================ */
 
     private String hashNullKey(String key, String hashKey) {
         return NEGATIVE_CACHE_PREFIX + "hash:" + key + ":" + hashKey;
-    }
-
-    private String logicalLockKey(String key) {
-        return "lock:logical:" + key;
     }
 
     private boolean isNegativeCached(String key) {
@@ -329,15 +277,11 @@ public class RedisUtil implements DisposableBean {
     }
 
     private void cacheNull(String key) {
-        stringRedisTemplate.opsForValue().set(key, "", VOID_VALUE_TTL, TIME_UNIT);
-    }
-
-    private <R> R toLogicalValue(RedisData data, Class<R> rType) {
-        Object value = data.getData();
-        if (value instanceof String json) {
-            return JSONUtil.toBean(json, rType);
+        try {
+            stringRedisTemplate.opsForValue().set(key, "", VOID_VALUE_TTL, TIME_UNIT);
+        } catch (DataAccessException e) {
+            logDegraded("跳过写空值缓存", "key=" + key, e);
         }
-        return JSONUtil.toBean(JSONUtil.toJsonStr(value), rType);
     }
 
     private LockHandle acquireLockWithRetry(String key) {
@@ -394,7 +338,27 @@ public class RedisUtil implements DisposableBean {
     }
 
     private void releaseLock(String key, String token) {
-        stringRedisTemplate.execute(UNLOCK_SCRIPT, Collections.singletonList(key), token);
+        try {
+            stringRedisTemplate.execute(UNLOCK_SCRIPT, Collections.singletonList(key), token);
+        } catch (DataAccessException e) {
+            // 必须吞掉：这行在 finally 里执行，抛出去会顶掉降级路径的返回值，让整个降级失效。
+            // 锁本身带 TTL，没人删也会自己过期。
+            logDegraded("释放锁失败，等 TTL 过期", "key=" + key, e);
+        }
+    }
+
+    /**
+     * 降级日志。
+     *
+     * <p>故意不打堆栈。Redis 不可用是「已经处理掉的预期内故障」，不是意外：
+     * 堆栈从 {@code RedisUtil} 往下全是 Lettuce / Spring 的库内调用，对定位没有帮助，
+     * 而每个请求都会走到这里，打堆栈等于按请求刷屏。
+     * 取根因的类名加 message 就够定位了——连接被拒、超时、还是命令报错，一眼能分。</p>
+     */
+    private void logDegraded(String action, String detail, DataAccessException e) {
+        Throwable root = NestedExceptionUtils.getMostSpecificCause(e);
+        log.warn("Redis 不可用，{} {} 根因={}: {}", action, detail,
+                root.getClass().getSimpleName(), root.getMessage());
     }
 
     private static DefaultRedisScript<Long> loadScript(String path) {

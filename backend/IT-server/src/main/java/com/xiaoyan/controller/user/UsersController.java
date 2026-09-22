@@ -60,9 +60,10 @@ public class UsersController {
     }
 
     @DeleteMapping
-    @Operation(summary = "注销当前账号（连同发布的文章和上传的资料一起删除）")
+    @Operation(summary = "注销当前账号")
     public Result<String> removeSelf() {
-        userService.removeSelf();
+        String studentId = BaseContext.getCurrentStudentId();
+        userService.removeSelf(studentId);
         return Result.success();
     }
 }

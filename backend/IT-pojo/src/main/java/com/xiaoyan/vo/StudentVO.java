@@ -27,9 +27,9 @@ public class StudentVO implements Serializable, HashCacheId {
 
     private String className;
 
-    private Integer articleCount;
+    private Long articleCount;
 
-    private Integer resourceCount;
+    private Long resourceCount;
 
     private String avatar;
 

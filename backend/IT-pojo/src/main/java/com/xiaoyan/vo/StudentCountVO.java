@@ -17,5 +17,5 @@ public class StudentCountVO implements Serializable {
     private String studentId;
 
     /** 记录条数。注意别用 count 当字段名，容易和 SQL 函数撞上 */
-    private Integer total;
+    private Long total;
 }

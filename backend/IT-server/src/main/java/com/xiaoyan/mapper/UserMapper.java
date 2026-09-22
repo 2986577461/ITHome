@@ -18,9 +18,6 @@ public interface UserMapper extends BaseMapper<Student> {
     /** 统计某个职位的学生数，用于判断「最后一个管理员」 */
     @Select("select count(*) from it_student where position=#{position} and deleted=0")
     int countByPosition(@Param("position") String position);
-
-    List<Student> selectByStudentIds(@Param("studentIds") Set<String> studentIds);
-
     void deletebyStudentIds(List<String> studentIds);
 
     Set<String> selectPositionByIds(List<String> studentIds);

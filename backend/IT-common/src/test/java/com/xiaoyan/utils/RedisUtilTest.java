@@ -61,29 +61,6 @@ class RedisUtilTest {
                     RedisUtil.DEFAULT_TTL, RedisUtil.DEFAULT_TIME_UNIT);
         }
     }
-
-    /* ====================================================
-     * saveWithLogicalExpire() — 逻辑过期
-     * ==================================================== */
-    @Nested
-    class SaveWithLogicalExpire {
-        @Test
-        void should_wrap_in_redis_data() {
-            redisUtil.saveWithLogicalExpire("k", new CacheValue(1));
-
-            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-            verify(valueOps).set(eq("k"), captor.capture());
-
-            RedisUtil.RedisData saved = JSONUtil.toBean(captor.getValue(), RedisUtil.RedisData.class);
-            assertNotNull(saved.getData());
-            assertNotNull(saved.getExpireTime());
-            assertTrue(saved.getExpireTime().isAfter(LocalDateTime.now()));
-        }
-    }
-
-    /* ====================================================
-     * queryStringWithMutex() — 互斥锁 + 双重校验
-     * ==================================================== */
     @Nested
     class QueryStringWithMutex {
         @Test

@@ -4,17 +4,15 @@ import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.xiaoyan.baseinterface.HashCacheId;
-import com.xiaoyan.baseinterface.ZsetScore;
 import lombok.Data;
 import lombok.ToString;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 @Data
 @ToString
-public class Article implements Serializable, HashCacheId , ZsetScore {
+public class Article implements Serializable, HashCacheId {
 
     @TableId("id")
     private Long id;
@@ -39,10 +37,5 @@ public class Article implements Serializable, HashCacheId , ZsetScore {
     @Override
     public String getCacheId() {
         return String.valueOf(this.id);
-    }
-
-    @Override
-    public double getScore() {
-        return updatedDateTime.toInstant(ZoneOffset.of("+8")).toEpochMilli();
     }
 }

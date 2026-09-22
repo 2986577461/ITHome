@@ -65,8 +65,7 @@ public class ResourcesController {
     @PostMapping
     @Operation(summary = "上传资料")
     public Result<String> saveResource(@ModelAttribute @Valid ResourcesDTO resourcesDTO) throws IOException {
-        String studentId = BaseContext.getCurrentStudentId();
-        resourcesService.saveResource(resourcesDTO, studentId);
+        resourcesService.saveResource(resourcesDTO);
         return Result.success();
     }
 
