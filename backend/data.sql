@@ -89,3 +89,21 @@ create table student_file
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
 ;
+-- 删除 OSS 对象失败时留下的欠账。student_file 那行在同一事务里已经删了，
+-- 之后没有任何地方能证明「OSS 上还剩一个该删没删的对象」，所以单记一张表，
+-- 由 OssSyncTask 定时重试。object_name 直接做主键：同一个对象重复记账是允许的，
+-- 重试也是幂等的
+create table pending_oss_delete
+(
+    object_name      varchar(200) primary key,
+    create_date_time datetime not null
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
+
+
+create table pending_oss_delete
+(
+    object_name      varchar(200) primary key,
+    create_date_time datetime not null
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;

@@ -35,7 +35,7 @@ public class ArticlesController {
 
     @GetMapping("page")
     @Operation(summary = "分页查询文章")
-    public Result<List<ArticleVO>> getPage(@NonNull @Min(1) Integer page, Integer type, @NonNull Integer size) {
+    public Result<List<ArticleVO>> getPage(@NonNull @Min(1) Integer page,@NonNull Integer type, @NonNull Integer size) {
         return Result.success(articlesService.getPage(page, type, size));
     }
 

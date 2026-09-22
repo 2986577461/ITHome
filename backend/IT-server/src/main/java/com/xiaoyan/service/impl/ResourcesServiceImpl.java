@@ -3,6 +3,7 @@ package com.xiaoyan.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import com.xiaoyan.constant.MessageConstant;
+import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
@@ -21,7 +22,6 @@ import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.vo.MyResourceVO;
 import com.xiaoyan.vo.ResourcesVO;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -61,9 +61,10 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public void saveResource(ResourcesDTO resourcesDTO, String studentId) throws IOException {
-        CopiedFile coverFile = copyFile(resourcesDTO.getCover());
-        CopiedFile resourceFile = copyFile(resourcesDTO.getFile());
+    public void saveResource(ResourcesDTO resourcesDTO) {
+        String studentId = BaseContext.getCurrentStudentId();
+        MultipartFile coverFile = resourcesDTO.getCover();
+        MultipartFile resourceFile = resourcesDTO.getFile();
         String head = resourcesDTO.getHead();
         String introduce = resourcesDTO.getIntroduce();
         LocalDateTime releaseDateTime = LocalDateTime.now();
@@ -72,10 +73,8 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         // 池内队列满时 CallerRunsPolicy 会让任务退回调用线程执行，宁可拖慢这次请求也不丢任务。
         AsyncExecutors.uploadExecutor().execute(() -> {
             try {
-                StudentFile cover = commonService.upload(coverFile.bytes(), coverFile.originalName(),
-                        coverFile.contentType(), coverFile.size(), studentId);
-                StudentFile file = commonService.upload(resourceFile.bytes(), resourceFile.originalName(),
-                        resourceFile.contentType(), resourceFile.size(), studentId);
+                StudentFile cover = commonService.upload(coverFile);
+                StudentFile file = commonService.upload(resourceFile);
 
                 Resources resource = Resources.builder().
                         head(head).
@@ -102,28 +101,19 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
         usersService.checkOwnerOrAdmin(resource.getStudentId());
 
+        // objectName 先取出来，记录删掉之后再删文件。反过来一旦 resourcesMapper 这步失败，
+        // 资料还在列表里、文件却已经没了
         StudentFile file = studentFileMapper.selectById(resource.getStudentFileFileId());
-        if (file != null) {
-            commonService.delete(file.getObjectName());
-        }
         StudentFile cover = studentFileMapper.selectById(resource.getStudentFileCoverId());
-        if (cover != null) {
-            commonService.delete(cover.getObjectName());
-        }
 
         resourcesMapper.deleteById(id);
         redisUtil.evict(CACHE_RESOURCES_ALL);
 
-    }
-
-    private CopiedFile copyFile(MultipartFile file) throws IOException {
-        if (file == null || file.getOriginalFilename() == null) {
-            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
+        if (file != null) {
+            commonService.delete(file.getObjectName());
         }
-        return new CopiedFile(file.getBytes(), file.getOriginalFilename(), file.getContentType(), file.getSize());
+        if (cover != null) {
+            commonService.delete(cover.getObjectName());
+        }
     }
-
-    private record CopiedFile(byte[] bytes, String originalName, String contentType, long size) {
-    }
-
 }

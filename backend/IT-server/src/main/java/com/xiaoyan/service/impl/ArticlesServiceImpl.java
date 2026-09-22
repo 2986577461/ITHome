@@ -61,7 +61,18 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     private RedisUtil redisUtil;
     private CommonService commonService;
 
-    public static final Pattern IMAGE_PATTERN = Pattern.compile("https?://[^/]+\\.aliyuncs\\.com/([^\"'\\s]+)");
+    /**
+     * 从正文 HTML 里抠出图片的 objectName。
+     *
+     * <p>两种形态都要认：正常是 OSS 的裸 URL，OSS 不可用时降级成了后端的
+     * {@code /user/common/local/{objectName}}。只认前者的话，降级期间插进正文的图
+     * 在删文章 / 删图时不会被回收，student_file 记录和本地文件都会漏掉。</p>
+     *
+     * <p>结尾排除 {@code ?} 是为了别把 {@code ?download=1} 带进 objectName——
+     * 正文里存的是不带参数的 file_url，但正文是富文本，防一手。</p>
+     */
+    public static final Pattern IMAGE_PATTERN = Pattern.compile(
+            "(?:https?://[^/]+\\.aliyuncs\\.com/|/user/common/local/)([^\"'\\s?]+)");
 
     @Override
     public Long getCount(Integer type) {
@@ -156,7 +167,8 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         }
         usersService.checkOwnerOrAdmin(oldArticle.getStudentId());
 
-        // 先计算需要删除的文件，等数据库事务提交后再删除
+        // 先算出差集，交给 commonService.delete——它把删文件那步挂在本事务的
+        // afterCommit 上，所以这里同步调用不会在回滚时把图先删掉
         Set<String> oldObjectNames = extractObjectNames(oldArticle.getContent());
         Set<String> newObjectNames = extractObjectNames(articleDTO.getContent());
         List<String> toDelete = oldObjectNames.stream()
@@ -205,8 +217,8 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         }
         usersService.checkOwnerOrAdmin(article.getStudentId());
 
-        // 文章内容里的图片 objectName 先算出来，事务提交后再删 OSS 文件，
-        // 否则事务回滚时图片已经删掉，数据库里却还留着对它的引用
+        // 文章内容里的图片 objectName 先算出来。真正的删除由 commonService.delete 挂到
+        // 本事务的 afterCommit 上执行，否则事务回滚时图片已经删掉，正文里却还引用着它们
         Set<String> objectNames = extractObjectNames(article.getContent());
 
         if (articleMapper.deleteById(id) == 1) {
@@ -217,6 +229,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         }
     }
 
+    @Transactional
     public List<ArticleImageVO> batchUploadFiles(List<MultipartFile> files) {
         if (files == null || files.isEmpty()) {
             return Collections.emptyList();
