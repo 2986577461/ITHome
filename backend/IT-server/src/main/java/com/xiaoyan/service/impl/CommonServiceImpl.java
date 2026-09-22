@@ -4,6 +4,7 @@ import com.xiaoyan.constant.MessageConstant;
 import com.xiaoyan.constant.StorageConstant;
 import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.exception.ParameterException;
+import com.xiaoyan.mapper.PendingOssDeleteMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.CommonService;
@@ -13,13 +14,14 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -59,6 +61,8 @@ public class CommonServiceImpl implements CommonService {
 
     private StudentFileMapper studentFileMapper;
 
+    private PendingOssDeleteMapper pendingOssDeleteMapper;
+
     private LocalFileStorage localFileStorage;
 
     @Override
@@ -76,9 +80,8 @@ public class CommonServiceImpl implements CommonService {
         if (originalName == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
-
         String objectName = buildObjectName(originalName);
-        String fileUrl = null;
+        String fileUrl;
         String storageType = StorageConstant.OSS;
         try {
             fileUrl = aliOssUtil.upload(bytes, objectName);
@@ -111,25 +114,66 @@ public class CommonServiceImpl implements CommonService {
         if (objectNames == null || objectNames.length == 0) {
             return;
         }
-        List<String> list = Arrays.asList(objectNames);
-
-        List<String> localNames = studentFileMapper.selectByObjectNames(list).stream()
-                .filter(file -> StorageConstant.LOCAL.equals(file.getStorageType()))
-                .map(StudentFile::getObjectName)
-                .toList();
-
-        // 顺序要紧：下面那步 OSS 批量删除失败会抛异常，反过来的话已经降级的那些
-        // 本地文件就永远留在盘上没人清了
-        localNames.forEach(localFileStorage::delete);
-
-        List<String> ossNames = list.stream()
-                .filter(name -> !localNames.contains(name))
-                .toList();
-        if (!ossNames.isEmpty()) {
-            aliOssUtil.deleteObjects(ossNames);
-        }
+        List<String> list = List.of(objectNames);
 
         studentFileMapper.deleteByObjectNames(list);
+        // 记账要在事务里做，不能等到删 OSS 失败了再补记——那时候已经在 afterCommit 阶段，
+        // 事务提交过了，连接也快回收了，在那里面写的 SQL 保不住。
+        // 顺着业务事务一起提交，也意味着事务回滚时账跟着回滚，不会平白欠一笔
+        pendingOssDeleteMapper.insertIgnore(list, LocalDateTime.now());
+
+        // 删文件这一步挂到事务提交之后。删盘和删 OSS 都不可逆，而调用方常常是
+        // @Transactional 的（ArticlesServiceImpl 的 update/delete），事务回滚时
+        // DB 记录和正文里对文件的引用都会回来，文件却回不来——正文里烧死的那些
+        // /user/common/local/xxx 就永久 404 了，正好是这套降级想避免的后果。
+        // 没有事务时同步执行，和以前一样。
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    purgeFiles(list);
+                }
+            });
+        } else {
+            purgeFiles(list);
+        }
+    }
+
+    /**
+     * 真正去删文件。只在事务提交后调用，且自己吞掉所有异常——走到这里事务已经落了，
+     * 再抛出去只会让调用方看到一个假的「删除失败」，而记录其实早删了。
+     */
+    private void purgeFiles(List<String> objectNames) {
+        // 不按 storage_type 分流、两边都删：objectName 是 UUID，同一个名字在本地和 OSS 上
+        // 最多各有一份，删不存在的那个是幂等的（deleteIfExists 返回 false，OSS 删不存在的
+        // key 也算成功）。而分流是有竞态的：查完到删之间 OssSyncTask 可能刚好把这个文件
+        // 补传到 OSS 并清掉本地副本，于是本地那份删了个空、OSS 那份被跳过，记录一删
+        // 就成了谁也不知道的孤儿。顺带还清掉了补传成功但本地副本没删干净的残留。
+        for (String objectName : objectNames) {
+            try {
+                localFileStorage.delete(objectName);
+            } catch (RuntimeException e) {
+                log.warn("删除本地文件失败 objectName={} 原因={}", objectName, e.getMessage());
+            }
+        }
+
+        try {
+            aliOssUtil.deleteObjects(objectNames);
+        } catch (RuntimeException e) {
+            // OSS 删除失败不上升成业务失败：记录已经删了，用户那边这东西就是「已删除」，
+            // 为了一个没删掉的 OSS 对象把整个删除动作报成失败、让 OSS 故障期间用户什么都
+            // 删不掉，代价更大。欠的那笔账上面已经记下了，交给 OssSyncTask 重试
+            log.warn("OSS 批量删除失败，{} 个对象留给定时任务重试", objectNames.size(), e);
+            return;
+        }
+
+        // 删干净了才平账。这一步失败不影响正确性：账留着，重试任务去删一个已经不存在的
+        // 对象，OSS 那边是幂等的，大不了白跑一次
+        try {
+            pendingOssDeleteMapper.deleteByObjectNames(objectNames);
+        } catch (RuntimeException e) {
+            log.warn("OSS 对象已删除，但平账失败，重试任务会再删一次: {}", e.getMessage());
+        }
     }
 
     @Override

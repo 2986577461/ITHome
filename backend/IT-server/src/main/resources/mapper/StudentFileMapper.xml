@@ -15,13 +15,4 @@
         </foreach>
     </delete>
 
-    <!-- 删除时按 storage_type 分流：本地文件删盘、OSS 文件才调 OSS。少这次查询就分不了流 -->
-    <select id="selectByObjectNames" resultType="com.xiaoyan.pojo.StudentFile">
-        SELECT * FROM student_file WHERE object_name IN
-        <foreach collection="objectNames" item="objectName" open="(" separator="," close=")">
-            #{objectName}
-        </foreach>
-    </select>
-
-
 </mapper>

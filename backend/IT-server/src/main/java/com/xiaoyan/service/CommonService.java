@@ -16,7 +16,16 @@ public interface CommonService {
      */
     StudentFile upload(byte[] bytes, String originalName, String contentType, long size, String studentId);
 
-    /** 删除文件 + student_file 记录，可批量。本地降级文件只删盘，不碰 OSS */
+    /**
+     * 删除文件 + student_file 记录，可批量。
+     *
+     * <p>记录删在调用方的事务里，文件（盘上 + OSS 上各试一遍）删在事务提交之后，
+     * 所以事务回滚不会留下「记录还在、文件没了」的坏引用。</p>
+     *
+     * <p>文件删除是尽力而为：删失败只记日志、不上抛，OSS 故障期间删除功能照常可用。
+     * 没删掉的 OSS 对象会记进 {@code pending_oss_delete}，由 {@code OssSyncTask}
+     * 等 OSS 恢复后重试。</p>
+     */
     void delete(String... objectNames);
 
     /**

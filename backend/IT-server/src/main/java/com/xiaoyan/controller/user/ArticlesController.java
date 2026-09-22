@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.NonNull;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -35,7 +36,8 @@ public class ArticlesController {
 
     @GetMapping("page")
     @Operation(summary = "分页查询文章")
-    public Result<List<ArticleVO>> getPage(@NonNull @Min(1) Integer page, Integer type, @NonNull Integer size) {
+    public Result<List<ArticleVO>> getPage(@NonNull @Min(1) Integer page, @NonNull Integer type,
+                                           @NonNull @Max(5) Integer size) {
         return Result.success(articlesService.getPage(page, type, size));
     }
 
