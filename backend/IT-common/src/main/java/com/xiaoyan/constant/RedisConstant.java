@@ -10,5 +10,5 @@ public class RedisConstant {
      * <p>field = {@code type:size:page}，value = 那一页的 ArticleVO JSON 数组。
      * 把 size 和 page 放进 field 而不是拼进 key，是为了让「清空整组缓存」始终是一次 DEL。</p>
      */
-    public static final String CACHE_ARTICLE_PAGES="cache:articles:page";
+    public static final String CACHE_ARTICLE_PAGES="cache:articles:page:v2";
 }

@@ -63,4 +63,5 @@ xiaoyan:
     - "/user/newcomers"
     - "/user/articles/page"
     - "/user/articles/count"
+    - "/user/articles/*/content"
     - "/ws/**"

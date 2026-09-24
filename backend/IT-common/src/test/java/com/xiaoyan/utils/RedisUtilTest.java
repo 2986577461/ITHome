@@ -12,12 +12,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -189,6 +191,88 @@ class RedisUtilTest {
                     });
 
             assertEquals(50, result.getValue());
+        }
+    }
+
+    /* ====================================================
+     * queryHashListWithMutex() — 分页数组的互斥回源
+     * ==================================================== */
+    @Nested
+    class QueryHashListWithMutex {
+        @Test
+        void should_return_cached_list_on_hit() {
+            when(hashOps.get("hash", "hk")).thenReturn("[{\"name\":\"a\",\"age\":1}]");
+
+            List<Person> result = redisUtil.queryHashListWithMutex("hash", "hk", Person.class,
+                    () -> List.of(), 2, TimeUnit.HOURS);
+
+            assertEquals(1, result.size());
+            assertEquals("a", result.get(0).getName());
+            verify(valueOps, never()).setIfAbsent(anyString(), anyString(), anyLong(), any());
+        }
+
+        @Test
+        void should_treat_empty_array_as_hit() {
+            when(hashOps.get("hash", "hk")).thenReturn("[]");
+
+            List<Person> result = redisUtil.queryHashListWithMutex("hash", "hk", Person.class,
+                    () -> {
+                        throw new RuntimeException("不应该走到DB");
+                    }, 2, TimeUnit.HOURS);
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        void should_load_from_db_on_miss_and_refresh_ttl() {
+            when(hashOps.get("hash", "hk")).thenReturn(null);
+            when(valueOps.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
+            List<Person> dbList = List.of(new Person("b", 2));
+
+            List<Person> result = redisUtil.queryHashListWithMutex("hash", "hk", Person.class,
+                    () -> dbList, 2, TimeUnit.HOURS);
+
+            assertEquals(1, result.size());
+            verify(hashOps).put("hash", "hk", JSONUtil.toJsonStr(dbList));
+            verify(stringRedisTemplate).expire("hash", 2L, TimeUnit.HOURS);
+        }
+
+        @Test
+        void should_cache_empty_list_when_db_returns_null() {
+            when(hashOps.get("hash", "hk")).thenReturn(null);
+            when(valueOps.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
+
+            List<Person> result = redisUtil.queryHashListWithMutex("hash", "hk", Person.class,
+                    () -> null, 2, TimeUnit.HOURS);
+
+            assertTrue(result.isEmpty());
+            verify(hashOps).put("hash", "hk", "[]");
+        }
+
+        @Test
+        void should_double_check_and_skip_db() {
+            when(hashOps.get("hash", "hk"))
+                    .thenReturn(null)
+                    .thenReturn("[{\"name\":\"c\",\"age\":3}]");
+            when(valueOps.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
+
+            List<Person> result = redisUtil.queryHashListWithMutex("hash", "hk", Person.class,
+                    () -> {
+                        throw new RuntimeException("不应该走到DB");
+                    }, 2, TimeUnit.HOURS);
+
+            assertEquals("c", result.get(0).getName());
+        }
+
+        @Test
+        void should_fallback_to_db_when_redis_down() {
+            when(hashOps.get("hash", "hk")).thenThrow(new QueryTimeoutException("down"));
+
+            List<Person> result = redisUtil.queryHashListWithMutex("hash", "hk", Person.class,
+                    () -> List.of(new Person("d", 4)), 2, TimeUnit.HOURS);
+
+            assertEquals("d", result.get(0).getName());
+            verify(valueOps, never()).setIfAbsent(anyString(), anyString(), anyLong(), any());
         }
     }
 

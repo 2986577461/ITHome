@@ -49,7 +49,9 @@ CREATE TABLE article
     content           varchar(10000) not null,
     student_id        varchar(20)    not null,
     release_date_time DATETIME       not null,
-    updated_date_time datetime       not null
+    updated_date_time datetime       not null,
+    KEY idx_article_updated (updated_date_time, id),
+    KEY idx_article_type_updated (type, updated_date_time, id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;

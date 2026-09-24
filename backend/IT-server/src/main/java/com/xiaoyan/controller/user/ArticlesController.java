@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.NonNull;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +29,7 @@ import java.util.List;
 
 @RestController("userArticles")
 @RequestMapping("user/articles")
+@Validated
 @Tag(name = "文章管理")
 public class ArticlesController {
 
@@ -36,8 +38,9 @@ public class ArticlesController {
 
     @GetMapping("page")
     @Operation(summary = "分页查询文章")
-    public Result<List<ArticleVO>> getPage(@NonNull @Min(1) Integer page, @NonNull Integer type,
-                                           @NonNull @Max(5) Integer size) {
+    public Result<List<ArticleVO>> getPage(@NonNull @Min(1) Integer page,
+                                            @NonNull @Min(0) @Max(6) Integer type,
+                                            @NonNull @Max(5) Integer size) {
         return Result.success(articlesService.getPage(page, type, size));
     }
 
@@ -51,6 +54,12 @@ public class ArticlesController {
     @Operation(summary = "获取文章总数")
     public Result<Long> getCount(Integer type) {
         return Result.success(articlesService.getCount(type));
+    }
+
+    @GetMapping("{id}/content")
+    @Operation(summary = "查询文章正文")
+    public Result<String> getContent(@PathVariable Long id) {
+        return Result.success(articlesService.getContent(id));
     }
 
     @GetMapping("position")

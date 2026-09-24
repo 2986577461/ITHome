@@ -22,7 +22,7 @@ public class ArticleDTO {
     @NotBlank(message = "[]不能为空")
     private String head;
 
-    @Size(min = 10, max = 5000, message = "编码长度10-50000")
+    @Size(min = 10, max = 5000, message = "编码长度10-5000")
     @NotBlank(message = "[]不能为空")
     private String content;
 }

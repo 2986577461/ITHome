@@ -15,7 +15,7 @@
                a.student_id,
                a.type,
                a.head,
-               a.content,
+               SUBSTRING(a.content, 1, 1500) AS excerpt,
                a.release_date_time,
                a.updated_date_time,
                s.name     AS name,
@@ -28,6 +28,12 @@
         </if>
         ORDER BY a.updated_date_time DESC, a.id DESC
         LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="selectContent" resultType="java.lang.String">
+        SELECT content
+        FROM article
+        WHERE id = #{id}
     </select>
 
     <select id="selectMyPage" resultType="com.xiaoyan.vo.MyArticleVO">

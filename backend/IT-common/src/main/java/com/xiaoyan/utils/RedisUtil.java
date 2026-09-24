@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -31,7 +32,8 @@ import java.util.function.Supplier;
  *
  * <p>每个方法自己处理 Redis 异常，调用方不用再写 try-catch。失败时的行为按用途分三类：</p>
  * <ul>
- *   <li><b>缓存读</b>（{@link #queryStringWithMutex} / {@link #queryHashWithMutex}）——
+ *   <li><b>缓存读</b>（{@link #queryStringWithMutex} / {@link #queryHashWithMutex} /
+ *       {@link #queryHashListWithMutex}）——
  *       降级查库。缓存只是「可选加速」，Redis 挂了系统应该只是变慢，不是不可用</li>
  *   <li><b>缓存写与失效</b>（{@link #putHashField} / {@link #evict} / {@link #evictHashFields}）——
  *       记日志后吞掉。最坏结果是脏数据多留到 TTL 过期</li>
@@ -82,7 +84,9 @@ public class RedisUtil implements DisposableBean {
      * 缓存读：Redis 不可用时降级查库
      * ============================================================ */
 
-    /** 写缓存。失败只记日志：没写进去最坏是下次再查一次库，不该让业务失败 */
+    /**
+     * 写缓存。失败只记日志：没写进去最坏是下次再查一次库，不该让业务失败
+     */
     public void save(@NonNull String key, @NonNull Object value) {
         try {
             stringRedisTemplate.opsForValue()
@@ -182,11 +186,55 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    /* ============================================================
-     * 缓存读写与失效：失败只记日志，等 TTL 自然过期
-     * ============================================================ */
+    /**
+     * 读 Hash 里的 JSON 数组，未命中时按 field 互斥回源。
+     *
+     * <p>空数组是有效缓存：field 存在就直接返回，不再查库。
+     * 不走单独的空值 key，是为了让整组缓存一次 DEL 就能清掉，包括空页。</p>
+     *
+     * <p>Redis 不可用时降级查库，不抢锁。抢锁重试耗尽仍抛 {@link IllegalStateException}。</p>
+     */
+    public <R> List<R> queryHashListWithMutex(@NonNull String key, @NonNull String hashKey,
+                                              @NonNull Class<R> elementType,
+                                              @NonNull Supplier<List<R>> dbFallback,
+                                              long ttl, @NonNull TimeUnit unit) {
+        try {
+            return doQueryHashListWithMutex(key, hashKey, elementType, dbFallback, ttl, unit);
+        } catch (DataAccessException e) {
+            logDegraded("降级查库", "key=" + key + " field=" + hashKey, e);
+            return nullToEmpty(dbFallback.get());
+        }
+    }
 
-    /** 读 Hash field。Redis 不可用和字段不存在都返回 null，调用方一律按「未命中」处理 */
+    private <R> List<R> doQueryHashListWithMutex(String key, String hashKey, Class<R> elementType,
+                                                 Supplier<List<R>> dbFallback,
+                                                 long ttl, TimeUnit unit) {
+        String cached = getHashField(key, hashKey);
+        if (cached != null) {
+            return JSONUtil.toList(cached, elementType);
+        }
+
+        LockHandle lock = acquireLockWithRetry("lock:hash:" + key + ":" + hashKey);
+        try {
+            Object latest = stringRedisTemplate.opsForHash().get(key, hashKey);
+            if (latest != null) {
+                return JSONUtil.toList((String) latest, elementType);
+            }
+            List<R> value = nullToEmpty(dbFallback.get());
+            putHashField(key, hashKey, JSONUtil.toJsonStr(value), ttl, unit);
+            return value;
+        } finally {
+            unlock(lock);
+        }
+    }
+
+    private static <R> List<R> nullToEmpty(List<R> value) {
+        return value == null ? List.of() : value;
+    }
+
+    /**
+     * 读 Hash field。Redis 不可用和字段不存在都返回 null，调用方一律按「未命中」处理
+     */
     public String getHashField(@NonNull String key, @NonNull String field) {
         try {
             return (String) stringRedisTemplate.opsForHash().get(key, field);
@@ -196,7 +244,9 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    /** 写 Hash field，不设过期。用于整组失效的缓存（如按 id 存的学员信息） */
+    /**
+     * 写 Hash field，不设过期。用于整组失效的缓存（如按 id 存的学员信息）
+     */
     public void putHashField(@NonNull String key, @NonNull String field, @NonNull String value) {
         try {
             stringRedisTemplate.opsForHash().put(key, field, value);
@@ -205,7 +255,9 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    /** 写 Hash field 并刷新整个 key 的 TTL。用于分页缓存这类整组共享一个过期时间的场景 */
+    /**
+     * 写 Hash field 并刷新整个 key 的 TTL。用于分页缓存这类整组共享一个过期时间的场景
+     */
     public void putHashField(@NonNull String key, @NonNull String field, @NonNull String value,
                              long ttl, @NonNull TimeUnit unit) {
         try {
@@ -216,7 +268,9 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    /** 删除缓存 key。失败只记日志：最坏是脏数据多留到 TTL 过期，远好于让接口报错 */
+    /**
+     * 删除缓存 key。失败只记日志：最坏是脏数据多留到 TTL 过期，远好于让接口报错
+     */
     public void evict(String... keys) {
         if (keys == null || keys.length == 0) {
             return;
@@ -228,7 +282,9 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    /** 删除 Hash 里的若干 field */
+    /**
+     * 删除 Hash 里的若干 field
+     */
     public void evictHashFields(@NonNull String key, Object... fields) {
         if (fields == null || fields.length == 0) {
             return;
@@ -252,7 +308,9 @@ public class RedisUtil implements DisposableBean {
      * 拿「注销延迟生效」换「全站可用」是划算的。
      * ============================================================ */
 
-    /** 校验 token 是否为该学员当前有效的登录态。Redis 不可用时返回 true（放行） */
+    /**
+     * 校验 token 是否为该学员当前有效的登录态。Redis 不可用时返回 true（放行）
+     */
     public boolean isTokenValid(@NonNull String key, @NonNull String studentId, @NonNull String token) {
         String stored;
         try {

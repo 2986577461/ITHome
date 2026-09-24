@@ -2,7 +2,7 @@ package com.xiaoyan.service.impl;
 
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.json.JSONUtil;
+import cn.hutool.http.HtmlUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.MessageConstant;
@@ -50,10 +50,11 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     /**
      * 分页缓存最多覆盖的文章数。
      *
-     * <p>超出这个位置的分页直接查库：否则客户端用一个很大的 page 就能无限往缓存里塞条目，
-     * field 数量没有上界。</p>
+     * <p>超出这个位置的分页直接返回空列表，不再查库：否则公开接口用很大的 offset 就能打到库。</p>
      */
-    public static final int MAX_CACHE_SIZE = 50;
+    public static final int MAX_CACHE_SIZE = 200;
+    /** 列表预览的可见字数。SQL 只取正文前缀，去掉标签后再截到这个长度。 */
+    private static final int EXCERPT_LENGTH = 200;
     private static final long CACHE_TTL_HOURS = 2;
 
     private final UsersService usersService;
@@ -113,36 +114,35 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     /**
      * 分页查询文章。type 为 null 或 0 表示不按类型过滤。
      *
-     * <p>缓存的是「已经切好页的一个数组」，整个榜单的全部分页装在同一个 Hash 里：
-     * field = {@code type:size:page}，value = 那一页的 ArticleVO JSON。</p>
+     * <p>前 {@link #MAX_CACHE_SIZE} 条进同一个 Hash，field = {@code type:size:page}。
+     * 未命中时按 field 互斥回源，同一页只有一个请求查库。
+     * 起始位置已经超出窗口的深页直接返回空列表，不查库、也不写缓存。
+     * Redis 挂了锁也拿不到，仍会各自降级查库。</p>
      */
     @Override
     public List<ArticleVO> getPage(@NonNull Integer page, @NonNull @Min(0) Integer type, @NonNull Integer size) {
-        if (page < 1 || size < 1) {
+        if (page < 1 || size < 1 || page > Integer.MAX_VALUE / size) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
         int start = (page - 1) * size;
-        // 缓存只覆盖每个榜单的前 MAX_CACHE_SIZE 条
-        boolean cacheable = page * size - 1 < MAX_CACHE_SIZE;
+        if (start >= MAX_CACHE_SIZE) {
+            return List.of();
+        }
+        int limit = Math.min(size, MAX_CACHE_SIZE - start);
         String field = cacheType(type) + ":" + size + ":" + page;
+        return redisUtil.queryHashListWithMutex(
+                CACHE_ARTICLE_PAGES, field, ArticleVO.class,
+                () -> queryPageFromDB(start, type, limit),
+                CACHE_TTL_HOURS, TimeUnit.HOURS);
+    }
 
-        if (cacheable) {
-            String cached = redisUtil.getHashField(CACHE_ARTICLE_PAGES, field);
-            if (cached != null) {
-                // 空数组也是有效值：说明这一页确实没有文章，不用再查库
-                return JSONUtil.toList(cached, ArticleVO.class);
-            }
+    @Override
+    public String getContent(@NonNull Long id) {
+        String content = articleMapper.selectContent(id);
+        if (content == null) {
+            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
-
-        List<ArticleVO> result = queryPageFromDB(start, type, size);
-
-        // 缓存这一页。不加锁也不需要加：整页一次性 HSET，value 是完整的一页，
-        // 重复写同一个值没有副作用，并发未命中最多是几个线程各查一次库、写进同一份结果。
-        if (cacheable) {
-            redisUtil.putHashField(CACHE_ARTICLE_PAGES, field, JSONUtil.toJsonStr(result),
-                    CACHE_TTL_HOURS, TimeUnit.HOURS);
-        }
-        return result;
+        return content;
     }
 
     /**
@@ -154,7 +154,29 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
     private List<ArticleVO> queryPageFromDB(int start, Integer type, int size) {
         Integer databaseType = type == null || type == ArticleType.ALL.getCode() ? null : type;
-        return articleMapper.selectPage(start, databaseType, size);
+        List<ArticleVO> page = articleMapper.selectPage(start, databaseType, size);
+        if (page == null || page.isEmpty()) {
+            return page;
+        }
+        for (ArticleVO article : page) {
+            article.setExcerpt(toExcerpt(article.getExcerpt()));
+        }
+        return page;
+    }
+
+    /** 把正文前缀去掉标签，压成一行，截到预览长度。超出的部分由展开接口取全文。 */
+    static String toExcerpt(String htmlPrefix) {
+        if (htmlPrefix == null || htmlPrefix.isEmpty()) {
+            return "";
+        }
+        String text = HtmlUtil.unescape(HtmlUtil.cleanHtmlTag(htmlPrefix))
+                .replace('\u00A0', ' ')
+                .replaceAll("\\s+", " ")
+                .trim();
+        if (text.length() <= EXCERPT_LENGTH) {
+            return text;
+        }
+        return text.substring(0, EXCERPT_LENGTH);
     }
 
 

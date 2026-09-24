@@ -5,6 +5,9 @@ export const getPage = async (page, size, type) => {
   return axiosInstance.get("user/articles/page", { params });
 };
 
+export const getArticleContent = (id) =>
+  axiosInstance.get("user/articles/" + id + "/content");
+
 export const getArticleCount = async (type) => {
   const params = {};
   if (type !== undefined && type !== null) params.type = type;

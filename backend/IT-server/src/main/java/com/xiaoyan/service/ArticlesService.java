@@ -20,7 +20,9 @@ public interface ArticlesService extends IService<Article> {
 
     void upload(ArticleDTO articleDTO);
 
-    List<ArticleVO> getPage(@NonNull Integer page, Integer type, @NonNull Integer size);
+    List<ArticleVO> getPage(Integer page, Integer type,Integer size);
+
+    String getContent(@NonNull Long id);
 
     void delete(Long id);
 
