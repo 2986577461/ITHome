@@ -15,10 +15,8 @@ import java.util.List;
 @Mapper
 public interface ArticleMapper extends BaseMapper<Article> {
 
-    /** 分页查文章，直接带出作者姓名和头像，避免查完再补一次学生信息。正文只取前缀，不把整篇 content 查出来 */
+    /** 分页查文章，直接带出作者姓名和头像，避免查完再补一次学生信息 */
     List<ArticleVO> selectPage(Integer offset, Integer type, Integer size);
-
-    String selectContent(Long id);
 
     List<MyArticleVO> selectMyPage(Integer offset, String studentId, Integer size);
 

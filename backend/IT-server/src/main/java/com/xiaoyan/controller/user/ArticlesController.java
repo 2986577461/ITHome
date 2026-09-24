@@ -56,12 +56,6 @@ public class ArticlesController {
         return Result.success(articlesService.getCount(type));
     }
 
-    @GetMapping("{id}/content")
-    @Operation(summary = "查询文章正文")
-    public Result<String> getContent(@PathVariable Long id) {
-        return Result.success(articlesService.getContent(id));
-    }
-
     @GetMapping("position")
     @Operation(summary = "返回文章所在位置")
     public Result<Integer> getArticlePosition(long id) {

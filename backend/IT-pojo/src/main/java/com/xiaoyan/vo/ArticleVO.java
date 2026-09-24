@@ -22,8 +22,7 @@ public class ArticleVO implements Serializable {
 
     private String head;
 
-    /** 列表预览，平文，不超过两百字。完整正文走单独接口。 */
-    private String excerpt;
+    private String content;
 
     private LocalDateTime updatedDateTime;
 }

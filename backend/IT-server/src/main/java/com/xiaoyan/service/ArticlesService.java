@@ -22,8 +22,6 @@ public interface ArticlesService extends IService<Article> {
 
     List<ArticleVO> getPage(Integer page, Integer type,Integer size);
 
-    String getContent(@NonNull Long id);
-
     void delete(Long id);
 
     void update(ArticleDTO article);

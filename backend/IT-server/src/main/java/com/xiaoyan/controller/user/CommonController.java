@@ -47,21 +47,6 @@ public class CommonController {
     public Result<String> getDownloadUrl(String objectName) {
         return Result.success(commonService.generateDownloadUrl(objectName, EXPIRATION_MILLIS));
     }
-
-    /**
-     * 降级文件的访问入口，附件或内联由文件类型决定。<b>免登录</b>
-     * （在 xiaoyan.admit-urls 里）。
-     *
-     * <p>为什么必须免登录：{@code <img src>} 发不出 Authorization 头。OSS 那边的图本来
-     * 就是「拿到 object_name 就能看」的公开资源（上传返回的是不带签名的裸 URL），
-     * 所以安全模型没变差。</p>
-     *
-     * <p>本地副本被补传清掉之后会 302 到 {@code file_url} 里回填好的 OSS 地址。文章正文
-     * 里烧死的那个本地 URL 就靠这条永远能跟过去，不会因为补传完就坏掉。</p>
-     *
-     * <p>刻意不用项目统一的「HTTP 200 + body code」：响应体是二进制流，塞不进 Result，
-     * 二进制接口用 HTTP 状态码是正常做法。</p>
-     */
     @GetMapping("/local/{objectName}")
     @Operation(summary = "访问尚未补传到 OSS 的本地文件")
     public ResponseEntity<Resource> accessLocal(@PathVariable("objectName") String objectName,

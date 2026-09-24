@@ -76,21 +76,7 @@
                 </span>
                 <span>{{ fmtDate(a.updatedDateTime) }}</span>
               </div>
-              <p v-if="!expanded[a.id]" class="ac-excerpt">{{ a.excerpt }}</p>
-              <div v-else class="ac-body" v-html="a.fullContent"></div>
-              <button
-                class="ac-expand"
-                :disabled="loadingContent[a.id]"
-                @click="toggleContent(a)"
-              >
-                {{
-                  loadingContent[a.id]
-                    ? "加载中..."
-                    : expanded[a.id]
-                      ? "收起"
-                      : "展开正文"
-                }}
-              </button>
+              <div class="ac-body" v-html="a.content"></div>
               <div class="ac-interact">
                 <button
                   class="interact-btn"
@@ -306,7 +292,6 @@ import { useArticleStore } from "@/stores/updateArticle";
 import {
   getPage,
   getArticleCount,
-  getArticleContent,
   deleteById,
 } from "@/request/axiosForArticles.js";
 import { toggleLike as apiToggleLike } from "@/request/axiosForLikes.js";
@@ -338,8 +323,6 @@ const pageSize = 5;
 const LIST_WINDOW = 200;
 const currentPage = ref(1);
 const totalCount = ref(0);
-const expanded = reactive({});
-const loadingContent = reactive({});
 const loading = ref(true);
 const loadingMore = ref(false);
 const totalPages = computed(() =>
@@ -433,7 +416,6 @@ async function fetchPage(p) {
     const resp = await getPage(p, pageSize, type);
     if (resp?.data) {
       const list = resp.data.records ?? resp.data;
-      for (const id of Object.keys(expanded)) expanded[id] = false;
       articles.value = list;
       list.forEach((a) => {
         if (!(a.id in likeCount)) {
@@ -479,34 +461,9 @@ async function fetchCount() {
   } catch {}
 }
 
-async function editArticle(a) {
-  let content = a.fullContent;
-  if (content == null) {
-    const resp = await getArticleContent(a.id);
-    if (!resp || Number(resp.code) !== 200) return;
-    content = resp.data ?? "";
-  }
-  articleStore.setArticle(a.id, a.head, content, a.type);
+function editArticle(a) {
+  articleStore.setArticle(a.id, a.head, a.content, a.type);
   router.push("/upload-article");
-}
-
-async function toggleContent(a) {
-  if (expanded[a.id]) {
-    expanded[a.id] = false;
-    return;
-  }
-  if (a.fullContent == null) {
-    loadingContent[a.id] = true;
-    try {
-      const resp = await getArticleContent(a.id);
-      if (!resp || Number(resp.code) !== 200) return;
-      a.fullContent = resp.data ?? "";
-    } finally {
-      loadingContent[a.id] = false;
-    }
-  }
-  expanded[a.id] = true;
-  highlightCode();
 }
 function goUpload() {
   articleStore.setArticle(null, "", "", "");
@@ -772,26 +729,6 @@ onMounted(async () => {
   justify-content: center;
   font-size: 11px;
   font-weight: 600;
-}
-.ac-excerpt {
-  margin: 0;
-  font-size: 16px;
-  line-height: 1.7;
-  color: var(--color-text-secondary);
-}
-.ac-expand {
-  margin-top: 10px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--color-accent);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-}
-.ac-expand:disabled {
-  cursor: default;
-  opacity: 0.6;
 }
 .ac-body {
   line-height: 1.9;
