@@ -79,10 +79,7 @@ create table student_file
     student_id       varchar(20)         not null,
     original_name    varchar(200)        not null,
     object_name      varchar(200) unique not null,
-    -- 降级到本地时暂时为 null，补传成功后回填
-    file_url         varchar(200)        null,
-    -- OSS / LOCAL，见 StorageConstant
-    storage_type     varchar(10)         not null default 'OSS',
+    file_url         varchar(200)        not null,
     file_size        bigint              not null,
     file_type        varchar(80)         not null,
     create_date_time datetime            not null,

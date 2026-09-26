@@ -11,10 +11,10 @@ import com.xiaoyan.mapper.NewcomerMapper;
 import com.xiaoyan.mapper.UserMapper;
 import com.xiaoyan.pojo.Student;
 import com.xiaoyan.service.NewcomersService;
-import com.xiaoyan.utils.RedisUtil;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +36,7 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
         implements NewcomersService {
 
     private final NewcomerMapper newcomerMapper;
-    private final RedisUtil redisUtil;
+    private final StringRedisTemplate stringRedisTemplate;
     private UserMapper userMapper;
 
     @Override
@@ -74,7 +74,7 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
 
         userMapper.insert(student);
         // 事务提交成功后再删除缓存，避免数据库回滚但缓存已失效
-        redisUtil.evictHashFields(CACHE_NEWCOMERS, String.valueOf(id));
+        stringRedisTemplate.opsForHash().delete(CACHE_NEWCOMERS, String.valueOf(id));
     }
 
     @Override

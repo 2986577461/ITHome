@@ -2,7 +2,6 @@
 /backend/*/target/
 /*/.claude/
 /frontend/node_modules/
-/backend/local-files/
 /*/CLAUDE.md
 /*/Dockerfile
 /backend/IT-server/src/main/resources/application-dev.yml

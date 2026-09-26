@@ -32,6 +32,7 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.streaming.SXSSFRow;
 import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -68,6 +69,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     private final ArticleMapper articleMapper;
     private final ResourcesMapper resourcesMapper;
     private JwtProperties jwtProperties;
+    private StringRedisTemplate stringRedisTemplate;
     private StudentFileMapper studentFileMapper;
     private CommonService commonService;
     private JwtWhiteList jwtWhiteList;
@@ -119,7 +121,6 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         return vo;
     }
 
-    @Transactional
     public void uploadAvatar(MultipartFile avatar) throws IOException {
         String studentId = BaseContext.getCurrentStudentId();
         Student student = userMapper.selectByStudentId(studentId);
@@ -127,22 +128,19 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
         }
 
-        // 老头像最后才删：先删的话，上传或下面那次 update 任何一步失败，
-        // student.avatar_id 都还指着一条已经删掉的记录，用户头像直接坏掉
-        Long oldAvatarId = student.getAvatarId();
-        Long newAvatarId = commonService.upload(avatar).getId();
-        student.setAvatarId(newAvatarId);
-        this.lambdaUpdate().set(Student::getAvatarId, newAvatarId).update();
-        redisUtil.evictHashFields(CACHE_STUDENTS, studentId);
-        // 头像会被烤进文章缓存里的 ArticleVO，不一起失效的话文章列表上还是旧头像
-        redisUtil.evict(CACHE_ARTICLE_PAGES);
-
-        if (oldAvatarId != null) {
-            StudentFile oldAvatar = studentFileMapper.selectById(oldAvatarId);
+        Long avatarId = student.getAvatarId();
+        if (avatarId != null) {
+            StudentFile oldAvatar = studentFileMapper.selectById(avatarId);
             if (oldAvatar != null) {
                 commonService.delete(oldAvatar.getObjectName());
             }
         }
+        Long newAvatarId = commonService.upload(avatar).getId();
+        student.setAvatarId(newAvatarId);
+        this.lambdaUpdate().set(Student::getAvatarId, newAvatarId).update();
+        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentId);
+        // 头像会被烤进文章缓存里的 ArticleVO，不一起失效的话文章列表上还是旧头像
+        stringRedisTemplate.delete(CACHE_ARTICLE_PAGES);
     }
 
     @Override
@@ -318,7 +316,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         }
 
         userMapper.deletebyStudentIds(distinctStudentIds);
-        redisUtil.evictHashFields(CACHE_STUDENTS, distinctStudentIds.toArray());
+        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, distinctStudentIds.toArray());
     }
 
     @Override
@@ -342,7 +340,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
         List<String> studentId1 = List.of(studentId);
         userMapper.deletebyStudentIds(studentId1);
-        redisUtil.evictHashFields(CACHE_STUDENTS, studentId1.toArray());
+        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentId1.toArray());
     }
 
     @Override
@@ -384,11 +382,11 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         }
 
         userMapper.updateById(student);
-        redisUtil.evictHashFields(CACHE_STUDENTS, target.getStudentId());
+        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, target.getStudentId());
         // 文章缓存里的 ArticleVO 带着作者姓名和头像（见 ArticleMapper.xml 的 selectPage），
         // 改了名字不失效的话，列表页会一直显示旧名字直到缓存两小时后过期。
         // 这里不做「有没有真的改」的判断：判空反而更绕，而改资料本来就是低频操作。
-        redisUtil.evict(CACHE_ARTICLE_PAGES);
+        stringRedisTemplate.delete(CACHE_ARTICLE_PAGES);
     }
 
 }

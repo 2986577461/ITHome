@@ -14,6 +14,7 @@ import com.xiaoyan.utils.AsyncExecutors;
 import com.xiaoyan.utils.RedisUtil;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import com.xiaoyan.dto.ResourcesDTO;
@@ -38,6 +39,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         implements ResourcesService {
 
     private ResourcesMapper resourcesMapper;
+    private StringRedisTemplate stringRedisTemplate;
     private UsersService usersService;
     private RedisUtil redisUtil;
     private CommonService commonService;
@@ -85,7 +87,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
                         releaseDateTime(releaseDateTime).build();
 
                 resourcesMapper.insert(resource);
-                redisUtil.evict(CACHE_RESOURCES_ALL);
+                stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
             } catch (Exception e) {
                 log.error("异步上传资料失败, studentId={}", studentId, e);
             }
@@ -107,7 +109,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         StudentFile cover = studentFileMapper.selectById(resource.getStudentFileCoverId());
 
         resourcesMapper.deleteById(id);
-        redisUtil.evict(CACHE_RESOURCES_ALL);
+        stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
 
         if (file != null) {
             commonService.delete(file.getObjectName());
