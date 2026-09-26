@@ -3,7 +3,6 @@ package com.xiaoyan.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import com.xiaoyan.constant.MessageConstant;
-import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
@@ -14,7 +13,6 @@ import com.xiaoyan.utils.AsyncExecutors;
 import com.xiaoyan.utils.RedisUtil;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import com.xiaoyan.dto.ResourcesDTO;
@@ -39,7 +37,6 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         implements ResourcesService {
 
     private ResourcesMapper resourcesMapper;
-    private StringRedisTemplate stringRedisTemplate;
     private UsersService usersService;
     private RedisUtil redisUtil;
     private CommonService commonService;
@@ -63,10 +60,9 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public void saveResource(ResourcesDTO resourcesDTO) {
-        String studentId = BaseContext.getCurrentStudentId();
+    public void saveResource(ResourcesDTO resourcesDTO, String studentId){
         MultipartFile coverFile = resourcesDTO.getCover();
-        MultipartFile resourceFile = resourcesDTO.getFile();
+        MultipartFile resourceFile =resourcesDTO.getFile();
         String head = resourcesDTO.getHead();
         String introduce = resourcesDTO.getIntroduce();
         LocalDateTime releaseDateTime = LocalDateTime.now();
@@ -87,7 +83,7 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
                         releaseDateTime(releaseDateTime).build();
 
                 resourcesMapper.insert(resource);
-                stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
+                redisUtil.evict(CACHE_RESOURCES_ALL);
             } catch (Exception e) {
                 log.error("异步上传资料失败, studentId={}", studentId, e);
             }
@@ -103,19 +99,17 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
         usersService.checkOwnerOrAdmin(resource.getStudentId());
 
-        // objectName 先取出来，记录删掉之后再删文件。反过来一旦 resourcesMapper 这步失败，
-        // 资料还在列表里、文件却已经没了
         StudentFile file = studentFileMapper.selectById(resource.getStudentFileFileId());
-        StudentFile cover = studentFileMapper.selectById(resource.getStudentFileCoverId());
-
-        resourcesMapper.deleteById(id);
-        stringRedisTemplate.delete(CACHE_RESOURCES_ALL);
-
         if (file != null) {
             commonService.delete(file.getObjectName());
         }
+        StudentFile cover = studentFileMapper.selectById(resource.getStudentFileCoverId());
         if (cover != null) {
             commonService.delete(cover.getObjectName());
         }
+
+        resourcesMapper.deleteById(id);
+        redisUtil.evict(CACHE_RESOURCES_ALL);
+
     }
 }

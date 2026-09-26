@@ -2,7 +2,6 @@ package com.xiaoyan.service.impl;
 
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.MessageConstant;
@@ -16,7 +15,7 @@ import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.ArticlesService;
 import com.xiaoyan.service.CommonService;
 import com.xiaoyan.service.UsersService;
-import com.xiaoyan.utils.TransactionUtils;
+import com.xiaoyan.utils.RedisUtil;
 import com.xiaoyan.vo.ArticleImageVO;
 import com.xiaoyan.vo.ArticleVO;
 import com.xiaoyan.vo.MyArticleVO;
@@ -24,7 +23,6 @@ import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,7 +34,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,12 +51,10 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
      * <p>超出这个位置的分页直接查库：否则客户端用一个很大的 page 就能无限往缓存里塞条目，
      * field 数量没有上界。</p>
      */
-    public static final int MAX_CACHE_SIZE = 50;
-    private static final long CACHE_TTL_HOURS = 2;
 
     private final UsersService usersService;
     private ArticleMapper articleMapper;
-    private StringRedisTemplate stringRedisTemplate;
+    private RedisUtil redisUtil;
     private CommonService commonService;
 
     public static final Pattern IMAGE_PATTERN = Pattern.compile("https?://[^/]+\\.aliyuncs\\.com/([^\"'\\s]+)");
@@ -86,7 +81,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
         articleMapper.insert(article);
 
-        stringRedisTemplate.delete(CACHE_ARTICLE_PAGES);
+        redisUtil.evict(CACHE_ARTICLE_PAGES);
     }
 
     @Override
@@ -104,36 +99,22 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
      * 分页查询文章。type 为 null 或 0 表示不按类型过滤。
      *
      * <p>缓存的是「已经切好页的一个数组」，整个榜单的全部分页装在同一个 Hash 里：
-     * field = {@code type:size:page}，value = 那一页的 ArticleVO JSON。</p>
+     * field = {@code type:size:page}，value = 那一页的 ArticleVO JSON。
+     * 缓存未命中时按 field 加互斥锁，只有持锁线程回源数据库，其余线程拿锁后会再次检查缓存。</p>
      */
     @Override
-    public List<ArticleVO> getPage(@NonNull Integer page, @NonNull @Min(0) Integer type, @NonNull Integer size) {
+    public List<ArticleVO> getPage(Integer page, Integer type, Integer size) {
         if (page < 1 || size < 1) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
-
         int start = (page - 1) * size;
-        // 缓存只覆盖每个榜单的前 MAX_CACHE_SIZE 条
-        boolean cacheable = page * size - 1 < MAX_CACHE_SIZE;
         String field = cacheType(type) + ":" + size + ":" + page;
 
-        if (cacheable) {
-            Object cached = stringRedisTemplate.opsForHash().get(CACHE_ARTICLE_PAGES, field);
-            if (cached != null) {
-                // 空数组也是有效值：说明这一页确实没有文章，不用再查库
-                return JSONUtil.toList((String) cached, ArticleVO.class);
-            }
-        }
-
-        List<ArticleVO> result = queryPageFromDB(start, type, size);
-
-        // 缓存这一页。不加锁也不需要加：整页一次性 HSET，value 是完整的一页，
-        // 重复写同一个值没有副作用，并发未命中最多是几个线程各查一次库、写进同一份结果。
-        if (cacheable) {
-            stringRedisTemplate.opsForHash().put(CACHE_ARTICLE_PAGES, field, JSONUtil.toJsonStr(result));
-            stringRedisTemplate.expire(CACHE_ARTICLE_PAGES, CACHE_TTL_HOURS, TimeUnit.HOURS);
-        }
-        return result;
+        return redisUtil.queryHashWithMutex(
+                CACHE_ARTICLE_PAGES,
+                field,
+                ArticleVO.class,
+                ignored -> queryPageFromDB(start, type, size));
     }
 
     /**
@@ -168,15 +149,12 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         // 更新文章
         Article article = BeanUtil.toBean(articleDTO, Article.class);
         article.setUpdatedDateTime(LocalDateTime.now());
-        articleMapper.updateById(article);
-
-        // 更新时间变了，文章在榜单里的位置也会跟着变，所以不增量改缓存，整组失效最省事
-        TransactionUtils.afterCommit(() -> {
-            stringRedisTemplate.delete(CACHE_ARTICLE_PAGES);
+        if (articleMapper.updateById(article) == 1) {
+            redisUtil.evict(CACHE_ARTICLE_PAGES);
             if (!toDelete.isEmpty()) {
                 commonService.delete(toDelete.toArray(String[]::new));
             }
-        });
+        }
     }
 
     private Set<String> extractObjectNames(String content) {
@@ -215,7 +193,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         Set<String> objectNames = extractObjectNames(article.getContent());
 
         if (articleMapper.deleteById(id) == 1) {
-            stringRedisTemplate.delete(CACHE_ARTICLE_PAGES);
+            redisUtil.evict(CACHE_ARTICLE_PAGES);
             if (!objectNames.isEmpty()) {
                 commonService.delete(objectNames.toArray(String[]::new));
             }

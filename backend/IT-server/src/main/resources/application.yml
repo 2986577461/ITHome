@@ -18,7 +18,7 @@ spring:
       port: ${SPRING_REDIS_PORT}
       password: ${SPRING_REDIS_PASSWORD}
       database: ${SPRING_REDIS_DATABASE:0}
-      timeout: 5000ms
+      timeout: 50ms
   #      开启数字转成字符串，避免前端js的long类型精度异常
   jackson:
     generator:

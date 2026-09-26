@@ -10,10 +10,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.NonNull;
-import org.springframework.validation.annotation.Validated;
+import org.hibernate.validator.constraints.Range;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,7 +28,6 @@ import java.util.List;
 
 @RestController("userArticles")
 @RequestMapping("user/articles")
-@Validated
 @Tag(name = "文章管理")
 public class ArticlesController {
 
@@ -38,9 +36,9 @@ public class ArticlesController {
 
     @GetMapping("page")
     @Operation(summary = "分页查询文章")
-    public Result<List<ArticleVO>> getPage(@NonNull @Min(1) Integer page,
-                                            @NonNull @Min(0) @Max(6) Integer type,
-                                            @NonNull @Max(5) Integer size) {
+    public Result<List<ArticleVO>> getPage(@NonNull @Range(min = 1, max = Integer.MAX_VALUE / 5 - 5) Integer page,
+                                           @NonNull @Range(min = 0, max = 6) Integer type,
+                                           @NonNull @Range(max = 5) Integer size) {
         return Result.success(articlesService.getPage(page, type, size));
     }
 

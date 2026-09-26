@@ -20,7 +20,7 @@ public interface ArticlesService extends IService<Article> {
 
     void upload(ArticleDTO articleDTO);
 
-    List<ArticleVO> getPage(Integer page, Integer type,Integer size);
+    List<ArticleVO> getPage(Integer page, Integer type, Integer size);
 
     void delete(Long id);
 

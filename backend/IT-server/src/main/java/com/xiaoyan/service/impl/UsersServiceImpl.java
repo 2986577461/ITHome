@@ -32,7 +32,6 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.streaming.SXSSFRow;
 import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -51,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static com.xiaoyan.constant.RedisConstant.CACHE_ARTICLE_PAGES;
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
@@ -63,13 +63,9 @@ import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
 @Slf4j
 public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         implements UsersService {
-
-    // 这里直接用 mapper，不注入 ArticlesService / ResourcesService：
-    // 那两个 Service 都注入了 UsersService，构造器注入成环会导致启动失败。
     private final ArticleMapper articleMapper;
     private final ResourcesMapper resourcesMapper;
     private JwtProperties jwtProperties;
-    private StringRedisTemplate stringRedisTemplate;
     private StudentFileMapper studentFileMapper;
     private CommonService commonService;
     private JwtWhiteList jwtWhiteList;
@@ -138,9 +134,9 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         Long newAvatarId = commonService.upload(avatar).getId();
         student.setAvatarId(newAvatarId);
         this.lambdaUpdate().set(Student::getAvatarId, newAvatarId).update();
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentId);
+        redisUtil.evictHashFields(CACHE_STUDENTS, studentId);
         // 头像会被烤进文章缓存里的 ArticleVO，不一起失效的话文章列表上还是旧头像
-        stringRedisTemplate.delete(CACHE_ARTICLE_PAGES);
+        redisUtil.evict(CACHE_ARTICLE_PAGES);
     }
 
     @Override
@@ -316,7 +312,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         }
 
         userMapper.deletebyStudentIds(distinctStudentIds);
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, distinctStudentIds.toArray());
+        redisUtil.evictHashFields(CACHE_STUDENTS, distinctStudentIds.toArray());
     }
 
     @Override
@@ -340,7 +336,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
         List<String> studentId1 = List.of(studentId);
         userMapper.deletebyStudentIds(studentId1);
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, studentId1.toArray());
+        redisUtil.evictHashFields(CACHE_STUDENTS, studentId1.toArray());
     }
 
     @Override
@@ -382,11 +378,11 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         }
 
         userMapper.updateById(student);
-        stringRedisTemplate.opsForHash().delete(CACHE_STUDENTS, target.getStudentId());
+        redisUtil.evictHashFields(CACHE_STUDENTS, target.getStudentId());
         // 文章缓存里的 ArticleVO 带着作者姓名和头像（见 ArticleMapper.xml 的 selectPage），
         // 改了名字不失效的话，列表页会一直显示旧名字直到缓存两小时后过期。
         // 这里不做「有没有真的改」的判断：判空反而更绕，而改资料本来就是低频操作。
-        stringRedisTemplate.delete(CACHE_ARTICLE_PAGES);
+        redisUtil.evict(CACHE_ARTICLE_PAGES);
     }
 
 }

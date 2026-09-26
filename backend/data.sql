@@ -14,7 +14,7 @@ CREATE TABLE it_student
     position   varchar(20)      NOT NULL,
     avatar_id  bigint           not null,
     password   VARCHAR(100)     NOT NULL,
-    create_date_time datetime   null, -- 入会时间，审批通过时写入；老成员为 null
+    create_date_time datetime   null,
     deleted    boolean          not null default 0
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
