@@ -3,7 +3,6 @@ package com.xiaoyan.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import com.xiaoyan.constant.MessageConstant;
-import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
@@ -61,10 +60,9 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public void saveResource(ResourcesDTO resourcesDTO) {
-        String studentId = BaseContext.getCurrentStudentId();
+    public void saveResource(ResourcesDTO resourcesDTO, String studentId){
         MultipartFile coverFile = resourcesDTO.getCover();
-        MultipartFile resourceFile = resourcesDTO.getFile();
+        MultipartFile resourceFile =resourcesDTO.getFile();
         String head = resourcesDTO.getHead();
         String introduce = resourcesDTO.getIntroduce();
         LocalDateTime releaseDateTime = LocalDateTime.now();
@@ -101,19 +99,17 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
 
         usersService.checkOwnerOrAdmin(resource.getStudentId());
 
-        // objectName 先取出来，记录删掉之后再删文件。反过来一旦 resourcesMapper 这步失败，
-        // 资料还在列表里、文件却已经没了
         StudentFile file = studentFileMapper.selectById(resource.getStudentFileFileId());
+        if (file != null) {
+            commonService.delete(file.getObjectName());
+        }
         StudentFile cover = studentFileMapper.selectById(resource.getStudentFileCoverId());
+        if (cover != null) {
+            commonService.delete(cover.getObjectName());
+        }
 
         resourcesMapper.deleteById(id);
         redisUtil.evict(CACHE_RESOURCES_ALL);
 
-        if (file != null) {
-            commonService.delete(file.getObjectName());
-        }
-        if (cover != null) {
-            commonService.delete(cover.getObjectName());
-        }
     }
 }

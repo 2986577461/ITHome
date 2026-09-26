@@ -14,7 +14,7 @@ CREATE TABLE it_student
     position   varchar(20)      NOT NULL,
     avatar_id  bigint           not null,
     password   VARCHAR(100)     NOT NULL,
-    create_date_time datetime   null, -- 入会时间，审批通过时写入；老成员为 null
+    create_date_time datetime   null,
     deleted    boolean          not null default 0
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
@@ -49,7 +49,9 @@ CREATE TABLE article
     content           varchar(10000) not null,
     student_id        varchar(20)    not null,
     release_date_time DATETIME       not null,
-    updated_date_time datetime       not null
+    updated_date_time datetime       not null,
+    KEY idx_article_updated (updated_date_time, id),
+    KEY idx_article_type_updated (type, updated_date_time, id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
@@ -77,10 +79,7 @@ create table student_file
     student_id       varchar(20)         not null,
     original_name    varchar(200)        not null,
     object_name      varchar(200) unique not null,
-    -- 降级到本地时暂时为 null，补传成功后回填
-    file_url         varchar(200)        null,
-    -- OSS / LOCAL，见 StorageConstant
-    storage_type     varchar(10)         not null default 'OSS',
+    file_url         varchar(200)        not null,
     file_size        bigint              not null,
     file_type        varchar(80)         not null,
     create_date_time datetime            not null,
@@ -88,22 +87,3 @@ create table student_file
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
-;
--- 删除 OSS 对象失败时留下的欠账。student_file 那行在同一事务里已经删了，
--- 之后没有任何地方能证明「OSS 上还剩一个该删没删的对象」，所以单记一张表，
--- 由 OssSyncTask 定时重试。object_name 直接做主键：同一个对象重复记账是允许的，
--- 重试也是幂等的
-create table pending_oss_delete
-(
-    object_name      varchar(200) primary key,
-    create_date_time datetime not null
-) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci;
-
-
-create table pending_oss_delete
-(
-    object_name      varchar(200) primary key,
-    create_date_time datetime not null
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;

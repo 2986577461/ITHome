@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static com.xiaoyan.constant.RedisConstant.CACHE_ARTICLE_PAGES;
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
@@ -62,9 +63,6 @@ import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
 @Slf4j
 public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         implements UsersService {
-
-    // 这里直接用 mapper，不注入 ArticlesService / ResourcesService：
-    // 那两个 Service 都注入了 UsersService，构造器注入成环会导致启动失败。
     private final ArticleMapper articleMapper;
     private final ResourcesMapper resourcesMapper;
     private JwtProperties jwtProperties;
@@ -119,7 +117,6 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         return vo;
     }
 
-    @Transactional
     public void uploadAvatar(MultipartFile avatar) throws IOException {
         String studentId = BaseContext.getCurrentStudentId();
         Student student = userMapper.selectByStudentId(studentId);
@@ -127,22 +124,19 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);
         }
 
-        // 老头像最后才删：先删的话，上传或下面那次 update 任何一步失败，
-        // student.avatar_id 都还指着一条已经删掉的记录，用户头像直接坏掉
-        Long oldAvatarId = student.getAvatarId();
+        Long avatarId = student.getAvatarId();
+        if (avatarId != null) {
+            StudentFile oldAvatar = studentFileMapper.selectById(avatarId);
+            if (oldAvatar != null) {
+                commonService.delete(oldAvatar.getObjectName());
+            }
+        }
         Long newAvatarId = commonService.upload(avatar).getId();
         student.setAvatarId(newAvatarId);
         this.lambdaUpdate().set(Student::getAvatarId, newAvatarId).update();
         redisUtil.evictHashFields(CACHE_STUDENTS, studentId);
         // 头像会被烤进文章缓存里的 ArticleVO，不一起失效的话文章列表上还是旧头像
         redisUtil.evict(CACHE_ARTICLE_PAGES);
-
-        if (oldAvatarId != null) {
-            StudentFile oldAvatar = studentFileMapper.selectById(oldAvatarId);
-            if (oldAvatar != null) {
-                commonService.delete(oldAvatar.getObjectName());
-            }
-        }
     }
 
     @Override

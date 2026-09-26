@@ -352,6 +352,7 @@ import { ElMessage } from "element-plus";
 import { getThis, update, uploadAvatar, removeSelf } from "@/request/axiosForUser";
 import { getArticlePosition } from "@/request/axiosForArticles";
 
+
 const router = useRouter();
 const userStore = useUserStore();
 const articleStore = useArticleStore();

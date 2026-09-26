@@ -320,12 +320,16 @@ const activeCat = ref("all");
 const deleteDialog = ref(false);
 const toDelete = ref(null);
 const pageSize = 5;
+const LIST_WINDOW = 200;
 const currentPage = ref(1);
 const totalCount = ref(0);
 const loading = ref(true);
 const loadingMore = ref(false);
 const totalPages = computed(() =>
-  Math.max(1, Math.ceil(totalCount.value / pageSize)),
+  Math.max(
+    1,
+    Math.ceil(Math.min(totalCount.value, LIST_WINDOW) / pageSize),
+  ),
 );
 const hasMore = computed(() => articles.value.length === pageSize);
 const pageNumbers = computed(() => {
@@ -546,9 +550,11 @@ onMounted(async () => {
   loading.value = true;
   var q = router.currentRoute.value.query;
   var pageNum = q.page ? Number(q.page) : 1;
+  if (!Number.isFinite(pageNum) || pageNum < 1) pageNum = 1;
+  await fetchCount();
+  if (pageNum > totalPages.value) pageNum = 1;
   await fetchPage(pageNum);
   currentPage.value = pageNum;
-  await fetchCount();
   loading.value = false;
   highlightCode();
   if (q.highlight) {

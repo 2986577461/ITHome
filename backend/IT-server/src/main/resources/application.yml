@@ -46,21 +46,12 @@ xiaoyan:
     secret-key: ${JWT_SECRET_KEY}
     token-name: ${JWT_TOKEN_NAME}
     ttl: ${JWT_TTL}
-  # OSS 不可用时文件的落地目录。相对路径按进程工作目录解析，
-  # 启动日志会打出解析后的绝对路径
-  file-storage:
-    local-dir: ${LOCAL_FILE_DIR:./local-files}
-  # 补传任务的间隔（毫秒）。写死的默认值和 OssSyncTask 上的保持一致
-  oss-sync:
-    interval: 300000
   admit-urls:
-    # <img src> 发不出 Authorization 头，降级文件的预览只能免登录。
-    # object_name 是 UUID 不可枚举，和 OSS 那边的公开图是同一个模型
-    - "/user/common/local/**"
     - "/user/users/login"
     - "/user/resources/all"
     - "/v3/api-docs/**"
     - "/user/newcomers"
     - "/user/articles/page"
     - "/user/articles/count"
+    - "/user/articles/*/content"
     - "/ws/**"

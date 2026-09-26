@@ -295,7 +295,6 @@ async function download(objectName) {
   try {
     var resp = await getDownloadUrl(objectName);
     if (!resp || !resp.data) return;
-    // 文件名由响应头的 Content-Disposition 带，OSS 和本地两条路都有，这里不用设 a.download
     var a = document.createElement("a");
     a.href = resp.data;
     a.style.display = "none";
