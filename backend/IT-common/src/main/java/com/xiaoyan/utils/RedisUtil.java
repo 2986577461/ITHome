@@ -34,7 +34,7 @@ import java.util.function.Supplier;
  *   <li><b>缓存读</b>（{@link #queryStringWithMutex} / {@link #queryHashWithMutex}）——
  *       降级查库。缓存只是「可选加速」，Redis 挂了系统应该只是变慢，不是不可用</li>
  *   <li><b>缓存写与失效</b>（{@link #putHashField} / {@link #evict} / {@link #evictHashFields}）——
- *       记日志后吞掉。最坏结果是脏数据多留到 TTL 过期</li>
+ *       记日志后吞掉，不让缓存故障影响主业务</li>
  *   <li><b>登录态</b>（{@link #isTokenValid}）—— 放行。见该方法的注释</li>
  * </ul>
  *
@@ -49,8 +49,6 @@ public class RedisUtil implements DisposableBean {
 
     private static final long WAITING_MILL = 50;
     private static final int LOCK_RETRY_TIMES = 20;
-    private static final String NEGATIVE_CACHE_PREFIX = "cache:null:";
-
     public static final long VOID_VALUE_TTL = 2L;
     public static final Long LOCK_TTL = 10L;
     public static Long DEFAULT_TTL = 120L;
@@ -140,7 +138,7 @@ public class RedisUtil implements DisposableBean {
     }
 
     public <R> R queryHashWithMutex(@NonNull String key, @NonNull String hashKey,
-                                    @NonNull Class<R> rType, @NonNull Function<String, R> dbFallback) {
+                                    @NonNull Class<?> rType, @NonNull Function<String, R> dbFallback) {
         try {
             return doQueryHashWithMutex(key, hashKey, rType, dbFallback);
         } catch (DataAccessException e) {
@@ -149,13 +147,14 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private <R> R doQueryHashWithMutex(String key, String hashKey,
-                                       Class<R> rType, Function<String, R> dbFallback) {
+                                       Class<?> rType, Function<String, R> dbFallback) {
         Object cached = stringRedisTemplate.opsForHash().get(key, hashKey);
         if (StrUtil.isNotBlank((String) cached)) {
-            return JSONUtil.toBean((String) cached, rType);
+            return (R) parse((String) cached, rType);
         }
-        if (cached != null || isNegativeCached(hashNullKey(key, hashKey))) {
+        if (cached != null) {
             return null;
         }
 
@@ -163,18 +162,16 @@ public class RedisUtil implements DisposableBean {
         try {
             Object latest = stringRedisTemplate.opsForHash().get(key, hashKey);
             if (StrUtil.isNotBlank((String) latest)) {
-                return JSONUtil.toBean((String) latest, rType);
+                return (R) parse((String) latest, rType);
             }
-            if (latest != null || isNegativeCached(hashNullKey(key, hashKey))) {
+            if (latest != null) {
                 return null;
             }
 
             R value = dbFallback.apply(hashKey);
             if (value == null) {
-                cacheNull(hashNullKey(key, hashKey));
                 return null;
             }
-            evict(hashNullKey(key, hashKey));
             putHashField(key, hashKey, JSONUtil.toJsonStr(value));
             return value;
         } finally {
@@ -200,17 +197,6 @@ public class RedisUtil implements DisposableBean {
     public void putHashField(@NonNull String key, @NonNull String field, @NonNull String value) {
         try {
             stringRedisTemplate.opsForHash().put(key, field, value);
-        } catch (DataAccessException e) {
-            logDegraded("跳过写缓存", "key=" + key + " field=" + field, e);
-        }
-    }
-
-    /** 写 Hash field 并刷新整个 key 的 TTL。用于分页缓存这类整组共享一个过期时间的场景 */
-    public void putHashField(@NonNull String key, @NonNull String field, @NonNull String value,
-                             long ttl, @NonNull TimeUnit unit) {
-        try {
-            stringRedisTemplate.opsForHash().put(key, field, value);
-            stringRedisTemplate.expire(key, ttl, unit);
         } catch (DataAccessException e) {
             logDegraded("跳过写缓存", "key=" + key + " field=" + field, e);
         }
@@ -267,14 +253,6 @@ public class RedisUtil implements DisposableBean {
     /* ============================================================
      * 分布式锁：内部使用
      * ============================================================ */
-
-    private String hashNullKey(String key, String hashKey) {
-        return NEGATIVE_CACHE_PREFIX + "hash:" + key + ":" + hashKey;
-    }
-
-    private boolean isNegativeCached(String key) {
-        return stringRedisTemplate.opsForValue().get(key) != null;
-    }
 
     private void cacheNull(String key) {
         try {
