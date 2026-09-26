@@ -19,7 +19,6 @@ import com.xiaoyan.utils.RedisUtil;
 import com.xiaoyan.vo.ArticleImageVO;
 import com.xiaoyan.vo.ArticleVO;
 import com.xiaoyan.vo.MyArticleVO;
-import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -45,12 +44,7 @@ import static com.xiaoyan.constant.RedisConstant.CACHE_ARTICLE_PAGES;
 public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         implements ArticlesService {
 
-    /**
-     * 分页缓存最多覆盖的文章数。
-     *
-     * <p>超出这个位置的分页直接查库：否则客户端用一个很大的 page 就能无限往缓存里塞条目，
-     * field 数量没有上界。</p>
-     */
+
 
     private final UsersService usersService;
     private ArticleMapper articleMapper;
