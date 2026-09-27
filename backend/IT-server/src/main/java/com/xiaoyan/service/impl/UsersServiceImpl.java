@@ -2,7 +2,6 @@ package com.xiaoyan.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.crypto.digest.BCrypt;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaoyan.constant.JwtClaimsConstant;
 import com.xiaoyan.constant.MessageConstant;
@@ -14,8 +13,6 @@ import com.xiaoyan.mapper.ArticleMapper;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
 import com.xiaoyan.mapper.UserMapper;
-import com.xiaoyan.pojo.Article;
-import com.xiaoyan.pojo.Resources;
 import com.xiaoyan.pojo.Student;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.properties.JwtProperties;
@@ -44,13 +41,13 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import static com.xiaoyan.constant.RedisConstant.CACHE_ARTICLE_PAGES;
 import static com.xiaoyan.constant.RedisConstant.CACHE_STUDENTS;
@@ -75,10 +72,19 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
     @Override
     public StudentVO getUser(String studentId) {
         return redisUtil.queryHashWithMutex(CACHE_STUDENTS, studentId,
-                StudentVO.class, id -> this.queryStudentFromDB(studentId));
+                StudentVO.class, ignored -> toSingleUser(studentId));
+    }
+
+    private StudentVO toSingleUser(String studentId) {
+        Student student = userMapper.selectByStudentId(studentId);
+        if (student == null) {
+            return null;
+        }
+        return this.toStudentVOList(Collections.singletonList(student)).get(0);
     }
 
     @Override
+
     public void checkOwnerOrAdmin(String ownerStudentId) {
         // 权限校验：仅作者本人或管理员可修改
         String currentStudentId = BaseContext.getCurrentStudentId();
@@ -95,26 +101,6 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
                 && !currentStudentId.equals(ownerStudentId)) {
             throw new ParameterException(Result.FORBIDDEN, MessageConstant.PERMISSION_DENIED);
         }
-    }
-
-    public StudentVO queryStudentFromDB(String studentId) {
-        Student student = userMapper.selectByStudentId(studentId);
-        if (student == null) {
-            return null;
-        }
-        StudentVO vo = BeanUtil.toBean(student, StudentVO.class);
-        Long avatarId = student.getAvatarId();
-        if (avatarId != null) {
-            StudentFile avatar = studentFileMapper.selectById(avatarId);
-            if (avatar != null) {
-                vo.setAvatar(avatar.getFileUrl());
-            }
-        }
-        vo.setArticleCount(articleMapper.selectCount(new LambdaQueryWrapper<Article>()
-                .eq(Article::getStudentId, studentId)));
-        vo.setResourceCount(resourcesMapper.selectCount(new LambdaQueryWrapper<Resources>()
-                .eq(Resources::getStudentId, studentId)));
-        return vo;
     }
 
     public void uploadAvatar(MultipartFile avatar) throws IOException {
@@ -178,7 +164,6 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
 
             workbook.write(bos);
             excelBytes = bos.toByteArray();
-            workbook.dispose();
         }
 
         HttpHeaders headers = new HttpHeaders();
@@ -247,15 +232,7 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         return Result.success(vo);
     }
 
-
-    @Override
-    public List<StudentVO> getAll() {
-        List<Student> list = this.list();
-        // 空列表要提前返回：下面的 IN () 是非法 SQL
-        if (list.isEmpty()) {
-            return List.of();
-        }
-
+    public List<StudentVO> toStudentVOList(List<Student> list) {
         Set<Long> avatarIds = new HashSet<>();
         List<String> studentIds = new ArrayList<>(list.size());
         for (Student student : list) {
@@ -271,8 +248,6 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
                     .forEach(file -> avatarUrlMap.put(file.getId(), file.getFileUrl()));
         }
 
-        // 逐个学生 count 的话，一个成员两次查询，50 个成员就是 100 次。
-        // 按 student_id 分组各查一次，两个计数总共 2 次。
         Map<String, Long> articleCountMap = toCountMap(articleMapper.countByStudentIds(studentIds));
         Map<String, Long> resourceCountMap = toCountMap(resourcesMapper.countByStudentIds(studentIds));
 
@@ -287,6 +262,15 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
             vo.setResourceCount(resourceCountMap.getOrDefault(studentId, 0L));
             return vo;
         }).toList();
+    }
+
+    @Override
+    public List<StudentVO> getAll() {
+        List<Student> list = this.list();
+        if (list.isEmpty()) {
+            return List.of();
+        }
+        return toStudentVOList(list);
     }
 
     private static Map<String, Long> toCountMap(List<StudentCountVO> counts) {
@@ -344,10 +328,6 @@ public class UsersServiceImpl extends ServiceImpl<UserMapper, Student>
         if (student == null || student.getId() == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
-
-        // 归属必须以主键查出来的真实记录为准。
-        // 请求里同时带着 id(主键) 和 studentId(学号)：若拿请求传来的 studentId 做校验，
-        // 攻击者填上自己的学号 + 别人的主键，校验通过、updateById 却按主键改掉了别人的记录。
         Student target = this.getById(student.getId());
         if (target == null) {
             throw new ParameterException(MessageConstant.ACCOUNT_NOT_FOUND);

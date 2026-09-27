@@ -1,11 +1,14 @@
 package com.xiaoyan.enumeration;
 
+import lombok.Getter;
+
 /**
  * 文章分类。
  *
  * <p>code 显式声明而不依赖 ordinal()：ordinal 会随枚举顺序变化，
  * 而它同时被写进数据库的 type 字段和 Redis 榜单 key，顺序一变数据就对不上。</p>
  */
+@Getter
 public enum ArticleType {
     ALL(0),
     C_LANGUAGE(1),
@@ -21,7 +24,4 @@ public enum ArticleType {
         this.code = code;
     }
 
-    public int getCode() {
-        return code;
-    }
 }

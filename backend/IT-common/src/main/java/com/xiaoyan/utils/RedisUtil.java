@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -31,7 +32,7 @@ import java.util.function.Supplier;
  *
  * <p>每个方法自己处理 Redis 异常，调用方不用再写 try-catch。失败时的行为按用途分三类：</p>
  * <ul>
- *   <li><b>缓存读</b>（{@link #queryStringWithMutex} / {@link #queryHashWithMutex}）——
+ *   <li><b>缓存读</b>（{@link #queryStringWithMutex} / {@link #queryHashWithMutex} / {@link #queryHashListWithMutex}）——
  *       降级查库。缓存只是「可选加速」，Redis 挂了系统应该只是变慢，不是不可用</li>
  *   <li><b>缓存写与失效</b>（{@link #putHashField} / {@link #evict} / {@link #evictHashFields}）——
  *       记日志后吞掉，不让缓存故障影响主业务</li>
@@ -90,6 +91,7 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
+
     @SuppressWarnings("unchecked")
     public <R> R queryStringWithMutex(@NonNull String key, @NonNull Class<?> type,
                                       @NonNull Supplier<R> dbFallback) {
@@ -134,11 +136,14 @@ public class RedisUtil implements DisposableBean {
     }
 
     private Object parse(String json, Class<?> type) {
-        return json.trim().startsWith("[") ? JSONUtil.toList(json, type) : JSONUtil.toBean(json, type);
+        return json.trim().startsWith("[")
+                ? JSONUtil.toList(json, type)
+                : JSONUtil.toBean(json, type);
     }
 
     public <R> R queryHashWithMutex(@NonNull String key, @NonNull String hashKey,
-                                    @NonNull Class<?> rType, @NonNull Function<String, R> dbFallback) {
+                                    @NonNull Class<R> rType,
+                                    @NonNull Function<String, R> dbFallback) {
         try {
             return doQueryHashWithMutex(key, hashKey, rType, dbFallback);
         } catch (DataAccessException e) {
@@ -147,12 +152,12 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private <R> R doQueryHashWithMutex(String key, String hashKey,
-                                       Class<?> rType, Function<String, R> dbFallback) {
+                                       Class<R> rType,
+                                       Function<String, R> dbFallback) {
         Object cached = stringRedisTemplate.opsForHash().get(key, hashKey);
         if (StrUtil.isNotBlank((String) cached)) {
-            return (R) parse((String) cached, rType);
+            return JSONUtil.toBean((String) cached, rType);
         }
         if (cached != null) {
             return null;
@@ -162,7 +167,7 @@ public class RedisUtil implements DisposableBean {
         try {
             Object latest = stringRedisTemplate.opsForHash().get(key, hashKey);
             if (StrUtil.isNotBlank((String) latest)) {
-                return (R) parse((String) latest, rType);
+                return JSONUtil.toBean((String) latest, rType);
             }
             if (latest != null) {
                 return null;
@@ -179,9 +184,49 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    /* ============================================================
-     * 缓存读写与失效：失败只记日志，等 TTL 自然过期
-     * ============================================================ */
+    public <R> List<R> queryHashListWithMutex(@NonNull String key, @NonNull String hashKey,
+                                              @NonNull Class<R> rType,
+                                              @NonNull Function<String, List<R>> dbFallback) {
+        try {
+            return doQueryHashListWithMutex(key, hashKey, rType, dbFallback);
+        } catch (DataAccessException e) {
+            logDegraded("降级查库", "key=" + key + " field=" + hashKey, e);
+            return dbFallback.apply(hashKey);
+        }
+    }
+
+    private <R> List<R> doQueryHashListWithMutex(String key, String hashKey,
+                                                  Class<R> rType,
+                                                  Function<String, List<R>> dbFallback) {
+        Object cached = stringRedisTemplate.opsForHash().get(key, hashKey);
+        if (StrUtil.isNotBlank((String) cached)) {
+            return JSONUtil.toList((String) cached, rType);
+        }
+        if (cached != null) {
+            return null;
+        }
+
+        LockHandle lock = acquireLockWithRetry("lock:hash:" + key + ":" + hashKey);
+        try {
+            Object latest = stringRedisTemplate.opsForHash().get(key, hashKey);
+            if (StrUtil.isNotBlank((String) latest)) {
+                return JSONUtil.toList((String) latest, rType);
+            }
+            if (latest != null) {
+                return null;
+            }
+
+            List<R> value = dbFallback.apply(hashKey);
+            if (value == null) {
+                return null;
+            }
+            // 空列表也是有效的分页结果，缓存为 []，避免相同请求反复回源。
+            putHashField(key, hashKey, JSONUtil.toJsonStr(value));
+            return value;
+        } finally {
+            unlock(lock);
+        }
+    }
 
     /** 读 Hash field。Redis 不可用和字段不存在都返回 null，调用方一律按「未命中」处理 */
     public String getHashField(@NonNull String key, @NonNull String field) {
