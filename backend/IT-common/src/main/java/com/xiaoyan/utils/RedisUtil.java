@@ -81,7 +81,9 @@ public class RedisUtil implements DisposableBean {
      * 缓存读：Redis 不可用时降级查库
      * ============================================================ */
 
-    /** 写缓存。失败只记日志：没写进去最坏是下次再查一次库，不该让业务失败 */
+    /**
+     * 写缓存。失败只记日志：没写进去最坏是下次再查一次库，不该让业务失败
+     */
     public void save(@NonNull String key, @NonNull Object value) {
         try {
             stringRedisTemplate.opsForValue()
@@ -92,7 +94,6 @@ public class RedisUtil implements DisposableBean {
     }
 
 
-    @SuppressWarnings("unchecked")
     public <R> R queryStringWithMutex(@NonNull String key, @NonNull Class<?> type,
                                       @NonNull Supplier<R> dbFallback) {
         try {
@@ -196,8 +197,8 @@ public class RedisUtil implements DisposableBean {
     }
 
     private <R> List<R> doQueryHashListWithMutex(String key, String hashKey,
-                                                  Class<R> rType,
-                                                  Function<String, List<R>> dbFallback) {
+                                                 Class<R> rType,
+                                                 Function<String, List<R>> dbFallback) {
         Object cached = stringRedisTemplate.opsForHash().get(key, hashKey);
         if (StrUtil.isNotBlank((String) cached)) {
             return JSONUtil.toList((String) cached, rType);
@@ -228,7 +229,9 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    /** 读 Hash field。Redis 不可用和字段不存在都返回 null，调用方一律按「未命中」处理 */
+    /**
+     * 读 Hash field。Redis 不可用和字段不存在都返回 null，调用方一律按「未命中」处理
+     */
     public String getHashField(@NonNull String key, @NonNull String field) {
         try {
             return (String) stringRedisTemplate.opsForHash().get(key, field);
@@ -238,7 +241,9 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    /** 写 Hash field，不设过期。用于整组失效的缓存（如按 id 存的学员信息） */
+    /**
+     * 写 Hash field，不设过期。用于整组失效的缓存（如按 id 存的学员信息）
+     */
     public void putHashField(@NonNull String key, @NonNull String field, @NonNull String value) {
         try {
             stringRedisTemplate.opsForHash().put(key, field, value);
@@ -247,7 +252,9 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    /** 删除缓存 key。失败只记日志：最坏是脏数据多留到 TTL 过期，远好于让接口报错 */
+    /**
+     * 删除缓存 key。失败只记日志：最坏是脏数据多留到 TTL 过期，远好于让接口报错
+     */
     public void evict(String... keys) {
         if (keys == null || keys.length == 0) {
             return;
@@ -259,7 +266,9 @@ public class RedisUtil implements DisposableBean {
         }
     }
 
-    /** 删除 Hash 里的若干 field */
+    /**
+     * 删除 Hash 里的若干 field
+     */
     public void evictHashFields(@NonNull String key, Object... fields) {
         if (fields == null || fields.length == 0) {
             return;
@@ -283,7 +292,9 @@ public class RedisUtil implements DisposableBean {
      * 拿「注销延迟生效」换「全站可用」是划算的。
      * ============================================================ */
 
-    /** 校验 token 是否为该学员当前有效的登录态。Redis 不可用时返回 true（放行） */
+    /**
+     * 校验 token 是否为该学员当前有效的登录态。Redis 不可用时返回 true（放行）
+     */
     public boolean isTokenValid(@NonNull String key, @NonNull String studentId, @NonNull String token) {
         String stored;
         try {
@@ -333,7 +344,7 @@ public class RedisUtil implements DisposableBean {
         }
 
         try {
-            long renewalInterval = Math.max(1L, TimeUnit.SECONDS.toMillis(LOCK_TTL) / 3);
+            long renewalInterval = TimeUnit.SECONDS.toMillis(LOCK_TTL) / 3;
             ScheduledFuture<?> renewalTask = lockRenewalExecutor.scheduleAtFixedRate(
                     () -> renewLock(key, token), renewalInterval, renewalInterval, TimeUnit.MILLISECONDS);
             return new LockHandle(key, token, renewalTask);

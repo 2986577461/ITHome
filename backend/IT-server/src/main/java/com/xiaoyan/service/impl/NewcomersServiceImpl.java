@@ -22,6 +22,7 @@ import com.xiaoyan.pojo.Newcomer;
 
 import java.time.LocalDateTime;
 import java.util.List;
+
 /**
  * @author yuchao
  */
@@ -71,18 +72,17 @@ public class NewcomersServiceImpl extends ServiceImpl<NewcomerMapper, Newcomer>
     }
 
     @Override
-    @Transactional
     public void applyJoin(@NonNull Newcomer newComer) {
         String studentId = newComer.getStudentId();
 
-        Newcomer dbNewComer = newcomerMapper.selectByStudentId(studentId);
+        // 唯一索引只能防止 newcomer 表内部重复，
+        // 已经是正式成员的学号必须额外检查。
         Student dbStudent = userMapper.selectByStudentId(studentId);
-        if (dbStudent != null || dbNewComer != null) {
+        if (dbStudent != null) {
             throw new ParameterException(MessageConstant.REPEATREQUEST);
         }
 
         newComer.setApplicationDateTime(LocalDateTime.now());
-        // 申请时就把密码 hash 存下来，审批通过后直接使用
         newComer.setPassword(BCrypt.hashpw(newComer.getPassword()));
         try {
             if (!this.save(newComer)) {
