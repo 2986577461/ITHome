@@ -45,7 +45,6 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         implements ArticlesService {
 
 
-
     private final UsersService usersService;
     private ArticleMapper articleMapper;
     private RedisUtil redisUtil;
@@ -98,24 +97,14 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
      */
     @Override
     public List<ArticleVO> getPage(Integer page, Integer type, Integer size) {
-        if (page < 1 || size < 1) {
-            throw new ParameterException(MessageConstant.PARAMETER_ERROR);
-        }
         int start = (page - 1) * size;
-        String field = cacheType(type) + ":" + size + ":" + page;
+        String field = type + ":" + size + ":" + page;
 
-        return redisUtil.queryHashWithMutex(
+        return redisUtil.queryHashListWithMutex(
                 CACHE_ARTICLE_PAGES,
                 field,
                 ArticleVO.class,
                 ignored -> queryPageFromDB(start, type, size));
-    }
-
-    /**
-     * 缓存 field 里统一用 ArticleType.ALL 的 code 代表「全部」
-     */
-    private int cacheType(Integer type) {
-        return type == null ? ArticleType.ALL.getCode() : type;
     }
 
     private List<ArticleVO> queryPageFromDB(int start, Integer type, int size) {
