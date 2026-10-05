@@ -320,16 +320,12 @@ const activeCat = ref("all");
 const deleteDialog = ref(false);
 const toDelete = ref(null);
 const pageSize = 5;
-const LIST_WINDOW = 200;
 const currentPage = ref(1);
 const totalCount = ref(0);
 const loading = ref(true);
 const loadingMore = ref(false);
 const totalPages = computed(() =>
-  Math.max(
-    1,
-    Math.ceil(Math.min(totalCount.value, LIST_WINDOW) / pageSize),
-  ),
+  Math.max(1, Math.ceil(totalCount.value / pageSize)),
 );
 const hasMore = computed(() => articles.value.length === pageSize);
 const pageNumbers = computed(() => {

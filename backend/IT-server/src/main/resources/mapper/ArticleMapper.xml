@@ -7,9 +7,6 @@
 <mapper namespace="com.xiaoyan.mapper.ArticleMapper">
 
 
-
-    <!-- 作者姓名和头像直接 JOIN 出来：student_id 在 it_student 上是 unique、
-         student_file.id 是主键，两个 LEFT JOIN 都不会放大行数 -->
     <select id="selectPage" resultType="com.xiaoyan.vo.ArticleVO">
         SELECT a.id,
                a.student_id,
@@ -21,13 +18,20 @@
                s.name     AS name,
                f.file_url AS avatar
         FROM article a
+                 join (SELECT id
+                       FROM article
+                       <where>
+                           <if test="type!=null">
+                               type=#{type}
+                           </if>
+                       </where>
+                       ORDER BY updated_date_time DESC, id DESC
+                       limit #{offset},#{size}
+        ) a_id
+                      ON a.id = a_id.id
                  LEFT JOIN it_student s ON s.student_id = a.student_id AND s.deleted = 0
                  LEFT JOIN student_file f ON f.id = s.avatar_id
-        <if test="type != null">
-            WHERE a.type = #{type}
-        </if>
         ORDER BY a.updated_date_time DESC, a.id DESC
-        LIMIT #{offset}, #{size}
     </select>
 
     <select id="selectMyPage" resultType="com.xiaoyan.vo.MyArticleVO">
