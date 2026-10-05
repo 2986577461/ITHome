@@ -14,6 +14,7 @@ import com.xiaoyan.utils.RedisUtil;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.xiaoyan.dto.ResourcesDTO;
 import com.xiaoyan.pojo.Resources;
@@ -91,11 +92,14 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
+    @Transactional
     public void deleteById(Long id, String studentId) {
         Resources resource = getById(id);
         if (resource == null) {
             throw new ParameterException(MessageConstant.PARAMETER_ERROR);
         }
+
+        resourcesMapper.deleteById(id);
 
         usersService.checkOwnerOrAdmin(resource.getStudentId());
 
@@ -107,8 +111,6 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
         if (cover != null) {
             commonService.delete(cover.getObjectName());
         }
-
-        resourcesMapper.deleteById(id);
         redisUtil.evict(CACHE_RESOURCES_ALL);
 
     }
