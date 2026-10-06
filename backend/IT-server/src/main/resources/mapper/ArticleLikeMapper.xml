@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xiaoyan.mapper.ArticleLikeMapper">
+
+    <select id="countByArticleIds" resultType="com.xiaoyan.vo.IdCountVO">
+        SELECT article_id AS id, CAST(COUNT(*) AS SIGNED) AS total
+        FROM article_like
+        WHERE article_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        GROUP BY article_id
+    </select>
+
+    <select id="selectLikedArticleIds" resultType="long">
+        SELECT article_id
+        FROM article_like
+        WHERE student_id = #{studentId}
+          AND article_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY create_date_time ASC, id ASC
+    </select>
+
+    <delete id="deleteByArticleId">
+        DELETE FROM article_like
+        WHERE article_id = #{articleId}
+    </delete>
+</mapper>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xiaoyan.mapper.ArticleCommentMapper">
+
+    <sql id="commentColumns">
+        c.id,
+        c.article_id,
+        c.parent_id,
+        c.student_id,
+        c.content,
+        c.create_date_time,
+        s.name AS name,
+        f.file_url AS avatar
+    </sql>
+
+    <sql id="commentJoins">
+        FROM article_comment c
+                 LEFT JOIN it_student s ON s.student_id = c.student_id AND s.deleted = 0
+                 LEFT JOIN student_file f ON f.id = s.avatar_id
+    </sql>
+
+    <!-- 只查顶层评论，从旧到新。点赞数不参与排序。 -->
+    <select id="selectTopLevel" resultType="com.xiaoyan.vo.CommentVO">
+        SELECT
+        <include refid="commentColumns"/>
+        <include refid="commentJoins"/>
+        WHERE c.article_id = #{articleId}
+          AND c.parent_id IS NULL
+          AND c.deleted = 0
+        ORDER BY c.create_date_time ASC, c.id ASC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countTopLevel" resultType="long">
+        SELECT CAST(COUNT(*) AS SIGNED)
+        FROM article_comment
+        WHERE article_id = #{articleId}
+          AND parent_id IS NULL
+          AND deleted = 0
+    </select>
+
+    <select id="countTopLevelByArticleIds" resultType="com.xiaoyan.vo.IdCountVO">
+        SELECT article_id AS id, CAST(COUNT(*) AS SIGNED) AS total
+        FROM article_comment
+        WHERE deleted = 0
+          AND parent_id IS NULL
+          AND article_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        GROUP BY article_id
+    </select>
+
+    <select id="selectReplies" resultType="com.xiaoyan.vo.CommentVO">
+        SELECT
+        <include refid="commentColumns"/>
+        <include refid="commentJoins"/>
+        WHERE c.deleted = 0
+          AND c.parent_id IN
+        <foreach collection="parentIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY c.create_date_time ASC, c.id ASC
+    </select>
+
+    <delete id="deleteByArticleId">
+        DELETE FROM article_comment
+        WHERE article_id = #{articleId}
+    </delete>
+</mapper>

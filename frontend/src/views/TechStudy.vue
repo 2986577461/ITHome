@@ -102,7 +102,7 @@
                       stroke-linecap="round"
                     />
                   </svg>
-                  {{ (comments[a.id] || []).length }}
+                  {{ commentTotal[a.id] || 0 }}
                 </button>
                 <button class="interact-btn share-btn" @click="shareArticle(a)">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -120,43 +120,84 @@
                 <div class="comment-input-row">
                   <input
                     v-model="commentInputs[a.id]"
+                    maxlength="500"
                     placeholder="写下你的评论..."
                     @keydown.enter.prevent="addComment(a.id)"
                   />
                   <button
                     class="comment-send"
                     @click="addComment(a.id)"
-                    :disabled="!commentInputs[a.id]?.trim()"
+                    :disabled="!commentInputs[a.id]?.trim() || commentSending[a.id] || commentsLoading[a.id]"
                   >
                     发送
                   </button>
+                </div>
+                <div
+                  v-if="commentsLoading[a.id] && !(comments[a.id] || []).length"
+                  class="no-comments"
+                >
+                  评论加载中...
                 </div>
                 <div
                   v-for="c in comments[a.id] || []"
                   :key="c.id"
                   class="comment-item"
                 >
-                  <div class="comment-avatar">{{ (c.name || "?")[0] }}</div>
+                  <img v-if="c.avatar" :src="c.avatar" class="comment-avatar" alt="" />
+                  <div v-else class="comment-avatar">{{ (c.name || "?")[0] }}</div>
                   <div class="comment-body">
                     <div class="comment-meta">
                       <span class="comment-name">{{ c.name }}</span>
-                      <span class="comment-time">{{ c.time || "刚刚" }}</span>
+                      <span class="comment-time">{{ fmtDate(c.time) }}</span>
                     </div>
                     <div class="comment-text">{{ c.content }}</div>
-                    <button
-                      class="comment-reply-btn"
-                      @click="toggleReplyInput(a.id, c.id)"
-                    >
-                      回复
-                    </button>
-                    <div v-if="c.replies?.length" class="replies-wrap">
-                      <div
-                        v-for="r in c.replies"
-                        :key="r.id"
-                        class="reply-item"
+                    <div class="comment-actions">
+                      <button
+                        class="comment-like-btn"
+                        :class="{ liked: c.liked }"
+                        @click="toggleCommentLike(c)"
                       >
-                        <span class="reply-name">{{ r.name }}</span>
-                        <span class="reply-text">{{ r.content }}</span>
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                          <path
+                            d="M8 3.5C6.5 2 4 2 4 5s4 4.5 4 4.5S12 9 12 6s-2.5-3-4-2.5z"
+                            stroke="currentColor"
+                            stroke-width="1.3"
+                            stroke-linecap="round"
+                          />
+                        </svg>
+                        {{ c.likeCount || 0 }}
+                      </button>
+                      <button
+                        class="comment-reply-btn"
+                        @click="toggleReplyInput(a.id, c.id)"
+                      >
+                        回复
+                      </button>
+                    </div>
+                    <div v-if="c.replies?.length" class="replies-wrap">
+                      <div v-for="r in c.replies" :key="r.id" class="reply-item">
+                        <div>
+                          <span class="reply-name">{{ r.name }}</span>
+                          <span class="reply-text">{{ r.content }}</span>
+                        </div>
+                        <div class="reply-meta">
+                          <span class="comment-time">{{ fmtDate(r.time) }}</span>
+                          <button
+                            class="comment-like-btn"
+                            :class="{ liked: r.liked }"
+                            @click="toggleCommentLike(r)"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                              <path
+                                d="M8 3.5C6.5 2 4 2 4 5s4 4.5 4 4.5S12 9 12 6s-2.5-3-4-2.5z"
+                                stroke="currentColor"
+                                stroke-width="1.3"
+                                stroke-linecap="round"
+                              />
+                            </svg>
+                            {{ r.likeCount || 0 }}
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <div
@@ -165,11 +206,13 @@
                     >
                       <input
                         v-model="replyInputs[a.id + '_' + c.id]"
+                        maxlength="500"
                         placeholder="回复..."
                         @keydown.enter.prevent="addReply(a.id, c.id)"
                       />
                       <button
                         class="comment-send"
+                        :disabled="!replyInputs[a.id + '_' + c.id]?.trim() || replySending[a.id + '_' + c.id]"
                         @click="addReply(a.id, c.id)"
                       >
                         回复
@@ -177,7 +220,18 @@
                     </div>
                   </div>
                 </div>
-                <div v-if="!(comments[a.id] || []).length" class="no-comments">
+                <button
+                  v-if="commentHasMore[a.id]"
+                  class="comment-more"
+                  :disabled="commentsLoading[a.id]"
+                  @click="loadComments(a.id, true)"
+                >
+                  {{ commentsLoading[a.id] ? "加载中..." : "展开更多评论" }}
+                </button>
+                <div
+                  v-if="!commentsLoading[a.id] && !(comments[a.id] || []).length"
+                  class="no-comments"
+                >
                   暂无评论，快来抢沙发吧~
                 </div>
               </div>
@@ -294,10 +348,15 @@ import {
   getArticleCount,
   deleteById,
 } from "@/request/axiosForArticles.js";
-import { toggleLike as apiToggleLike } from "@/request/axiosForLikes.js";
+import {
+  toggleLike as apiToggleLike,
+  toggleCommentLike as apiToggleCommentLike,
+  getLikeSummary,
+} from "@/request/axiosForLikes.js";
 import {
   addComment as apiAddComment,
   replyComment as apiReplyComment,
+  getComments,
 } from "@/request/axiosForComments.js";
 import hljs from "highlight.js";
 import "highlight.js/styles/atom-one-dark.css";
@@ -350,6 +409,14 @@ const comments = reactive({});
 const commentInputs = reactive({});
 const replyInputs = reactive({});
 const replyInputVisible = reactive({});
+const commentTotal = reactive({});
+const commentHasMore = reactive({});
+const commentPage = reactive({});
+const commentsLoading = reactive({});
+const commentSending = reactive({});
+const replySending = reactive({});
+const likePending = reactive({});
+const commentReqGen = {};
 
 function fmtDate(d) {
   if (!d) return "";
@@ -413,12 +480,14 @@ async function fetchPage(p) {
     if (resp?.data) {
       const list = resp.data.records ?? resp.data;
       articles.value = list;
-      list.forEach((a) => {
-        if (!(a.id in likeCount)) {
-          likeCount[a.id] = 0;
-          liked[a.id] = false;
-        }
-      });
+      await fetchEngagement(list);
+      const opened = list.filter((a) => showComments[a.id]);
+      await Promise.all(
+        opened.map((a) => {
+          commentPage[a.id] = 1;
+          return loadComments(a.id, false);
+        }),
+      );
     }
   } catch {
     articles.value = [];
@@ -481,35 +550,170 @@ async function doDelete() {
   toDelete.value = null;
 }
 
-async function toggleLike(articleId) {
-  liked[articleId] = !liked[articleId];
-  likeCount[articleId] =
-    (likeCount[articleId] || 0) + (liked[articleId] ? 1 : -1);
-  try {
-    await apiToggleLike(articleId);
-  } catch {}
+function ensureLogin() {
+  if (userStore.condition) return true;
+  ElMessage.warning("请登录后再操作");
+  return false;
 }
 
-function toggleComments(articleId) {
+function isYes(value) {
+  return value === true || value === "true";
+}
+
+function cmpId(a, b) {
+  try {
+    const x = BigInt(a);
+    const y = BigInt(b);
+    if (x < y) return -1;
+    if (x > y) return 1;
+    return 0;
+  } catch {
+    return String(a).localeCompare(String(b));
+  }
+}
+
+function mapComment(raw) {
+  return {
+    id: raw.id,
+    name: raw.name || "匿名",
+    avatar: raw.avatar || "",
+    content: raw.content,
+    time: raw.createDateTime || raw.time || "",
+    likeCount: Number(raw.likeCount || 0),
+    liked: isYes(raw.liked),
+    replies: (raw.replies || []).map(mapComment),
+  };
+}
+
+function mergeComments(articleId, incoming) {
+  const map = new Map();
+  for (const item of comments[articleId] || []) map.set(String(item.id), item);
+  for (const item of incoming) map.set(String(item.id), item);
+  comments[articleId] = [...map.values()].sort((a, b) => {
+    const ta = new Date(a.time).getTime();
+    const tb = new Date(b.time).getTime();
+    const na = Number.isFinite(ta) ? ta : 0;
+    const nb = Number.isFinite(tb) ? tb : 0;
+    if (na !== nb) return na - nb;
+    return cmpId(a.id, b.id);
+  });
+}
+
+async function fetchEngagement(list) {
+  const ids = (list || []).map((a) => a.id).filter((id) => id != null && id !== "");
+  if (!ids.length) return;
+  try {
+    const resp = await getLikeSummary(ids);
+    if (Number(resp?.code) !== 200 || !Array.isArray(resp.data)) return;
+    resp.data.forEach((item) => {
+      likeCount[item.articleId] = Number(item.likeCount || 0);
+      liked[item.articleId] = isYes(item.liked);
+      commentTotal[item.articleId] = Number(item.commentCount || 0);
+    });
+  } catch {
+    /* 计数失败时先按 0 展示，打开评论区还会再拉一次 */
+  }
+}
+
+async function loadComments(articleId, append) {
+  if (append && commentsLoading[articleId]) return;
+  const page = append ? commentPage[articleId] || 1 : 1;
+  const gen = (commentReqGen[articleId] || 0) + 1;
+  commentReqGen[articleId] = gen;
+  commentsLoading[articleId] = true;
+  try {
+    const resp = await getComments(articleId, page);
+    if (commentReqGen[articleId] !== gen) return;
+    if (Number(resp?.code) !== 200 || !resp.data) return;
+    const list = (resp.data.records || []).map(mapComment);
+    if (!append) comments[articleId] = [];
+    mergeComments(articleId, list);
+    commentTotal[articleId] = Number(resp.data.total || 0);
+    commentHasMore[articleId] = isYes(resp.data.hasMore);
+    commentPage[articleId] = page + 1;
+  } finally {
+    if (commentReqGen[articleId] === gen) commentsLoading[articleId] = false;
+  }
+}
+
+async function toggleLike(articleId) {
+  if (!ensureLogin()) return;
+  if (likePending[articleId]) return;
+  likePending[articleId] = true;
+  const prevLiked = !!liked[articleId];
+  const prevCount = Number(likeCount[articleId] || 0);
+  liked[articleId] = !prevLiked;
+  likeCount[articleId] = Math.max(0, prevCount + (liked[articleId] ? 1 : -1));
+  try {
+    const resp = await apiToggleLike(articleId);
+    if (Number(resp?.code) !== 200 || !resp.data) {
+      liked[articleId] = prevLiked;
+      likeCount[articleId] = prevCount;
+      return;
+    }
+    liked[articleId] = isYes(resp.data.liked);
+    likeCount[articleId] = Number(resp.data.likeCount || 0);
+  } catch {
+    liked[articleId] = prevLiked;
+    likeCount[articleId] = prevCount;
+  } finally {
+    likePending[articleId] = false;
+  }
+}
+
+async function toggleCommentLike(comment) {
+  if (!ensureLogin()) return;
+  const id = comment.id;
+  if (likePending[id]) return;
+  likePending[id] = true;
+  const prevLiked = !!comment.liked;
+  const prevCount = Number(comment.likeCount || 0);
+  comment.liked = !prevLiked;
+  comment.likeCount = Math.max(0, prevCount + (comment.liked ? 1 : -1));
+  try {
+    const resp = await apiToggleCommentLike(id);
+    if (Number(resp?.code) !== 200 || !resp.data) {
+      comment.liked = prevLiked;
+      comment.likeCount = prevCount;
+      return;
+    }
+    comment.liked = isYes(resp.data.liked);
+    comment.likeCount = Number(resp.data.likeCount || 0);
+  } catch {
+    comment.liked = prevLiked;
+    comment.likeCount = prevCount;
+  } finally {
+    likePending[id] = false;
+  }
+}
+
+async function toggleComments(articleId) {
   showComments[articleId] = !showComments[articleId];
-  if (showComments[articleId] && !comments[articleId]) comments[articleId] = [];
+  if (!showComments[articleId]) return;
+  commentPage[articleId] = 1;
+  await loadComments(articleId, false);
 }
 
 async function addComment(articleId) {
   const text = commentInputs[articleId]?.trim();
   if (!text) return;
-  if (!comments[articleId]) comments[articleId] = [];
-  comments[articleId].push({
-    id: Date.now(),
-    name: userStore.name || "我",
-    content: text,
-    time: "刚刚",
-    replies: [],
-  });
-  commentInputs[articleId] = "";
+  if (!ensureLogin()) return;
+  if (commentSending[articleId] || commentsLoading[articleId]) return;
+  commentSending[articleId] = true;
   try {
-    await apiAddComment({ articleId, content: text });
-  } catch {}
+    const resp = await apiAddComment({ articleId, content: text });
+    if (Number(resp?.code) !== 200 || !resp.data) return;
+    commentInputs[articleId] = "";
+    commentTotal[articleId] = Number(commentTotal[articleId] || 0) + 1;
+    // 后面还有没展开的评论时，不把新评论插到中间，避免打乱从旧到新的顺序
+    if (!commentHasMore[articleId]) {
+      mergeComments(articleId, [mapComment(resp.data)]);
+    } else {
+      ElMessage.success("评论已发表，继续展开就能看到");
+    }
+  } finally {
+    commentSending[articleId] = false;
+  }
 }
 
 function toggleReplyInput(articleId, commentId) {
@@ -521,20 +725,30 @@ async function addReply(articleId, commentId) {
   const key = articleId + "_" + commentId;
   const text = replyInputs[key]?.trim();
   if (!text) return;
-  const c = (comments[articleId] || []).find((x) => x.id === commentId);
-  if (c) {
-    if (!c.replies) c.replies = [];
-    c.replies.push({
-      id: Date.now(),
-      name: userStore.name || "我",
-      content: text,
-    });
-  }
-  replyInputs[key] = "";
-  replyInputVisible[articleId] = null;
+  if (!ensureLogin()) return;
+  if (replySending[key]) return;
+  replySending[key] = true;
   try {
-    await apiReplyComment({ commentId, content: text });
-  } catch {}
+    const resp = await apiReplyComment({ commentId, content: text });
+    if (Number(resp?.code) !== 200 || !resp.data) return;
+    const parent = (comments[articleId] || []).find(
+      (item) => String(item.id) === String(commentId),
+    );
+    if (parent) {
+      if (!parent.replies) parent.replies = [];
+      parent.replies.push(mapComment(resp.data));
+      parent.replies.sort((a, b) => {
+        const ta = new Date(a.time).getTime() || 0;
+        const tb = new Date(b.time).getTime() || 0;
+        if (ta !== tb) return ta - tb;
+        return cmpId(a.id, b.id);
+      });
+    }
+    replyInputs[key] = "";
+    replyInputVisible[articleId] = null;
+  } finally {
+    replySending[key] = false;
+  }
 }
 
 function shareArticle() {
@@ -913,8 +1127,49 @@ onMounted(async () => {
 }
 .reply-item {
   font-size: 13px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   line-height: 1.5;
+}
+.comment-actions,
+.reply-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+}
+.comment-like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  padding: 2px 0;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+.comment-like-btn.liked {
+  color: #ff3b30;
+}
+img.comment-avatar {
+  object-fit: cover;
+  display: block;
+  background: none;
+}
+.comment-more {
+  width: 100%;
+  margin: 4px 0 8px;
+  padding: 8px 0;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: 13px;
+  cursor: pointer;
+}
+.comment-more:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .reply-name {
   font-weight: 600;

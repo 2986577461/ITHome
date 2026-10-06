@@ -87,3 +87,42 @@ create table student_file
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE article_like
+(
+    id               bigint primary key,
+    article_id       bigint      not null,
+    student_id       varchar(20) not null,
+    create_date_time datetime    not null,
+    UNIQUE KEY uk_article_like (article_id, student_id),
+    KEY idx_article_like_time (article_id, create_date_time, id)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE article_comment
+(
+    id               bigint primary key,
+    article_id       bigint       not null,
+    parent_id        bigint       null,
+    student_id       varchar(20)  not null,
+    content          varchar(500) not null,
+    create_date_time datetime     not null,
+    deleted          tinyint(1)   not null default 0,
+    KEY idx_comment_article (article_id, parent_id, create_date_time, id),
+    KEY idx_comment_parent (parent_id, create_date_time, id)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE comment_like
+(
+    id               bigint primary key,
+    comment_id       bigint      not null,
+    student_id       varchar(20) not null,
+    create_date_time datetime    not null,
+    UNIQUE KEY uk_comment_like (comment_id, student_id),
+    KEY idx_comment_like_time (comment_id, create_date_time, id)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;

@@ -42,6 +42,11 @@ public class JwtUserTokenInterceptor implements HandlerInterceptor {
             token=request.getParameter(jwtProperties.getTokenName());
         }
 
+        // 评论列表和点赞数允许游客看。没带 token 就放行；带了就照常校验，这样登录用户能看到自己是否点过赞。
+        if ((token == null || token.isBlank()) && isOptionalRead(request)) {
+            return true;
+        }
+
         try {
             Claims claims = JwtUtil.parseJWT(jwtProperties.getSecretKey(), token);
             Object userId = claims.get(JwtClaimsConstant.USER_ID);
@@ -65,5 +70,16 @@ public class JwtUserTokenInterceptor implements HandlerInterceptor {
             response.setStatus(401);
             return false;
         }
+    }
+
+    private boolean isOptionalRead(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        String path = request.getServletPath();
+        if ("/user/comments".equals(path) || "/user/likes/summary".equals(path)) {
+            return true;
+        }
+        return path.startsWith("/user/comments/") && path.endsWith("/replies");
     }
 }
