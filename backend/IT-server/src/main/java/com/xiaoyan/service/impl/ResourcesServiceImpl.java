@@ -3,6 +3,7 @@ package com.xiaoyan.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import com.xiaoyan.constant.MessageConstant;
+import com.xiaoyan.context.BaseContext;
 import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ResourcesMapper;
 import com.xiaoyan.mapper.StudentFileMapper;
@@ -61,7 +62,8 @@ public class ResourcesServiceImpl extends ServiceImpl<ResourcesMapper, Resources
     }
 
     @Override
-    public void saveResource(ResourcesDTO resourcesDTO, String studentId){
+    public void saveResource(ResourcesDTO resourcesDTO){
+        String studentId= BaseContext.getCurrentStudentId();
         MultipartFile coverFile = resourcesDTO.getCover();
         MultipartFile resourceFile =resourcesDTO.getFile();
         String head = resourcesDTO.getHead();
