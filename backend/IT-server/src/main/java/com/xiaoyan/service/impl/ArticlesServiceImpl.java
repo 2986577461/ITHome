@@ -13,7 +13,9 @@ import com.xiaoyan.mapper.ArticleMapper;
 import com.xiaoyan.pojo.Article;
 import com.xiaoyan.pojo.StudentFile;
 import com.xiaoyan.service.ArticlesService;
+import com.xiaoyan.service.CommentsService;
 import com.xiaoyan.service.CommonService;
+import com.xiaoyan.service.LikesService;
 import com.xiaoyan.service.UsersService;
 import com.xiaoyan.utils.RedisUtil;
 import com.xiaoyan.vo.ArticleImageVO;
@@ -46,6 +48,8 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
 
 
     private final UsersService usersService;
+    private final LikesService likesService;
+    private final CommentsService commentsService;
     private ArticleMapper articleMapper;
     private RedisUtil redisUtil;
     private CommonService commonService;
@@ -176,6 +180,8 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         Set<String> objectNames = extractObjectNames(article.getContent());
 
         if (articleMapper.deleteById(id) == 1) {
+            likesService.deleteByArticle(id);
+            commentsService.deleteByArticle(id);
             redisUtil.evict(CACHE_ARTICLE_PAGES);
             if (!objectNames.isEmpty()) {
                 commonService.delete(objectNames.toArray(String[]::new));

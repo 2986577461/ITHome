@@ -31,7 +31,8 @@ public class MessageConstant {
     public static final String SERVER_ERROR = "服务器开小差了，请稍后重试";
 
     public static final String LAST_ADMIN_CANNOT_LEAVE = "你是最后一位会长，请先设置另一位成员为会长，再注销账号";
-
-
+    public static final String ARTICLE_NOT_FOUND = "文章不存在";
+    public static final String COMMENT_NOT_FOUND = "评论不存在";
+    public static final String REPLY_TARGET_INVALID = "只能回复文章下的评论";
 
 }
