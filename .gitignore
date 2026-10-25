@@ -3,6 +3,8 @@
 /*/.claude/
 /frontend/node_modules/
 /*/CLAUDE.md
+!/ai-backend/CLAUDE.md
+!/frontend/CLAUDE.md
 /*/Dockerfile
 /backend/IT-server/src/main/resources/application-dev.yml
 
