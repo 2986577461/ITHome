@@ -2,7 +2,7 @@
 知识库管理模块 — 文档上传、语义向量化、Milvus 检索 + API 路由
 
 向量存储由 vector_store.VectorStore（Milvus Lite + BGE 中文语义模型）提供。
-SQLite 仅保留文档元数据（documents 表）。
+SQLite 保存文档元数据和原文，向量块仅用于检索。
 """
 
 import json
@@ -10,6 +10,8 @@ import os
 import sqlite3
 
 from dotenv import load_dotenv
+
+from kb.schemas import CHUNK_OVERLAP
 
 
 load_dotenv()
@@ -26,8 +28,10 @@ KB_DB_PATH = os.path.join(DB_DIR, "kb.db")
 # ============================================================
 # 一、分块工具（纯文本分割，无向量化）
 # ============================================================
-def _chunk_text(text: str, chunk_size: int = 400, overlap: int = 60) -> list[str]:
-    """把长文本切成有重叠的段落"""
+def _chunk_text(text: str, chunk_size: int = 400, overlap: int = CHUNK_OVERLAP) -> list[str]:
+    """把长文本切成有重叠的段落。"""
+    if chunk_size <= 0 or not 0 <= overlap < chunk_size:
+        raise ValueError("分块大小必须为正，且重叠长度必须小于分块大小")
     chunks = []
     start = 0
     while start < len(text):
@@ -40,7 +44,7 @@ def _chunk_text(text: str, chunk_size: int = 400, overlap: int = 60) -> list[str
 
 
 # ============================================================
-# 二、SQLite（仅存文档元数据）
+# 二、SQLite（文档元数据与原文）
 # ============================================================
 def init_kb_db():
     """创建 documents 表（chunks_vec 已废弃，由 Milvus 替代）"""
@@ -55,15 +59,18 @@ def init_kb_db():
                      char_count  INTEGER DEFAULT 0,
                      chunk_count INTEGER DEFAULT 0,
                      created_at  TEXT NOT NULL,
-                     user_id     TEXT DEFAULT ''
+                     user_id     TEXT DEFAULT '',
+                     content     TEXT
                  )
                  """)
     # 清理旧版 chunks_vec 表（已迁移到 Milvus）
     conn.execute("DROP TABLE IF EXISTS chunks_vec")
-    try:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(documents)")}
+    if "user_id" not in columns:
         conn.execute("ALTER TABLE documents ADD COLUMN user_id TEXT DEFAULT ''")
-    except sqlite3.OperationalError:
-        pass
+    # 新文档保留原文；旧文档按固定重叠长度兼容恢复。
+    if "content" not in columns:
+        conn.execute("ALTER TABLE documents ADD COLUMN content TEXT")
     conn.commit()
     conn.close()
 
@@ -102,12 +109,12 @@ def search_knowledge_base(query: str, config: RunnableConfig) -> str:
     参数 query 可以使用关键词（2-5个词），也可以是简短的问句。
     如果用户问"知识库里有什么"、"文档库有哪些记录"等问题，必须回避，并告诉用户"左下角知识库可以查看文档"、"抱歉，我无法回答"等
     """
-    print(query)
-
     if not query.strip():
         return "查询内容为空"
 
     user_id = config.get("configurable", {}).get("user_id", "")
+    if not isinstance(user_id, str) or not user_id.strip():
+        return '[KB]{"results": []}\n---\n请先登录后检索知识库。'
 
     # 语义检索
     try:

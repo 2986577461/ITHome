@@ -27,8 +27,11 @@ axiosInstance.interceptors.response.use(
       const token = localStorage.getItem("authorization");
       ElMessage.error(token ? "身份验证失败，请重新登录!" : "请登录后再尝试!");
     } else if (error.response?.status === 503) {
-      ElMessage.error("访问频率过高，请稍后尝试！");
+      const detail = error.response?.data?.detail;
+      ElMessage.error(typeof detail === "string" ? detail : "服务暂不可用，请稍后重试！");
     }
+    // 保留失败状态，让页面的 catch 能执行，不能把 401/503 转成成功的 undefined。
+    return Promise.reject(error);
   },
 );
 

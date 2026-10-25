@@ -76,7 +76,7 @@
                 <span class="kb-doc-name" :title="d.filename">{{
                   d.filename
                 }}</span>
-                <button class="kb-doc-del" @click="deleteDocument(d.id)">
+                <button class="kb-doc-del" @click.stop="deleteDocument(d.id)">
                   ×
                 </button>
               </div>
@@ -344,7 +344,7 @@
           <span>{{ docTitle }}</span>
           <button class="doc-close" @click="closeDocModal">×</button>
         </div>
-        <div class="doc-modal-body" v-html="docContent"></div>
+        <div class="doc-modal-body">{{ docContent }}</div>
       </div>
     </div>
   </div>
@@ -357,6 +357,8 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import hljs from "highlight.js";
 import "highlight.js/styles/atom-one-dark.css";
 import { marked } from "marked";
+import { sanitizeHtml } from "@/utils/sanitizeHtml";
+const MAX_DOCUMENT_BYTES = 1024 * 1024;
 var hljsRenderer = new marked.Renderer();
 hljsRenderer.code = function (o) {
   var lang = o.lang,
@@ -436,7 +438,7 @@ function _buildMsg(role, content, searchInfo) {
         if (!m.searchType) m.searchType = "kb";
       }
     } catch (err) {
-      console.error("上传失败:", f.name, err);
+      console.error("解析检索记录失败:", err);
     }
   }
   return m;
@@ -466,7 +468,7 @@ function afterText(msg) {
 }
 function renderMarkdown(t) {
   if (!t) return "";
-  return marked.parse(t);
+  return sanitizeHtml(marked.parse(t));
 }
 function scrollBottom() {
   if (msgBox.value) msgBox.value.scrollTop = msgBox.value.scrollHeight;
@@ -529,15 +531,22 @@ function triggerUpload() {
 }
 async function onFileSelect(e) {
   for (const f of e.target.files || []) {
+    if (f.size > MAX_DOCUMENT_BYTES) {
+      ElMessage.error(`${f.name}：单个文档不能超过 1 MiB`);
+      continue;
+    }
     try {
-      const b64 = await new Promise((r) => {
+      const b64 = await new Promise((resolve, reject) => {
         const fr = new FileReader();
-        fr.onload = () => r(fr.result.split(",")[1]);
+        fr.onload = () => resolve(fr.result.split(",")[1]);
+        fr.onerror = () => reject(fr.error || new Error("文件读取失败"));
         fr.readAsDataURL(f);
       });
       await uploadKbDocument(f.name, b64);
     } catch (err) {
       console.error("上传失败:", f.name, err);
+      const detail = err.response?.data?.detail;
+      ElMessage.error(`${f.name}：${typeof detail === "string" ? detail : "上传失败，请检查文件格式与大小"}`);
     }
   }
   e.target.value = "";
@@ -563,14 +572,21 @@ async function viewDocContent(docId) {
       docContent.value = resp.content;
       docCache[docId] = resp.content;
     }
-  } catch {
-    docContent.value = "加载失败";
+  } catch (err) {
+    const detail = err.response?.data?.detail;
+    docContent.value = typeof detail === "string" ? detail : "加载失败，请稍后重试";
   }
 }
 
 async function deleteDocument(docId) {
-  await deleteKbDocument(docId);
-  kbDocs.value = kbDocs.value.filter((d) => d.id !== docId);
+  try {
+    await deleteKbDocument(docId);
+    kbDocs.value = kbDocs.value.filter((d) => d.id !== docId);
+    delete docCache[docId];
+  } catch (err) {
+    const detail = err.response?.data?.detail;
+    ElMessage.error(typeof detail === "string" ? detail : "删除失败，请稍后重试");
+  }
 }
 
 async function switchConversation(threadId) {

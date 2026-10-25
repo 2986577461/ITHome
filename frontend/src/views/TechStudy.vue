@@ -76,7 +76,7 @@
                 </span>
                 <span>{{ fmtDate(a.updatedDateTime) }}</span>
               </div>
-              <div class="ac-body" v-html="a.content"></div>
+              <div class="ac-body" v-html="sanitizeHtml(a.content)"></div>
               <div class="ac-interact">
                 <button
                   class="interact-btn"
@@ -341,6 +341,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
+import { sanitizeHtml } from "@/utils/sanitizeHtml";
 import { useUserStore } from "@/stores/user";
 import { useArticleStore } from "@/stores/updateArticle";
 import {

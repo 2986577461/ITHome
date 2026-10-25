@@ -12,13 +12,14 @@
 import os
 import httpx
 
-BUSINESS_BASE_URL = os.getenv("BUSINESS_BASE_URL", "http://www.myzyitzj.cn")
+BUSINESS_BASE_URL = os.getenv("BUSINESS_BASE_URL", "http://localhost:8080")
 
 
 class BusinessClient:
     """
     封装对业务模块的 HTTP 调用。
     支持 GET / POST / PUT / DELETE，自动携带 JWT token 转发。
+    内部业务通信使用直连，不继承环境变量或系统代理设置。
     """
 
     def __init__(self, base_url: str = BUSINESS_BASE_URL):
@@ -28,7 +29,7 @@ class BusinessClient:
 
     async def get(self, path: str, *, params: dict | None = None, token: str | None = None):
         """GET 请求业务模块，直接返回业务模块的 JSON 响应"""
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
             headers = {"Authorization": token} if token else {}
             res = await client.get(f"{self.base_url}{path}", params=params, headers=headers)
             res.raise_for_status()
@@ -36,7 +37,7 @@ class BusinessClient:
 
     async def post(self, path: str, *, json_data: dict | None = None, token: str | None = None):
         """POST 请求业务模块，直接返回业务模块的 JSON 响应"""
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
             headers = {"Authorization": token} if token else {}
             if json_data:
                 headers["Content-Type"] = "application/json"
@@ -46,7 +47,7 @@ class BusinessClient:
 
     async def put(self, path: str, *, json_data: dict | None = None, token: str | None = None):
         """PUT 请求业务模块，直接返回业务模块的 JSON 响应"""
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
             headers = {"Authorization": token} if token else {}
             if json_data:
                 headers["Content-Type"] = "application/json"
@@ -56,7 +57,7 @@ class BusinessClient:
 
     async def delete(self, path: str, *, token: str | None = None):
         """DELETE 请求业务模块，直接返回业务模块的 JSON 响应"""
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
             headers = {"Authorization": token} if token else {}
             res = await client.delete(f"{self.base_url}{path}", headers=headers)
             res.raise_for_status()

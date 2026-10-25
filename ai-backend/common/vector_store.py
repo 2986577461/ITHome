@@ -5,7 +5,9 @@ vector_store.py — Milvus Lite 向量存储 + fastembed 语义 embedding
 提供纯语义检索（BAAI/bge-small-zh-v1.5）+ ANN 近似搜索。
 """
 
+import json
 import os
+import threading
 
 # 抑制 Milvus Lite 的 gRPC 和 fork 日志
 import logging
@@ -30,6 +32,7 @@ class VectorStore:
     def __init__(self, db_path: str = DEFAULT_DB):
         self.client = MilvusClient(db_path)
         self._embed_model = None
+        self._model_lock = threading.Lock()
         self._init_collection()
 
     # ------------------------------------------------------------------
@@ -38,8 +41,10 @@ class VectorStore:
 
     def _get_model(self):
         if self._embed_model is None:
-            from fastembed import TextEmbedding
-            self._embed_model = TextEmbedding(model_name="BAAI/bge-small-zh-v1.5")
+            with self._model_lock:
+                if self._embed_model is None:
+                    from fastembed import TextEmbedding
+                    self._embed_model = TextEmbedding(model_name="BAAI/bge-small-zh-v1.5")
         return self._embed_model
 
     def embed(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
@@ -97,12 +102,27 @@ class VectorStore:
     # 写入
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _user_filter(user_id: str) -> str:
+        """身份必须来自鉴权上下文；空身份不允许退化为全库操作。"""
+        if not isinstance(user_id, str) or not user_id.strip() or len(user_id) > 128:
+            raise ValueError("知识库操作需要有效的用户身份")
+        return f"user_id == {json.dumps(user_id, ensure_ascii=False)}"
+
+    @classmethod
+    def _document_filter(cls, doc_id: int, user_id: str) -> str:
+        user_filter = cls._user_filter(user_id)
+        if type(doc_id) is not int or doc_id <= 0:
+            raise ValueError("文档 ID 必须为正整数")
+        return f"doc_id == {doc_id} and {user_filter}"
+
     def insert_chunks(self, doc_id: int, chunks: list[str],
                       user_id: str) -> int:
         """
         分块 + embedding + 入库。
         返回插入的块数。
         """
+        self._document_filter(doc_id, user_id)
         if not chunks:
             return 0
 
@@ -131,8 +151,8 @@ class VectorStore:
 
         每个元素：{doc_id, chunk_idx, content, score}
         """
+        expr = self._user_filter(user_id)
         q_vec = self.embed_one(query)
-        expr = f'user_id == "{user_id}"' if user_id else ""
 
         self.client.load_collection(COLLECTION)
         results = self.client.search(
@@ -140,7 +160,7 @@ class VectorStore:
             data=[q_vec],
             limit=top_k,
             search_params={"metric_type": "IP"},
-            filter=expr or None,
+            filter=expr,
             output_fields=["doc_id", "chunk_idx", "content"],
         )
 
@@ -155,14 +175,22 @@ class VectorStore:
         return hits
 
 
-    def get_chunks_by_doc(self, doc_id: int) -> list[dict]:
-        """按 doc_id 查询所有 chunk，按 chunk_idx 排序后返回"""
+    def get_chunks_by_doc(self, doc_id: int, user_id: str) -> list[dict]:
+        """按用户和文档读取全部片段，避免普通 query 的默认条数截断。"""
+        expr = self._document_filter(doc_id, user_id)
         self.client.load_collection(COLLECTION)
-        results = self.client.query(
+        iterator = self.client.query_iterator(
             collection_name=COLLECTION,
-            filter=f'doc_id == {doc_id}',
+            filter=expr,
             output_fields=["chunk_idx", "content"],
+            batch_size=1000,
         )
+        results = []
+        try:
+            while batch := iterator.next():
+                results.extend(batch)
+        finally:
+            iterator.close()
         results.sort(key=lambda r: r["chunk_idx"])
         return [{"chunk_idx": r["chunk_idx"], "content": r["content"]} for r in results]
 
@@ -170,13 +198,13 @@ class VectorStore:
     # 删除
     # ------------------------------------------------------------------
 
-    def delete_document(self, doc_id: int):
-        """删除某个文档的所有向量块"""
-        self.client.delete(COLLECTION, filter=f'doc_id == {doc_id}')
+    def delete_document(self, doc_id: int, user_id: str):
+        """删除当前用户某个文档的所有向量块。"""
+        self.client.delete(COLLECTION, filter=self._document_filter(doc_id, user_id))
 
     def delete_documents_by_user(self, user_id: str):
-        """删除某个用户的所有向量块"""
-        self.client.delete(COLLECTION, filter=f'user_id == "{user_id}"')
+        """删除某个用户的所有向量块。"""
+        self.client.delete(COLLECTION, filter=self._user_filter(user_id))
 
     def doc_count(self) -> int:
         """统计所有文档数（按 doc_id 去重）"""
@@ -190,10 +218,13 @@ class VectorStore:
 
 # 全局单例
 _vector_store: VectorStore | None = None
+_vector_store_lock = threading.Lock()
 
 
 def get_vector_store() -> VectorStore:
     global _vector_store
     if _vector_store is None:
-        _vector_store = VectorStore()
+        with _vector_store_lock:
+            if _vector_store is None:
+                _vector_store = VectorStore()
     return _vector_store

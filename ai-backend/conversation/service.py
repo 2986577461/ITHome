@@ -4,11 +4,13 @@
 本模块通过 FastAPI APIRouter 注册路由，在 Agent.py 中用 app.include_router() 挂载。
 """
 
+import logging
 import os
 import sqlite3
 import uuid
 from datetime import datetime
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException, Header, Query, Depends
 from pydantic import BaseModel, Field
@@ -25,6 +27,8 @@ APP_DB_PATH = os.path.join(DB_DIR, "app.db")
 # 鉴权：委托 business_client 验证 token
 # ============================================================
 from common.business_client import business_client
+
+logger = logging.getLogger(__name__)
 
 
 async def get_current_user(authorization: str = Header(default=""),
@@ -43,13 +47,28 @@ async def get_current_user(authorization: str = Header(default=""),
 
     try:
         result = await business_client.get_user_info(raw)
-    except Exception:
-        raise HTTPException(401, "身份验证失败，请重新登录")
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code in (401, 403):
+            raise HTTPException(401, "登录已失效，请重新登录") from exc
+        logger.warning("业务鉴权服务返回异常状态 status=%s", exc.response.status_code)
+        raise HTTPException(503, "身份验证服务暂不可用，请稍后重试") from exc
+    except httpx.RequestError as exc:
+        # 不记录请求 URL 或异常原文，避免 Token 查询参数等信息进入日志。
+        logger.warning("业务鉴权服务连接失败 error_type=%s", type(exc).__name__)
+        raise HTTPException(503, "无法连接身份验证服务，请检查 Java 服务和 BUSINESS_BASE_URL 配置") from exc
+    except ValueError as exc:
+        logger.warning("业务鉴权服务返回无效 JSON")
+        raise HTTPException(502, "身份验证服务响应异常") from exc
 
-    user_data = (result.get("data") or {}) if isinstance(result, dict) else {}
-    student_id = user_data.get("studentId", "")
+    if isinstance(result, dict) and str(result.get("code")) in ("401", "403"):
+        raise HTTPException(401, "登录已失效，请重新登录")
+    if not isinstance(result, dict) or str(result.get("code")) != "200":
+        logger.warning("业务鉴权服务返回异常业务响应")
+        raise HTTPException(502, "身份验证服务响应异常")
+    user_data = result.get("data")
+    student_id = user_data.get("studentId") if isinstance(user_data, dict) else None
     if not student_id:
-        raise HTTPException(401, "身份验证失败：缺少 studentId")
+        raise HTTPException(502, "身份验证服务响应异常：缺少 studentId")
 
     return str(student_id)
 
