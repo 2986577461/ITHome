@@ -2,12 +2,12 @@
 agent_logger.py — Agent 结构化日志追踪
 
 格式：每行一个 JSON 对象，兼容 ELK 消费。
-字段：t(时间) lvl(级别) task(追踪id) step(步骤) state(状态) msg(描述) data(结构化数据)
+字段：t(时间) lvl(级别) run_id(运行标识，可选) step(步骤) state(状态) msg(描述) data(结构化数据)
 
 用法：
   alog = get_agent_logger()
-  alog.info(task_id, step, "searching_kb", "检索知识库", {"query": q})
-  alog.error(task_id, step, "failed", "工具调用超时", {"tool": "web_search"})
+  alog.info(1, "searching_kb", "检索知识库", {"run_id": run_id, "hit_count": 3})
+  alog.error(2, "failed", "工具调用超时", {"run_id": run_id, "tool": "web_search"})
 """
 
 import json
@@ -20,21 +20,26 @@ LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 SENSITIVE_KEYS = {"token", "api_key", "authorization", "password", "secret", "cookie"}
+USAGE_KEYS = {"input_tokens", "output_tokens", "total_tokens", "prompt_tokens", "completion_tokens",
+              "input_token_details", "output_token_details", "completion_tokens_details", "prompt_tokens_details",
+              "reasoning_tokens", "cached_tokens", "token_usage"}
 
 
-def _redact(data: dict) -> dict:
-    """递归脱敏敏感字段"""
-    result = {}
-    for k, v in data.items():
-        if any(s in k.lower() for s in SENSITIVE_KEYS):
-            result[k] = "****"
-        elif isinstance(v, dict):
-            result[k] = _redact(v)
-        elif isinstance(v, str) and len(v) > 200:
-            result[k] = v[:200] + "..."
-        else:
-            result[k] = v
-    return result
+def _redact(data):
+    """递归脱敏字典和列表；Token 用量不是凭证，允许记录。"""
+    if isinstance(data, dict):
+        result = {}
+        for key, value in data.items():
+            name = str(key).lower()
+            metric = name in USAGE_KEYS and isinstance(value, (int, dict))
+            sensitive = any(marker in name for marker in SENSITIVE_KEYS) and not metric
+            result[key] = "****" if sensitive else _redact(value)
+        return result
+    if isinstance(data, (list, tuple)):
+        return [_redact(value) for value in data]
+    if isinstance(data, str) and len(data) > 200:
+        return data[:200] + "..."
+    return data
 
 
 class AgentLogger:
@@ -72,6 +77,8 @@ class AgentLogger:
         }
         if data:
             entry["data"] = _redact(data)
+            if data.get("run_id"):
+                entry["run_id"] = data["run_id"]
         self.logger.log(
             getattr(logging, level, logging.INFO),
             json.dumps(entry, ensure_ascii=False),

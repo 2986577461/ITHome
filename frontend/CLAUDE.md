@@ -2,12 +2,13 @@
 
 ## 当前工作进度
 
-项目正围绕“资料检索 → 文章草稿 → 用户确认 → 安全发布”分阶段优化。
+项目保持现有聊天、知识库、联网搜索与直接发布功能，只优化可靠性和 RAG 质量，**用户已取消草稿、人工确认、幂等发布及新增业务功能计划**。
 
-- **第一阶段已完成**：知识库基础正确性、用户隔离、上传限制、全文展示、HTML 清洗、错误传播；后续发现的本地 Python → Java 鉴权地址与代理问题已修复，用户确认恢复正常。
-- **下一步是第二阶段，尚未实现**：草稿预览/编辑、版本绑定的人工确认、Java 幂等发布、超时结果查询及文章跳转。先与用户确认表结构和接口，不只用 Prompt 约束确认行为。
-- **第三、四阶段尚未开始**：Agent 执行治理，以及基于实际上下文的 RAG 评估和优化。
-- 跨模块交接、后端约束和验收目标见 [../ai-backend/CLAUDE.md](../ai-backend/CLAUDE.md)；基础修复验收见 [../ai-backend/tests/README.md](../ai-backend/tests/README.md)。
+- **基础修复已完成**：知识库正确性与隔离、上传限制、全文、HTML 清洗和本地鉴权。
+- **最小 Harness 已实现，待人工验收**：异步执行、预算与分层超时、并发限制、有界 SSE、断连取消、发布不重试。
+- **RAG 评估口径已修复**：基于真实工具调用和最终模型输入，不再生成答案后重新检索。
+- **下一步**：真实服务验收、约 30 条真实标注问题和基线，再按效果优化检索；尚未宣称质量或性能提升。
+- 跨模块进度见 [../ai-backend/CLAUDE.md](../ai-backend/CLAUDE.md)，Harness 配置与边界见 [../ai-backend/agent/README.md](../ai-backend/agent/README.md)。
 
 ## 命令
 
@@ -86,7 +87,7 @@ Axios `baseURL` 为 `""`，不要直接写死本地 Java/Python 地址：
 |---|---|---|
 | GET | `/user/articles/page` | `page`、`size`、`type`；文章分页 |
 | GET | `/user/articles/count` | 可选 `type` |
-| POST / PUT | `/user/articles` | 当前直接创建/修改文章，尚无草稿确认流程 |
+| POST / PUT | `/user/articles` | 直接创建/修改文章；保持现状，不新增草稿流程 |
 | DELETE | `/user/articles/{id}` | 删除文章 |
 | POST | `/user/articles/image` | FormData，`files` |
 | GET / POST | `/api/conversations` | 会话列表/创建 |
@@ -98,7 +99,7 @@ Axios `baseURL` 为 `""`，不要直接写死本地 Java/Python 地址：
 | GET | `/api/kb/documents/{doc_id}/content` | 原文对象，`content` 是纯文本 |
 | DELETE | `/api/kb/documents/{doc_id}` | 删除本人资料 |
 
-文章对象包含 `id`、`name`、`studentId`、`type`、`head`、`content`、`updatedDateTime` 等字段。后端 `ArticleType` 当前映射为：0=全部，1=C，2=HTML，3=CSS，4=JavaScript，5=Java，6=MySQL。AI 工具/Prompt 的分类描述存在差异，第二阶段必须核对统一，不能直接照搬其中一端。
+文章对象包含 `id`、`name`、`studentId`、`type`、`head`、`content`、`updatedDateTime` 等字段。后端 `ArticleType` 映射为：0=全部，1=C，2=HTML，3=CSS，4=JavaScript，5=Java，6=MySQL；本轮已将 AI 工具/Prompt 对齐此映射。
 
 ## HTML 与知识库安全约束
 
@@ -107,7 +108,7 @@ Axios `baseURL` 为 `""`，不要直接写死本地 Java/Python 地址：
 - 聊天内容先 `marked.parse()`，再 `sanitizeHtml()`；文章正文在 `TechStudy.vue` 使用同一清洗函数。
 - 白名单保留标题、正文、强调、列表、代码、高亮 class、表格、链接及图片；禁止脚本、事件属性、内联样式、iframe、表单、SVG 和 MathML。不用正则自制 HTML 清洗器。
 - 新增不可信 HTML 展示入口时复用清洗函数，并补安全回归；不要给白名单随意增加危险标签或属性。
-- 前端展示清洗不等于 Java 发布接口已实现服务端清洗，该部分仍属第二阶段。
+- 前端展示清洗不等于 Java 发布接口已实现服务端清洗，该部分仍是已知边界，不在本轮范围。
 - 上传/删除失败不更新成成功 UI；旧资料恢复失败要展示后端重传提示。
 
 ## SSE 状态与已知限制
@@ -115,8 +116,9 @@ Axios `baseURL` 为 `""`，不要直接写死本地 Java/Python 地址：
 - 协议包含 `[STATE]` JSON、正文、`[ERROR]` 和 `[DONE]`。
 - 检索状态包括 `searching_kb`、`searching_web`；发布使用 `publishing`，生成使用 `generating`。
 - 会话历史保存搜索信息用于恢复来源卡片。
-- 关闭 EventSource 仅关闭客户端连接，当前不保证 Python Agent 停止，也不能撤回已经执行的发布。
-- 任务预算、取消传播、结构化错误与 fetch 流式鉴权留待第三阶段；不要声称已有完整执行治理。
+- 关闭 EventSource 会触发后端取消与资源清理，但已启动的同步线程仍可能运行，已经完成的发布不能撤回。
+- 后端已有限额和分层超时，SSE 协议保持不变；发布结果未知时提示核对文章列表，跨任务仍无数据库幂等保障。
+- fetch 流式鉴权尚未实施，不要将当前 URL Token 方案描述为已经替换。
 
 ## 其他约定
 
@@ -125,4 +127,4 @@ Axios `baseURL` 为 `""`，不要直接写死本地 Java/Python 地址：
 - `userStore.effectiveAvatar` 直接返回 `state.avatar`；随机头像使用 DiceBear。FormData 上传不要手动设置 Content-Type 边界。
 - 复用全局 CSS 自定义属性、`.section`、`.section-inner`、`.section-alt`、公共按钮和 scroll-reveal；注意 `prefers-reduced-motion`。
 - 修改前扫描代码并检查 Git 状态，保留用户已有改动；定位不清或设计有歧义先询问。
-- 普通明确修复可直接实施；涉及下一阶段表结构/接口设计先确认。不要自行扩展成通用 Agent 平台。
+- 普通明确修复可直接实施；阶段范围变动先确认。保留现有业务，不恢复已取消的草稿计划，也不扩展成通用 Agent 平台。

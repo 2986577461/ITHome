@@ -5,6 +5,7 @@
 """
 
 import os
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -19,10 +20,12 @@ load_dotenv()
 from conversation.router import conversation_router
 from kb.router import kb_router
 from agent.router import agent_router
+from agent.service import shutdown_agent_tasks
+from agent.harness import Limits
 
 
 
-model = init_chat_model(model="deepseek-v4-flash")
+model = init_chat_model(model="deepseek-v4-flash", max_retries=0)
 
 web_search = TavilySearch(
     max_results=3,
@@ -30,7 +33,17 @@ web_search = TavilySearch(
 )
 
 
+@asynccontextmanager
+async def lifespan(app):
+    Limits.from_env()  # 非法预算配置应启动失败，不等到用户发起 SSE 才报错。
+    try:
+        yield
+    finally:
+        await shutdown_agent_tasks()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="协会网站聊天机器人",
     description="支持联网搜索、SQLite 记忆、流式输出的智能对话接口",
     version="1.0.0",

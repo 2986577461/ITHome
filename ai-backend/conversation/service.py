@@ -192,46 +192,37 @@ def save_ai_message(thread_id: str, content: str, search_info: dict | None, user
         conn.close()
 
 
-def generate_and_save_title(thread_id: str, question: str, first_reply: str, model):
-    """
-    如果当前标题还是"新的对话"，用 AI 生成一个标题并写入数据库。
-    model 参数是 LangChain chat model 实例。
-    """
-    import traceback
+async def generate_and_save_title(thread_id: str, question: str, first_reply: str, model):
+    """可取消的辅助任务；由 Agent 调度器施加独立超时和并发上限。"""
+    from agent.workers import workers
 
-    # 检查是否需要生成标题
-    check_conn = get_app_db()
-    try:
-        current = check_conn.execute(
-            "SELECT title FROM conversations WHERE thread_id = ?", (thread_id,)
-        ).fetchone()
-        need_title = (current and current["title"] == "新的对话")
-    finally:
-        check_conn.close()
+    def needs_title():
+        conn = get_app_db()
+        try:
+            row = conn.execute("SELECT title FROM conversations WHERE thread_id = ?", (thread_id,)).fetchone()
+            return bool(row and row["title"] == "新的对话")
+        finally:
+            conn.close()
 
-    if not need_title:
+    if not await workers.run(needs_title):
+        return
+    response = await model.ainvoke(
+        f"用户问题：{question[:500]}\n助手回答：{first_reply[:300]}\n\n为这段对话起一个标题，15个字以内",
+        max_tokens=32,
+    )
+    title = response.content.strip()[:30] if isinstance(response.content, str) else ""
+    if not title:
         return
 
-    generated_title = ""
-    try:
-        resp = model.invoke(
-            f"用户问题：{question}\n"
-            f"助手回答：{first_reply[:300]}\n\n"
-            f"为这段对话起一个标题，15个字以内"
-        )
-        generated_title = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
-        if len(generated_title) > 30:
-            generated_title = generated_title[:30]
-    except Exception:
-        traceback.print_exc()
-
-    if generated_title:
+    def save_title():
         conn = get_app_db()
         try:
             conn.execute(
-                "UPDATE conversations SET title = ?, updated_at = ? WHERE thread_id = ?",
-                (generated_title, datetime.now().isoformat(), thread_id),
+                "UPDATE conversations SET title = ?, updated_at = ? WHERE thread_id = ? AND title = '新的对话'",
+                (title, datetime.now().isoformat(), thread_id),
             )
             conn.commit()
         finally:
             conn.close()
+
+    await workers.run(save_title)
