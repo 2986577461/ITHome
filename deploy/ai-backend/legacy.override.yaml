@@ -1,0 +1,5 @@
+# Only for the pre-CI baseline. New releases use the prompt inside their image.
+services:
+  chatbot-backend:
+    volumes:
+      - ./shared/legacy-SystemPrompt.md:/app/SystemPrompt.md:ro

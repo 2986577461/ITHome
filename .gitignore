@@ -6,6 +6,7 @@
 !/ai-backend/CLAUDE.md
 !/frontend/CLAUDE.md
 /*/Dockerfile
+!/ai-backend/Dockerfile
 /backend/IT-server/src/main/resources/application-dev.yml
 
 /frontend/.vscode/

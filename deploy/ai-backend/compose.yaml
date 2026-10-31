@@ -1,0 +1,37 @@
+# Managed independently of Java, shared Nginx, MySQL, and Redis.
+services:
+  chatbot-backend:
+    image: ${AI_IMAGE:?AI_IMAGE is required}
+    pull_policy: never
+    container_name: chatbot-backend
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 150s
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    env_file:
+      - path: ./shared/runtime.env
+        format: raw
+    volumes:
+      - ./shared/data/conversation:/app/conversation/db
+      - ./shared/data/agent:/app/agent/db
+      - ./shared/data/kb:/app/kb/db
+      - ./shared/data/vector:/app/common/db
+      - ./shared/data/legacy:/app/db
+      - ./shared/logs:/app/common/logs
+    networks: [ithome]
+    healthcheck:
+      test: [CMD, python, -c, "import json,urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=2); assert json.load(r)['status']=='ok'"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+networks:
+  ithome:
+    external: true
+    name: ithome_net

@@ -8,8 +8,9 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
 
 from conversation.service import get_current_user
+from kb.documents import DocumentError, chunk_text, extract_text
 from kb.schemas import CHUNK_OVERLAP, MAX_DOCUMENT_BYTES, UploadDocumentRequest
-from kb.tools import get_kb_db, _chunk_text
+from kb.tools import get_kb_db
 from common.vector_store import get_vector_store
 from state.manager import get_cache_manager
 
@@ -20,9 +21,9 @@ kb_router = APIRouter(prefix="/api/kb", tags=["知识库"])
 @kb_router.post("/upload", summary="上传文档到知识库")
 def kb_upload(body: UploadDocumentRequest, user_id: str = Depends(get_current_user)):
     # 同步路由由 FastAPI 在线程池中执行，避免 embedding 阻塞事件循环。
-    ext = body.filename.rsplit(".", 1)[-1].lower() if "." in body.filename else "txt"
-    if ext not in ("txt", "md"):
-        raise HTTPException(400, f"不支持的文件类型：.{ext}，仅支持 txt/md")
+    ext = body.filename.rsplit(".", 1)[-1].lower() if "." in body.filename else ""
+    if ext not in ("txt", "md", "docx", "pdf"):
+        raise HTTPException(400, "仅支持 txt、md、docx 和 pdf")
     try:
         raw = base64.b64decode(body.content_b64, validate=True)
     except (binascii.Error, ValueError):
@@ -30,14 +31,10 @@ def kb_upload(body: UploadDocumentRequest, user_id: str = Depends(get_current_us
     if len(raw) > MAX_DOCUMENT_BYTES:
         raise HTTPException(413, "单个文档不能超过 1 MiB")
     try:
-        text = raw.decode("utf-8")
-    except UnicodeDecodeError:
-        raise HTTPException(400, "文档必须使用 UTF-8 编码")
-    if not text.strip():
-        raise HTTPException(400, "文件内容为空")
-
-    chunk_size = 800 if len(text) > 500000 else 500 if len(text) > 100000 else 300
-    chunks = _chunk_text(text, chunk_size)
+        text = extract_text(raw, ext)
+    except DocumentError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    chunks = chunk_text(text, ext)
     vs = get_vector_store()
     conn = get_kb_db()
     doc_id = None

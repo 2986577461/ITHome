@@ -1,0 +1,59 @@
+name: AI Backend CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths: ['ai-backend/**', 'deploy/ai-backend/**', '.github/workflows/ai-backend-*.yml', '.gitignore']
+  push:
+    branches: [dev, main]
+    paths: ['ai-backend/**', 'deploy/ai-backend/**', '.github/workflows/ai-backend-*.yml', '.gitignore']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check deployment tooling
+        run: |
+          python3 -m unittest discover -s deploy/ai-backend/tests -v
+          git diff --check
+      - name: Build and test locked Linux dependencies
+        run: |
+          docker build --platform linux/amd64 --target test -t ithome-ai-test ai-backend
+          docker run --rm --network none ithome-ai-test
+      - name: Build release image and smoke-test offline
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          docker build --platform linux/amd64 --target runtime \
+            --build-arg VCS_REF="$REVISION" -t "ithome-ai:$REVISION" ai-backend
+          docker run --rm --network none \
+            -e DEEPSEEK_API_KEY=smoke-placeholder -e TAVILY_API_KEY=smoke-placeholder \
+            "ithome-ai:$REVISION" python scripts/smoke.py --embedding
+      - name: Package the tested image
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main')
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          mkdir artifact
+          docker save "ithome-ai:$REVISION" | zstd -T0 -3 -o artifact/image.tar.zst
+          python3 deploy/ai-backend/artifact.py create artifact "$REVISION"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main')
+        with:
+          name: ai-backend-image-${{ github.sha }}
+          path: artifact/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14

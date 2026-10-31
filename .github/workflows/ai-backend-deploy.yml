@@ -1,0 +1,84 @@
+name: AI Backend Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful AI Backend CI run ID (not a PR run)
+        required: true
+        type: string
+      revision:
+        description: Full 40-character Git commit SHA produced by that run
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+# Queue releases. Never cancel an in-flight production deployment.
+concurrency:
+  group: ithome-ai-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      revision: ${{ steps.verify.outputs.revision }}
+      run_id: ${{ steps.verify.outputs.run_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ inputs.run_id }}
+          EXPECTED_REVISION: ${{ inputs.revision }}
+        run: python3 deploy/ai-backend/verify_run.py
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: ithome-ai-production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ai-backend-image-${{ needs.verify.outputs.revision }}
+          path: artifact
+          run-id: ${{ needs.verify.outputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify artifact
+        env:
+          REVISION: ${{ needs.verify.outputs.revision }}
+        run: python3 deploy/ai-backend/artifact.py verify artifact "$REVISION" >> "$GITHUB_ENV"
+      - name: Upload and deploy only the AI container
+        env:
+          DEPLOY_HOST: ${{ secrets.AI_DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.AI_DEPLOY_PORT }}
+          DEPLOY_KEY: ${{ secrets.AI_DEPLOY_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.AI_DEPLOY_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$DEPLOY_HOST" && -n "$DEPLOY_KEY" && -n "$DEPLOY_KNOWN_HOSTS" ]]
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          port="${DEPLOY_PORT:-22}"
+          [[ "$port" =~ ^[0-9]+$ ]]
+          umask 077
+          sshdir="$(mktemp -d)"
+          trap 'rm -rf "$sshdir"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$sshdir/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$sshdir/known_hosts"
+          ssh -T -p "$port" -i "$sshdir/key" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$sshdir/known_hosts" \
+            -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
+            "root@$DEPLOY_HOST" "deploy $REVISION $ARCHIVE_SHA256 $IMAGE_ID" < artifact/image.tar.zst

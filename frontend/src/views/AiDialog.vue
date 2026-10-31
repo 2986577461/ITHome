@@ -278,7 +278,7 @@
                 <input
                   type="file"
                   ref="fileInput"
-                  accept=".txt,.md"
+                  accept=".txt,.md,.docx,.pdf"
                   @change="onFileSelect"
                   style="display: none"
                   multiple

@@ -59,7 +59,8 @@ conversation/router.py     会话 CRUD 与历史消息接口
 conversation/service.py    委托 Java 鉴权、消息保存、自动标题
 kb/router.py               文档上传、列表、全文、删除
 kb/schemas.py              上传 Pydantic 模型、1 MiB 上限、重叠长度常量
-kb/tools.py                SQLite 初始化、分块、知识库检索工具
+kb/documents.py            文档解析及段落分块
+kb/tools.py                SQLite 初始化、历史分块、知识库检索工具
 common/vector_store.py     Milvus Lite + fastembed/BGE
 common/business_client.py  内部 Java HTTP 客户端
 common/logger.py           结构化日志
@@ -113,7 +114,7 @@ Python get_current_user → GET {BUSINESS_BASE_URL}/user/users → data.studentI
 | 向量片段 | `common/db/milvus.db` | Milvus Lite，512 维 BGE 中文向量 |
 | 文档缓存 | Redis | 列表 `kb:docs:{user_id}` 1h；全文 `kb:doc:v2:{user_id}:{doc_id}` 2h |
 
-- 上传只接受 txt/md（无后缀按 txt）、严格 Base64、UTF-8，原文最多 1 MiB。
+- 上传只接受 txt/md/docx/pdf、严格 Base64，单文件最多 1 MiB；txt/md 要求 UTF-8，DOCX/PDF 保存提取后的纯文本。PDF 不支持 OCR。段落分块及验收口径见 [tests/README.md](tests/README.md)。
 - 所有普通向量操作必须有非空用户身份；文档读删同时限定用户与文档 ID，不允许空身份退化为全库检索。
 - 全文读取先查数据库归属/存在性，再读缓存。Redis 异常降级，不能将已落库的上传因缓存失效失败误报为失败。
 - 旧文档无原文时按历史固定 60 字重叠恢复，校验索引、片段数、重叠和原文长度；不能验证则 409 提示重传，不猜测原文。
