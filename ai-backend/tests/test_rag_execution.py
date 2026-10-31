@@ -10,6 +10,12 @@ from eval.execution import collect_sample
 from test_agent_harness import ScriptedModel
 
 
+@pytest.fixture(autouse=True)
+def mock_committed_hit_validation(modules, monkeypatch):
+    # These tests exercise evaluation with a synthetic vector store, not SQLite.
+    monkeypatch.setattr(modules.tools, "_committed_hits", lambda hits: hits)
+
+
 def test_sample_uses_rewritten_query_and_actual_context(modules, monkeypatch):
     store = Mock()
     store.search.return_value = [{"doc_id": 8, "chunk_idx": 2, "score": 0.9, "content": "actual evidence"}]

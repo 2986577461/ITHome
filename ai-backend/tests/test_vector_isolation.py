@@ -24,7 +24,7 @@ def test_invalid_identity_fails_closed(store, user_id, operation):
         if operation == "search":
             store.search("question", user_id)
         elif operation == "read":
-            store.get_chunks_by_doc(1, user_id)
+            store.get_chunks_by_doc(1, user_id, owner_id="alice")
         elif operation == "delete":
             store.delete_document(1, user_id)
         elif operation == "delete_user":
@@ -43,10 +43,10 @@ def test_invalid_document_id_cannot_change_filter(store, doc_id):
     store.client.delete.assert_not_called()
 
 
-def test_filters_scope_search_read_and_delete_to_user(store):
-    store.search("question", "alice")
-    assert store.client.search.call_args.kwargs["filter"] == 'user_id == "alice"'
-    store.get_chunks_by_doc(12, "alice")
+def test_shared_read_search_and_owner_scoped_delete(store):
+    store.search("question", "bob")
+    assert "filter" not in store.client.search.call_args.kwargs
+    store.get_chunks_by_doc(12, "bob", owner_id="alice")
     assert store.client.query_iterator.call_args.kwargs["filter"] == 'doc_id == 12 and user_id == "alice"'
     store.delete_document(12, "alice")
     assert store.client.delete.call_args.kwargs["filter"] == 'doc_id == 12 and user_id == "alice"'
@@ -54,9 +54,9 @@ def test_filters_scope_search_read_and_delete_to_user(store):
 
 def test_user_filter_escapes_quotes_and_backslashes(store):
     user = 'alice" or user_id != "\\'
-    store.search("question", user)
-    expr = store.client.search.call_args.kwargs["filter"]
-    assert json.loads(expr.removeprefix("user_id == ")) == user
+    store.delete_document(1, user)
+    expr = store.client.delete.call_args.kwargs["filter"].split(" and user_id == ", 1)[1]
+    assert json.loads(expr) == user
 
 
 def test_chunk_iterator_collects_all_batches_and_closes(store):
@@ -66,7 +66,7 @@ def test_chunk_iterator_collects_all_batches_and_closes(store):
         [{"chunk_idx": 0, "content": "first"}],
         [],
     ]
-    assert store.get_chunks_by_doc(1, "alice") == [
+    assert store.get_chunks_by_doc(1, "alice", owner_id="alice") == [
         {"chunk_idx": 0, "content": "first"}, {"chunk_idx": 1, "content": "second"},
     ]
     iterator.close.assert_called_once()
@@ -76,5 +76,5 @@ def test_chunk_iterator_closes_on_error(store):
     iterator = store.client.query_iterator.return_value
     iterator.next.side_effect = RuntimeError("offline")
     with pytest.raises(RuntimeError):
-        store.get_chunks_by_doc(1, "alice")
+        store.get_chunks_by_doc(1, "alice", owner_id="alice")
     iterator.close.assert_called_once()

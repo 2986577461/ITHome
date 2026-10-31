@@ -57,7 +57,7 @@
           </div>
           <div class="kb-section">
             <div class="kb-header">
-              📄 知识库
+              📄 共享知识库
               <button
                 class="kb-add-btn"
                 @click="triggerUpload()"
@@ -76,7 +76,7 @@
                 <span class="kb-doc-name" :title="d.filename">{{
                   d.filename
                 }}</span>
-                <button class="kb-doc-del" @click.stop="deleteDocument(d.id)">
+                <button v-if="d.is_owner" class="kb-doc-del" title="删除我上传的文档" @click.stop="deleteDocument(d.id)">
                   ×
                 </button>
               </div>
@@ -409,7 +409,6 @@ const fileInput = ref(null);
 const docModal = ref(false);
 const docTitle = ref("");
 const docContent = ref("");
-var docCache = {};
 let es = null;
 
 function _buildMsg(role, content, searchInfo) {
@@ -530,6 +529,15 @@ function triggerUpload() {
   }
 }
 async function onFileSelect(e) {
+  if (!e.target.files?.length) return;
+  try {
+    await ElMessageBox.confirm("上传的文档将对所有登录用户可见，请勿上传私人或敏感资料。", "共享知识库", {
+      confirmButtonText: "确认上传", cancelButtonText: "取消", type: "warning",
+    });
+  } catch {
+    e.target.value = "";
+    return;
+  }
   for (const f of e.target.files || []) {
     if (f.size > MAX_DOCUMENT_BYTES) {
       ElMessage.error(`${f.name}：单个文档不能超过 1 MiB`);
@@ -561,16 +569,11 @@ async function viewDocContent(docId) {
   });
   docTitle.value = d ? d.filename : "文档内容";
   docModal.value = true;
-  if (docCache[docId]) {
-    docContent.value = docCache[docId];
-    return;
-  }
   docContent.value = "加载中...";
   try {
     var resp = await getKbDocumentContent(docId);
     if (resp && resp.content != null) {
       docContent.value = resp.content;
-      docCache[docId] = resp.content;
     }
   } catch (err) {
     const detail = err.response?.data?.detail;
@@ -582,7 +585,6 @@ async function deleteDocument(docId) {
   try {
     await deleteKbDocument(docId);
     kbDocs.value = kbDocs.value.filter((d) => d.id !== docId);
-    delete docCache[docId];
   } catch (err) {
     const detail = err.response?.data?.detail;
     ElMessage.error(typeof detail === "string" ? detail : "删除失败，请稍后重试");

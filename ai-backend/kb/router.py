@@ -1,4 +1,4 @@
-"""知识库 API：鉴权后的用户隔离、受限上传和原文展示。"""
+"""知识库 API：登录用户共享读取，上传者可删除。"""
 
 import base64
 import binascii
@@ -61,27 +61,21 @@ def kb_upload(body: UploadDocumentRequest, user_id: str = Depends(get_current_us
     finally:
         conn.close()
 
-    get_cache_manager().invalidate_kb_docs_cache(user_id)
     return {"ok": True, "doc_id": doc_id, "filename": body.filename,
             "chunks": chunk_count, "char_count": len(text)}
 
 
 @kb_router.get("/documents", summary="知识库文档列表")
 def kb_list_documents(user_id: str = Depends(get_current_user)):
-    sm = get_cache_manager()
-    cached = sm.get_cached_kb_docs(user_id)
-    if cached is not None:
-        return cached
+    # Do not use old per-user list caches: another user can upload or delete.
     conn = get_kb_db()
     try:
         rows = conn.execute(
-            "SELECT id, filename, file_type, char_count, chunk_count, created_at "
-            "FROM documents WHERE user_id = ? ORDER BY created_at DESC",
-            (user_id,)
+            "SELECT id, filename, file_type, char_count, chunk_count, created_at, user_id "
+            "FROM documents ORDER BY created_at DESC"
         ).fetchall()
-        docs = [dict(r) for r in rows]
-        sm.cache_kb_docs(user_id, docs)
-        return docs
+        return [{**{k: row[k] for k in row.keys() if k != "user_id"},
+                 "is_owner": row["user_id"] == user_id} for row in rows]
     finally:
         conn.close()
 
@@ -111,12 +105,12 @@ def _restore_legacy_text(chunks: list[dict], char_count: int, chunk_count: int) 
 
 @kb_router.get("/documents/{doc_id}/content", summary="获取文档全文")
 def kb_document_content(doc_id: int, user_id: str = Depends(get_current_user)):
-    # 即使有缓存，也以数据库中的归属和存在性为准，防止失效失败后读到已删除文档。
+    # Check existence even on cache hits, so deleted documents cannot be read.
     conn = get_kb_db()
     try:
         row = conn.execute(
-            "SELECT filename, content, char_count, chunk_count FROM documents WHERE id = ? AND user_id = ?",
-            (doc_id, user_id),
+            "SELECT filename, content, char_count, chunk_count, user_id FROM documents WHERE id = ?",
+            (doc_id,),
         ).fetchone()
         if not row:
             raise HTTPException(404, "文档不存在或无权访问")
@@ -129,7 +123,7 @@ def kb_document_content(doc_id: int, user_id: str = Depends(get_current_user)):
         return cached
     text = row["content"]
     if text is None:
-        chunks = get_vector_store().get_chunks_by_doc(doc_id, user_id)
+        chunks = get_vector_store().get_chunks_by_doc(doc_id, user_id, owner_id=row["user_id"] or "")
         text = _restore_legacy_text(chunks, row["char_count"], row["chunk_count"])
     result = {"doc_id": doc_id, "filename": row["filename"], "content": text,
               "chars": len(text), "chunks": row["chunk_count"]}
@@ -143,10 +137,12 @@ def kb_delete_document(doc_id: int, user_id: str = Depends(get_current_user)):
     try:
         conn.execute("BEGIN IMMEDIATE")
         row = conn.execute(
-            "SELECT id FROM documents WHERE id = ? AND user_id = ?", (doc_id, user_id)
+            "SELECT user_id FROM documents WHERE id = ?", (doc_id,)
         ).fetchone()
         if not row:
-            raise HTTPException(404, "文档不存在或无权访问")
+            raise HTTPException(404, "文档不存在")
+        if row["user_id"] != user_id:
+            raise HTTPException(403, "只有上传者可以删除文档")
         # 先删向量。失败时保留元数据，允许用户重试，而不是吞异常后报告成功。
         try:
             get_vector_store().delete_document(doc_id, user_id)
@@ -161,6 +157,5 @@ def kb_delete_document(doc_id: int, user_id: str = Depends(get_current_user)):
     finally:
         conn.close()
     sm = get_cache_manager()
-    sm.invalidate_kb_docs_cache(user_id)
     sm.invalidate_kb_doc_content_cache(doc_id, user_id)
     return {"ok": True}

@@ -151,7 +151,7 @@ class VectorStore:
 
         每个元素：{doc_id, chunk_idx, content, score}
         """
-        expr = self._user_filter(user_id)
+        self._user_filter(user_id)  # Authenticated callers may search the shared collection.
         q_vec = self.embed_one(query)
 
         self.client.load_collection(COLLECTION)
@@ -160,8 +160,7 @@ class VectorStore:
             data=[q_vec],
             limit=top_k,
             search_params={"metric_type": "IP"},
-            filter=expr,
-            output_fields=["doc_id", "chunk_idx", "content"],
+            output_fields=["doc_id", "chunk_idx", "content", "user_id"],
         )
 
         hits = []
@@ -170,14 +169,18 @@ class VectorStore:
                 "doc_id": hit["entity"]["doc_id"],
                 "chunk_idx": hit["entity"]["chunk_idx"],
                 "content": hit["entity"]["content"],
+                "owner_id": hit["entity"]["user_id"],
                 "score": hit["distance"],
             })
         return hits
 
 
-    def get_chunks_by_doc(self, doc_id: int, user_id: str) -> list[dict]:
-        """按用户和文档读取全部片段，避免普通 query 的默认条数截断。"""
-        expr = self._document_filter(doc_id, user_id)
+    def get_chunks_by_doc(self, doc_id: int, user_id: str, *, owner_id: str) -> list[dict]:
+        """已鉴权用户可读取共享文档；owner 来自 SQLite，用于排除残留向量。"""
+        self._user_filter(user_id)
+        if type(doc_id) is not int or doc_id <= 0 or not isinstance(owner_id, str):
+            raise ValueError("无效文档 ID 或上传者")
+        expr = f"doc_id == {doc_id} and user_id == {json.dumps(owner_id, ensure_ascii=False)}"
         self.client.load_collection(COLLECTION)
         iterator = self.client.query_iterator(
             collection_name=COLLECTION,

@@ -10,7 +10,7 @@
 
 | 阶段 | 状态 | 范围 |
 |---|---|---|
-| 基础正确性 | 已完成 | 知识库隔离、上传校验、全文恢复、前端 HTML 防护、缓存降级、本地鉴权修复 |
+| 基础正确性 | 已完成 | 知识库鉴权、上传校验、全文恢复、前端 HTML 防护、缓存降级、本地鉴权修复 |
 | 最小 Agent Harness | 已实现，待真实服务人工验收 | 异步执行、总/分层超时、调用和上下文预算、有界并发与 SSE 缓冲、断连取消、发布不重试、链路日志 |
 | RAG 评估口径 | 已修复，未建立质量基线 | 使用最终模型实际上下文，跳过无证据评分，不再回答后重新检索 |
 | 评估驱动优化 | 待办，下一步 | 约 30 条真实标注样本、基线报告，再决定分块/去重/阈值及混合检索/重排 |
@@ -100,8 +100,8 @@ Python get_current_user → GET {BUSINESS_BASE_URL}/user/users → data.studentI
 | DELETE | `/api/conversations/{thread_id}` | 删除本人会话 |
 | GET | `/api/conversations/{thread_id}/messages` | 本人会话历史 |
 | POST | `/api/kb/upload` | JSON：`filename`、`content_b64` |
-| GET | `/api/kb/documents` | 本人文档列表 |
-| GET | `/api/kb/documents/{doc_id}/content` | 本人文档全文 |
+| GET | `/api/kb/documents` | 登录用户共享文档列表 |
+| GET | `/api/kb/documents/{doc_id}/content` | 共享文档全文 |
 | DELETE | `/api/kb/documents/{doc_id}` | 删除本人文档 |
 
 ## 数据与安全约束
@@ -112,11 +112,11 @@ Python get_current_user → GET {BUSINESS_BASE_URL}/user/users → data.studentI
 | Agent checkpoint | `agent/db/conversations.db` | LangGraph AsyncSqliteSaver；线程标识含用户 ID |
 | 文档元数据和原文 | `kb/db/kb.db` | `documents.content` 自动补列，新文档保存原文 |
 | 向量片段 | `common/db/milvus.db` | Milvus Lite，512 维 BGE 中文向量 |
-| 文档缓存 | Redis | 列表 `kb:docs:{user_id}` 1h；全文 `kb:doc:v2:{user_id}:{doc_id}` 2h |
+| 文档缓存 | Redis | 列表不再缓存；全文 `kb:doc:v2:{user_id}:{doc_id}` 2h，读取前检查文档存在 |
 
 - 上传只接受 txt/md/docx/pdf、严格 Base64，单文件最多 1 MiB；txt/md 要求 UTF-8，DOCX/PDF 保存提取后的纯文本。PDF 不支持 OCR。段落分块及验收口径见 [tests/README.md](tests/README.md)。
-- 所有普通向量操作必须有非空用户身份；文档读删同时限定用户与文档 ID，不允许空身份退化为全库检索。
-- 全文读取先查数据库归属/存在性，再读缓存。Redis 异常降级，不能将已落库的上传因缓存失效失败误报为失败。
+- 历史和新知识库文档对所有登录用户共享；仅上传者可删除，未记录上传者的旧文档不能通过普通接口删除。会话仍按用户隔离。
+- 检索结果须与 SQLite 文档 ID、上传者一致，避免泄露失败上传遗留的孤立向量；该过滤在 top-k 后进行，可能导致返回的有效片段少于 top-k。全文缓存读取前检查文档存在性。Redis 故障降级。
 - 旧文档无原文时按历史固定 60 字重叠恢复，校验索引、片段数、重叠和原文长度；不能验证则 409 提示重传，不猜测原文。
 - 向量删除失败返回 503，保留元数据供重试。SQLite 与 Milvus 无共享事务，上传回滚的向量清理仍是尽力而为，没有持久化补偿任务。
 - 前端使用纯文本文档预览和 DOMPurify；Java 发布服务端 HTML 清洗尚未实现，不在本轮范围，不能声称已全面解决 XSS。

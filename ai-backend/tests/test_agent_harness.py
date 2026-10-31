@@ -200,6 +200,7 @@ def test_actual_kb_context_is_captured_from_tool_and_model_input(agent_env, modu
         {"doc_id": 7, "chunk_idx": 4, "score": 0.2, "content": "discarded context"},
     ]
     monkeypatch.setattr(modules.tools, "get_vector_store", lambda: vectors)
+    monkeypatch.setattr(modules.tools, "_committed_hits", lambda hits: hits)
     model = ScriptedModel(scripts=[
         [AIMessageChunk(content="", tool_calls=[{"name": "search_knowledge_base", "args": {"query": "real query"}, "id": "kb-1"}])],
         [AIMessageChunk(content="answer [文档#7 片段#3]")],

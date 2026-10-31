@@ -32,14 +32,20 @@ def test_upload_list_read_delete_round_trip(kb):
     assert kb.client.get(f"/api/kb/documents/{doc['doc_id']}/content").status_code == 404
 
 
-def test_cross_user_list_read_delete_are_isolated(kb):
+def test_shared_read_and_owner_only_delete(kb):
+    # Bob's pre-existing list cache must not hide Alice's new upload.
+    assert kb.client.get("/api/kb/documents", headers={"x-test-user": "bob"}).json() == []
     doc_id = upload(kb).json()["doc_id"]
     headers = {"x-test-user": "bob"}
+    docs = kb.client.get("/api/kb/documents", headers=headers).json()
+    assert docs[0]["id"] == doc_id and docs[0]["is_owner"] is False
+    assert kb.client.get("/api/kb/documents").json()[0]["is_owner"] is True
+    assert kb.client.get(f"/api/kb/documents/{doc_id}/content", headers=headers).status_code == 200
+    assert kb.client.delete(f"/api/kb/documents/{doc_id}", headers=headers).status_code == 403
+    kb.vectors.delete_document.assert_not_called()
+    assert kb.client.delete(f"/api/kb/documents/{doc_id}").status_code == 200
     assert kb.client.get("/api/kb/documents", headers=headers).json() == []
     assert kb.client.get(f"/api/kb/documents/{doc_id}/content", headers=headers).status_code == 404
-    assert kb.client.delete(f"/api/kb/documents/{doc_id}", headers=headers).status_code == 404
-    kb.vectors.delete_document.assert_not_called()
-    assert kb.client.get(f"/api/kb/documents/{doc_id}/content").status_code == 200
 
 
 @pytest.mark.parametrize("method,path", [
@@ -101,14 +107,13 @@ def test_vector_delete_failure_keeps_metadata_for_retry(kb):
     assert kb.client.delete(f"/api/kb/documents/{doc_id}").status_code == 200
 
 
-def test_stale_content_cache_cannot_bypass_database_ownership(kb):
+def test_stale_content_cache_cannot_bypass_document_deletion(kb):
     doc_id = upload(kb).json()["doc_id"]
-    kb.values[kb.cache._kbd_key(doc_id, "bob")] = '{"content":"secret"}'
-    assert kb.client.get(f"/api/kb/documents/{doc_id}/content", headers={"x-test-user": "bob"}).status_code == 404
-    kb.client.get(f"/api/kb/documents/{doc_id}/content")  # 填充 alice 的缓存
+    assert kb.client.get(f"/api/kb/documents/{doc_id}/content", headers={"x-test-user": "bob"}).status_code == 200
+    assert kb.cache._kbd_key(doc_id, "bob") in kb.values
     with kb.tools.get_kb_db() as conn:
         conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
-    assert kb.client.get(f"/api/kb/documents/{doc_id}/content").status_code == 404
+    assert kb.client.get(f"/api/kb/documents/{doc_id}/content", headers={"x-test-user": "bob"}).status_code == 404
 
 
 def test_redis_failure_does_not_break_core_document_operations(kb):
@@ -138,10 +143,10 @@ def legacy_doc(kb, text):
 @pytest.mark.parametrize("text", ["旧资料", "重复字符" * 250, "\n".join(str(i) for i in range(400))])
 def test_legacy_document_restored_without_duplicate_overlap(kb, text):
     doc_id = legacy_doc(kb, text)
-    response = kb.client.get(f"/api/kb/documents/{doc_id}/content")
+    response = kb.client.get(f"/api/kb/documents/{doc_id}/content", headers={"x-test-user": "bob"})
     assert response.status_code == 200
     assert response.json()["content"] == text
-    kb.vectors.get_chunks_by_doc.assert_called_once_with(doc_id, "alice")
+    kb.vectors.get_chunks_by_doc.assert_called_once_with(doc_id, "bob", owner_id="alice")
 
 
 @pytest.mark.parametrize("corruption", ["missing", "index", "overlap", "length"])
@@ -174,6 +179,22 @@ def test_old_schema_migration_is_idempotent(kb, tmp_path, monkeypatch):
     assert row["filename"] == "old.md"
     assert row["content"] is None
     assert row["user_id"] == ""
+
+
+def test_shared_retrieval_excludes_orphan_and_wrong_owner(kb, monkeypatch):
+    doc_id = upload(kb, text="shared evidence").json()["doc_id"]
+    store = Mock()
+    store.search.return_value = [
+        {"doc_id": doc_id, "owner_id": "alice", "chunk_idx": 0, "content": "shared evidence", "score": 0.9},
+        {"doc_id": doc_id, "owner_id": "other", "chunk_idx": 1, "content": "wrong owner", "score": 0.9},
+        {"doc_id": 999, "owner_id": "alice", "chunk_idx": 0, "content": "orphan", "score": 0.9},
+    ]
+    monkeypatch.setattr(kb.tools, "get_vector_store", lambda: store)
+    content, artifact = kb.tools.retrieve_knowledge("question", "bob")
+    assert artifact["status"] == "success"
+    assert "shared evidence" in content
+    assert "wrong owner" not in content and "orphan" not in content
+    assert len(artifact["retrieved"]) == 1
 
 
 def test_empty_tool_identity_never_calls_vector_store(kb, monkeypatch):
