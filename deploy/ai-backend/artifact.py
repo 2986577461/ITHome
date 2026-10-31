@@ -43,9 +43,15 @@ def main():
         parser.error("revision must be a full lowercase Git SHA")
     if args.action == "create":
         image = f"ithome-ai:{args.revision}"
-        image_id = subprocess.check_output(
-            ["docker", "image", "inspect", "--format", "{{.Id}}", image], text=True
-        ).strip().removeprefix("sha256:")
+        metadata = json.loads(subprocess.check_output(
+            ["docker", "image", "inspect", image], text=True
+        ))[0]
+        image_id = metadata["Id"].removeprefix("sha256:")
+        labels = metadata["Config"].get("Labels") or {}
+        storage = (Path(__file__).resolve().parents[2] / "ai-backend/storage-version").read_text().strip()
+        if (labels.get("org.opencontainers.image.revision") != args.revision
+                or labels.get("org.ithome.storage-version") != storage):
+            raise ValueError("Built image labels do not match source revision/storage version")
         manifest = dict(revision=args.revision, image=image, image_id=image_id,
                         archive_sha256=checksum(args.directory / "image.tar.zst"))
         (args.directory / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")

@@ -23,3 +23,4 @@ ai-backend/__pycache__/
 /picture
 /.claude
 /perf
+/deploy/ai-backend/**/__pycache__/

@@ -32,9 +32,10 @@ CMD ["python", "-m", "pytest", "tests", "-q"]
 
 FROM dependencies AS runtime
 ARG VCS_REF
+ARG STORAGE_VERSION=1
 LABEL org.opencontainers.image.source="https://github.com/2986577461/ITHome" \
       org.opencontainers.image.revision="${VCS_REF}" \
-      org.ithome.storage-version="1"
+      org.ithome.storage-version="${STORAGE_VERSION}"
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=6 \
     CMD ["python", "scripts/smoke.py", "--live"]

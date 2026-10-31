@@ -37,6 +37,22 @@ class ArtifactTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "checksum"):
                 artifact.verify(root, REV)
 
+    def test_create_checks_image_labels_before_emitting_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "image.tar.zst").write_bytes(b"synthetic")
+            image = dict(Id=IMAGE, Config={"Labels": {
+                "org.opencontainers.image.revision": REV, "org.ithome.storage-version": "1"}})
+            with patch.object(sys, "argv", ["artifact.py", "create", str(root), REV]), \
+                    patch.object(artifact.subprocess, "check_output", return_value=json.dumps([image])):
+                artifact.main()
+            self.assertEqual(artifact.verify(root, REV)["image_id"], "c" * 64)
+            image["Config"]["Labels"]["org.ithome.storage-version"] = "999"
+            with patch.object(sys, "argv", ["artifact.py", "create", str(root), REV]), \
+                    patch.object(artifact.subprocess, "check_output", return_value=json.dumps([image])), \
+                    self.assertRaisesRegex(ValueError, "labels"):
+                artifact.main()
+
     def test_manifest_cannot_inject_github_environment(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -170,6 +186,13 @@ class DeploymentTests(unittest.TestCase):
         self.deployment.recover()
         self.deployment.activate.assert_called_once_with(OLD)
         self.assertFalse((self.root / "pending.json").exists())
+
+    def test_activate_refuses_wrong_running_image_even_if_health_would_pass(self):
+        self.deployment.compose = Mock()
+        self.deployment.health = Mock()
+        with patch.object(server, "run", return_value=IMAGE), self.assertRaisesRegex(RuntimeError, "image"):
+            self.deployment.activate(NEW)
+        self.deployment.health.assert_not_called()
 
     def test_compose_rejects_mutable_image_tag(self):
         with self.assertRaisesRegex(ValueError, "pin"):

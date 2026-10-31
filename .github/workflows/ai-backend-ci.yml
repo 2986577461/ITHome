@@ -37,7 +37,8 @@ jobs:
           REVISION: ${{ github.sha }}
         run: |
           docker build --platform linux/amd64 --target runtime \
-            --build-arg VCS_REF="$REVISION" -t "ithome-ai:$REVISION" ai-backend
+            --build-arg VCS_REF="$REVISION" --build-arg STORAGE_VERSION="$(<ai-backend/storage-version)" \
+            -t "ithome-ai:$REVISION" ai-backend
           docker run --rm --network none \
             -e DEEPSEEK_API_KEY=smoke-placeholder -e TAVILY_API_KEY=smoke-placeholder \
             "ithome-ai:$REVISION" python scripts/smoke.py --embedding

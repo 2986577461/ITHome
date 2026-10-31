@@ -161,7 +161,8 @@ class Deployment:
         run(["docker", "run", "--rm", "--network", "none", "--memory", "1536m", "--cpus", "2",
              "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
              "-e", "DEEPSEEK_API_KEY=smoke-placeholder", "-e", "TAVILY_API_KEY=smoke-placeholder",
-             "--entrypoint", "python", image["Id"], "scripts/smoke.py", "--embedding"], timeout=240)
+             "--entrypoint", "python", image["Id"], "scripts/smoke.py", "--embedding",
+             "--storage-version", storage_version], timeout=240)
         return {"revision": revision, "image": image["Id"], "storage_version": storage_version,
                 "legacy_prompt": False}
 
