@@ -71,5 +71,5 @@ RUN_RAG_MODEL_TESTS=1 python3 -m pytest ai-backend/tests/test_document_ingestion
 - SQLite 与 Milvus 没有共享事务。上传失败会尽力清理部分向量，但若清理也失败，仍可能留下孤立向量。检索会按文档 ID 和上传者过滤不匹配的片段，但不能识别同一上传者、同一文档 ID 复用时的残留；孤立片段还可能占用 top-k 名额。向量删除成功后 SQLite 提交失败，也需要重试或后续修复机制。
 - 共享列表直接查询数据库，不再使用原有用户列表缓存；全文会重新校验文档存在性。
 - 上传有单文件限制，但未加入总存储配额、入口请求体限制或全局向量化任务并发预算。大 JSON 仍需在反向代理层限制请求体大小。
-- HTML 清洗是当前前端展示入口的防护，不等于 Java 发布接口已加入服务端清洗；服务端清洗仍属已知边界，不在本轮 Harness 范围。
+- 前端展示使用 DOMPurify；后续 Java 修复已在文章新增/修改服务层加入 jsoup 白名单清洗（见 `../../backend/HTML_SANITIZATION.md`）。这不属于 Harness 执行治理；历史数据未批量改写，且 HTML 清洗不保证文章事实正确或发布获得授权。
 - 自动测试未覆盖真实 Java 登录、真实 embedding 模型、LLM 或浏览器端完整联调。未执行生产构建。

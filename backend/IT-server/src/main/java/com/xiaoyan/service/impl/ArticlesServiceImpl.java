@@ -12,6 +12,7 @@ import com.xiaoyan.exception.ParameterException;
 import com.xiaoyan.mapper.ArticleMapper;
 import com.xiaoyan.pojo.Article;
 import com.xiaoyan.pojo.StudentFile;
+import com.xiaoyan.security.ArticleHtmlSanitizer;
 import com.xiaoyan.service.ArticlesService;
 import com.xiaoyan.service.CommentsService;
 import com.xiaoyan.service.CommonService;
@@ -69,6 +70,7 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
     @Transactional
     public void upload(ArticleDTO articleDTO) {
         Article article = BeanUtil.toBean(articleDTO, Article.class);
+        article.setContent(ArticleHtmlSanitizer.sanitize(articleDTO.getContent()));
         String studentId = BaseContext.getCurrentStudentId();
         article.setStudentId(studentId);
 
@@ -126,15 +128,17 @@ public class ArticlesServiceImpl extends ServiceImpl<ArticleMapper, Article>
         }
         usersService.checkOwnerOrAdmin(oldArticle.getStudentId());
 
-        // 先计算需要删除的文件，等数据库事务提交后再删除
+        String cleanContent = ArticleHtmlSanitizer.sanitize(articleDTO.getContent());
+        // Compare against the content actually being stored, not discarded unsafe HTML.
         Set<String> oldObjectNames = extractObjectNames(oldArticle.getContent());
-        Set<String> newObjectNames = extractObjectNames(articleDTO.getContent());
+        Set<String> newObjectNames = extractObjectNames(cleanContent);
         List<String> toDelete = oldObjectNames.stream()
                 .filter(name -> !newObjectNames.contains(name))
                 .toList();
 
         // 更新文章
         Article article = BeanUtil.toBean(articleDTO, Article.class);
+        article.setContent(cleanContent);
         article.setUpdatedDateTime(LocalDateTime.now());
         if (articleMapper.updateById(article) == 1) {
             redisUtil.evict(CACHE_ARTICLE_PAGES);
